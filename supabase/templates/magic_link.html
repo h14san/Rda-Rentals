@@ -1,0 +1,18 @@
+<!--
+  Sign-in code for returning users.
+
+  Deliberately renders {{ .Token }} and NOT {{ .ConfirmationURL }}. The default
+  Supabase template is a magic link pointing at Site URL, which is meaningless
+  for a native app — there is no localhost:3000 on a phone, and a link cannot
+  hand a session back to the app without deep-link plumbing. A typed code works
+  identically on email and SMS, which is what lets the auth channel switch with
+  one env var. See src/lib/auth.ts.
+-->
+<h2>Your Rwanda Rentals sign-in code</h2>
+<p>Enter this code in the app to sign in:</p>
+<p style="font-size: 32px; font-weight: 700; letter-spacing: 6px; margin: 24px 0;">
+  {{ .Token }}
+</p>
+<p style="color: #6B7280; font-size: 14px;">
+  The code expires in one hour. If you did not request it, you can ignore this email.
+</p>

@@ -14,7 +14,7 @@ import {
 } from '@/features/listings/types';
 import { formatPriceCompact } from '@/lib/format';
 import { KIGALI_DISTRICTS, sectorsFor } from '@/lib/locations';
-import { colors, fontSize, spacing } from '@/theme';
+import { colors, fontFamily, fontSize, spacing } from '@/theme';
 
 const BEDROOM_OPTIONS = [0, 1, 2, 3, 4] as const;
 
@@ -147,7 +147,9 @@ export default function FiltersScreen() {
                 label={PROPERTY_TYPE_LABELS[type]}
                 selected={draft.propertyType === type}
                 onPress={() =>
-                  patch({ propertyType: draft.propertyType === type ? null : type })
+                  patch({
+                    propertyType: draft.propertyType === type ? null : type,
+                  })
                 }
               />
             ))}
@@ -162,7 +164,9 @@ export default function FiltersScreen() {
                 key={n}
                 label={n === 0 ? 'Studio' : `${n}+`}
                 selected={draft.minBedrooms === n}
-                onPress={() => patch({ minBedrooms: draft.minBedrooms === n ? null : n })}
+                onPress={() =>
+                  patch({ minBedrooms: draft.minBedrooms === n ? null : n })
+                }
               />
             ))}
           </View>
@@ -202,9 +206,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  priceReadout: { fontSize: fontSize.md, fontWeight: '600', color: colors.softBlack },
-  clearLink: { fontSize: fontSize.sm, fontWeight: '600', color: colors.muted },
-  sliderLabel: { fontSize: fontSize.xs, color: colors.muted },
+  priceReadout: {
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.semibold,
+    color: colors.softBlack,
+  },
+  clearLink: {
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.semibold,
+    color: colors.muted,
+  },
+  sliderLabel: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xs,
+    color: colors.muted,
+  },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   footer: {
     flexDirection: 'row',

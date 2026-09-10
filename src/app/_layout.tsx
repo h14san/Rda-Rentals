@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -8,7 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LoadingState } from '@/components/states';
 import { AuthProvider, useAuth } from '@/features/auth/context';
 import { FiltersProvider } from '@/features/listings/filters-context';
-import { colors } from '@/theme';
+import { colors, fontAssets, type } from '@/theme';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -32,6 +33,9 @@ const queryClient = new QueryClient({
  */
 function AuthGate() {
   const { session, profile, initializing } = useAuth();
+  // Held behind the splash screen: rendering in the fallback face and then
+  // swapping to Inter reflows every screen, which looks like a bug.
+  const [fontsLoaded, fontError] = useFonts(fontAssets);
   // Typed as a tuple by typedRoutes; widen it to index freely.
   const segments = useSegments() as string[];
   const router = useRouter();
@@ -40,14 +44,16 @@ function AuthGate() {
   // A signed-in user whose profile row has not arrived yet is in neither state,
   // so hold rather than bounce them through the wrong screen.
   const profileLoading = !!session && !profile;
-  const ready = !initializing && !profileLoading;
+  // A font failure must not brick the app — fall through to the system face.
+  const ready = !initializing && !profileLoading && (fontsLoaded || !!fontError);
 
   useEffect(() => {
     if (!ready) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const onProfileSetup = segments[1] === 'profile-setup';
-    const profileIncomplete = !!profile && (!profile.full_name || !profile.whatsapp_phone);
+    const profileIncomplete =
+      !!profile && (!profile.full_name || !profile.whatsapp_phone);
 
     if (!session && !inAuthGroup) {
       router.replace('/sign-in');
@@ -72,6 +78,7 @@ function AuthGate() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.white },
         headerTintColor: colors.softBlack,
+        headerTitleStyle: type.h2,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.white },
       }}

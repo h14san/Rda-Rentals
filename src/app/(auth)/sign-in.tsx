@@ -19,7 +19,7 @@ import {
   normalizeIdentifier,
   requestCode,
 } from '@/lib/auth';
-import { colors, fontSize, spacing } from '@/theme';
+import { colors, fontFamily, fontSize, spacing } from '@/theme';
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -56,7 +56,10 @@ export default function SignInScreen() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.header}>
             <Text style={styles.brand}>Rwanda Rentals</Text>
             <Text style={styles.tagline}>
@@ -74,7 +77,9 @@ export default function SignInScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType={AUTH_CHANNEL === 'phone' ? 'phone-pad' : 'email-address'}
-            textContentType={AUTH_CHANNEL === 'phone' ? 'telephoneNumber' : 'emailAddress'}
+            textContentType={
+              AUTH_CHANNEL === 'phone' ? 'telephoneNumber' : 'emailAddress'
+            }
             onSubmitEditing={onSubmit}
             returnKeyType="go"
           />
@@ -93,9 +98,28 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.white },
   flex: { flex: 1 },
-  content: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg, gap: spacing.lg },
+  content: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: spacing.lg,
+    gap: spacing.lg,
+  },
   header: { gap: spacing.sm, marginBottom: spacing.md },
-  brand: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.softBlack },
-  tagline: { fontSize: fontSize.md, color: colors.muted, lineHeight: 24 },
-  legal: { fontSize: fontSize.xs, color: colors.muted, textAlign: 'center' },
+  brand: {
+    fontSize: fontSize.xxl,
+    fontFamily: fontFamily.bold,
+    color: colors.softBlack,
+  },
+  tagline: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.md,
+    color: colors.muted,
+    lineHeight: 24,
+  },
+  legal: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xs,
+    color: colors.muted,
+    textAlign: 'center',
+  },
 });

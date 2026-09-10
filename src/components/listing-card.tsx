@@ -1,13 +1,10 @@
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import {
-  PROPERTY_TYPE_LABELS,
-  type ListingWithImages,
-} from '@/features/listings/types';
+import { listingFacts, type ListingWithImages } from '@/features/listings/types';
 import { formatLocation, formatPrice } from '@/lib/format';
 import { imageUrl } from '@/lib/supabase';
-import { colors, fontSize, radius, shadow, spacing } from '@/theme';
+import { colors, fontFamily, radius, shadow, spacing, type } from '@/theme';
 
 /**
  * Feed card: image-first, per the Airbnb-inspired direction in the framework
@@ -22,12 +19,7 @@ export function ListingCard({
   onPress: () => void;
 }) {
   const cover = listing.listing_images?.[0];
-  const bedrooms =
-    listing.bedrooms === null
-      ? null
-      : listing.bedrooms === 0
-        ? 'Studio'
-        : `${listing.bedrooms} bed${listing.bedrooms === 1 ? '' : 's'}`;
+  const facts = listingFacts(listing);
 
   return (
     <Pressable
@@ -69,14 +61,7 @@ export function ListingCard({
           {listing.title}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
-          {[
-            formatLocation(listing.sector, listing.district),
-            PROPERTY_TYPE_LABELS[listing.property_type],
-            bedrooms,
-            listing.furnished ? 'Furnished' : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
+          {[formatLocation(listing.sector, listing.district), ...facts].join(' · ')}
         </Text>
       </View>
     </Pressable>
@@ -93,13 +78,16 @@ const styles = StyleSheet.create({
   imageWrap: { position: 'relative' },
   image: {
     width: '100%',
-    aspectRatio: 4 / 3,
+    // Slightly taller than 4:3. Rental interiors are shot in portrait on a
+    // phone, and the extra height keeps a room readable instead of cropping it
+    // to a letterbox.
+    aspectRatio: 5 / 4,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
     backgroundColor: colors.lightGray,
   },
   imageFallback: { alignItems: 'center', justifyContent: 'center' },
-  imageFallbackText: { color: colors.muted, fontSize: fontSize.sm },
+  imageFallbackText: type.meta,
 
   featuredBadge: {
     position: 'absolute',
@@ -110,11 +98,23 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: radius.pill,
   },
-  featuredText: { fontSize: fontSize.xs, fontWeight: '700', color: colors.softBlack },
+  featuredText: {
+    ...type.caption,
+    fontFamily: fontFamily.bold,
+    color: colors.softBlack,
+  },
 
-  body: { padding: spacing.md, gap: 2 },
-  price: { fontSize: fontSize.lg, fontWeight: '700', color: colors.softBlack },
-  perMonth: { fontSize: fontSize.sm, fontWeight: '400', color: colors.muted },
-  title: { fontSize: fontSize.md, color: colors.charcoal },
-  meta: { fontSize: fontSize.sm, color: colors.muted },
+  body: { padding: spacing.md, gap: spacing.xs },
+  // Price and "/ month" sit on one baseline, with the unit deliberately quiet:
+  // the figure is what gets scanned, the unit only disambiguates it.
+  price: type.price,
+  perMonth: {
+    ...type.meta,
+    fontFamily: fontFamily.medium,
+  },
+  title: {
+    ...type.bodyStrong,
+    color: colors.charcoal,
+  },
+  meta: type.meta,
 });

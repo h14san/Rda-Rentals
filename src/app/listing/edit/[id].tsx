@@ -21,7 +21,7 @@ import {
 } from '@/features/listings/types';
 import { formatPrice } from '@/lib/format';
 import { KIGALI_DISTRICTS, sectorsFor } from '@/lib/locations';
-import { colors, fontSize, spacing } from '@/theme';
+import { colors, fontFamily, fontSize, spacing } from '@/theme';
 
 /**
  * Edit an existing listing.
@@ -63,9 +63,7 @@ export default function EditListingScreen() {
   // RLS already blocks writing someone else's row, but failing here gives a
   // clear message instead of a policy error after the user has typed.
   if (listing.owner_id !== userId) {
-    return (
-      <ErrorState error={new Error('You can only edit your own listings.')} />
-    );
+    return <ErrorState error={new Error('You can only edit your own listings.')} />;
   }
 
   if (seededId !== listing.id) {
@@ -127,7 +125,10 @@ export default function EditListingScreen() {
     >
       <Stack.Screen options={{ title: 'Edit listing' }} />
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <TextField
           label="Title"
           value={title}
@@ -222,7 +223,11 @@ export default function EditListingScreen() {
           </View>
         )}
 
-        <TextField label="Address or landmark" value={address} onChangeText={setAddress} />
+        <TextField
+          label="Address or landmark"
+          value={address}
+          onChangeText={setAddress}
+        />
 
         <TextField
           label="Description"
@@ -234,7 +239,8 @@ export default function EditListingScreen() {
         />
 
         <Text style={styles.note}>
-          Photos cannot be changed here yet. Delete and repost the listing to replace them.
+          Photos cannot be changed here yet. Delete and repost the listing to replace
+          them.
         </Text>
       </ScrollView>
 
@@ -261,10 +267,23 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.white },
   content: { padding: spacing.md, paddingBottom: spacing.xl, gap: spacing.md },
   field: { gap: spacing.sm },
-  fieldLabel: { fontSize: fontSize.sm, fontWeight: '600', color: colors.charcoal },
+  fieldLabel: {
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.semibold,
+    color: colors.charcoal,
+  },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  textArea: { minHeight: 120, paddingTop: spacing.md, textAlignVertical: 'top' },
-  note: { fontSize: fontSize.xs, color: colors.muted, lineHeight: 18 },
+  textArea: {
+    minHeight: 120,
+    paddingTop: spacing.md,
+    textAlignVertical: 'top',
+  },
+  note: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xs,
+    color: colors.muted,
+    lineHeight: 18,
+  },
   flex: { flex: 1 },
   flexTwo: { flex: 2 },
   footer: {

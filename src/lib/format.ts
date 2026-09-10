@@ -39,6 +39,9 @@ export function timeAgo(iso: string): string {
 }
 
 /** Human location line: "Kimironko, Gasabo". */
-export function formatLocation(sector?: string | null, district?: string | null): string {
+export function formatLocation(
+  sector?: string | null,
+  district?: string | null,
+): string {
   return [sector, district].filter(Boolean).join(', ') || 'Location not set';
 }

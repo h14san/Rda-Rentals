@@ -1,18 +1,32 @@
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ListingCard } from '@/components/listing-card';
 import { EmptyState, ErrorState, ListingCardSkeleton } from '@/components/states';
 import { Chip } from '@/components/ui';
 import { useFilters } from '@/features/listings/filters-context';
-import { SORT_LABELS, useListingsFeed, type SortOrder } from '@/features/listings/queries';
+import {
+  SORT_LABELS,
+  useListingsFeed,
+  type SortOrder,
+} from '@/features/listings/queries';
+import { isEmptyResult, useSmartSearch } from '@/features/listings/smart-search';
 import { activeFilterCount } from '@/features/listings/types';
 import { LAUNCH_SECTORS, districtForSector } from '@/lib/locations';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { colors, radius, spacing, type } from '@/theme';
 
 const SORT_CYCLE: SortOrder[] = ['newest', 'price_asc', 'price_desc'];
 
@@ -23,7 +37,45 @@ function nextSort(current: SortOrder): SortOrder {
 
 export default function FeedScreen() {
   const router = useRouter();
-  const { filters, setFilters, resetFilters, sort, setSort } = useFilters();
+  const {
+    filters,
+    setFilters,
+    resetFilters,
+    sort,
+    setSort,
+    interpretation,
+    setInterpretation,
+  } = useFilters();
+
+  const [searchText, setSearchText] = useState('');
+  const smartSearch = useSmartSearch();
+
+  function runSmartSearch() {
+    const query = searchText.trim();
+    if (!query || smartSearch.isPending) return;
+
+    smartSearch.mutate(query, {
+      onSuccess: (result) => {
+        if (isEmptyResult(result)) {
+          // Applying an all-null filter would silently reset the feed and look
+          // like the search did nothing.
+          Alert.alert(
+            'No filters found',
+            'Try naming a price, area, or property type — for example "2 bedroom in Remera under 300,000".',
+          );
+          return;
+        }
+        setFilters(result.filters);
+        setInterpretation(result.interpretation || null);
+      },
+      onError: (error) => Alert.alert('Search failed', error.message),
+    });
+  }
+
+  function clearSearch() {
+    setSearchText('');
+    resetFilters();
+  }
 
   const {
     data,
@@ -74,6 +126,46 @@ export default function FeedScreen() {
           </Pressable>
         </View>
 
+        <View style={styles.searchRow}>
+          <Ionicons name="sparkles-outline" size={18} color={colors.muted} />
+          <TextInput
+            style={styles.searchInput}
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Try: cheap studio near Kimironko"
+            placeholderTextColor={colors.muted}
+            returnKeyType="search"
+            onSubmitEditing={runSmartSearch}
+            editable={!smartSearch.isPending}
+          />
+          {smartSearch.isPending ? (
+            <ActivityIndicator size="small" color={colors.muted} />
+          ) : searchText.length > 0 ? (
+            <Pressable
+              onPress={clearSearch}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Ionicons name="close-circle" size={18} color={colors.muted} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {!!interpretation && (
+          <View style={styles.interpretation}>
+            <Text style={styles.interpretationText} numberOfLines={2}>
+              {interpretation}
+            </Text>
+            <Pressable
+              onPress={clearSearch}
+              accessibilityRole="button"
+              accessibilityLabel="Clear smart search"
+            >
+              <Text style={styles.clearLink}>Clear</Text>
+            </Pressable>
+          </View>
+        )}
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -92,9 +184,7 @@ export default function FeedScreen() {
         {!isPending && !isError && (
           <View style={styles.resultRow}>
             <Text style={styles.resultCount}>
-              {total === 0
-                ? 'No rentals'
-                : `${total} rental${total === 1 ? '' : 's'}`}
+              {total === 0 ? 'No rentals' : `${total} rental${total === 1 ? '' : 's'}`}
             </Text>
 
             <Pressable
@@ -103,7 +193,11 @@ export default function FeedScreen() {
               onPress={() => setSort(nextSort(sort))}
               style={({ pressed }) => [styles.sortButton, pressed && { opacity: 0.7 }]}
             >
-              <Ionicons name="swap-vertical-outline" size={16} color={colors.charcoal} />
+              <Ionicons
+                name="swap-vertical-outline"
+                size={16}
+                color={colors.charcoal}
+              />
               <Text style={styles.sortLabel}>{SORT_LABELS[sort]}</Text>
             </Pressable>
           </View>
@@ -172,8 +266,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
   },
-  title: { fontSize: fontSize.xl, fontWeight: '700', color: colors.softBlack },
-  subtitle: { fontSize: fontSize.sm, color: colors.muted },
+  title: type.h1,
+  subtitle: type.meta,
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -184,7 +278,31 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.pill,
   },
-  filterLabel: { fontSize: fontSize.sm, fontWeight: '600', color: colors.softBlack },
+  filterLabel: type.label,
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    paddingHorizontal: spacing.md,
+    height: 48,
+    borderRadius: radius.pill,
+    backgroundColor: colors.lightGray,
+  },
+  searchInput: { flex: 1, ...type.body, paddingVertical: 0 },
+  interpretation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  interpretationText: { ...type.meta, flex: 1, color: colors.charcoal },
+  clearLink: type.label,
   chipRow: { paddingHorizontal: spacing.md, gap: spacing.sm },
   resultRow: {
     flexDirection: 'row',
@@ -192,9 +310,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
   },
-  resultCount: { fontSize: fontSize.sm, color: colors.muted, fontWeight: '500' },
+  resultCount: type.meta,
   sortButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  sortLabel: { fontSize: fontSize.sm, fontWeight: '600', color: colors.charcoal },
+  sortLabel: type.label,
   listContent: { padding: spacing.md },
   listPadding: { padding: spacing.md },
   footer: { paddingVertical: spacing.lg },

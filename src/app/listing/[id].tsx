@@ -8,14 +8,11 @@ import { ImageCarousel } from '@/components/image-carousel';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, SectionTitle } from '@/components/ui';
 import { useListingDetail } from '@/features/listings/queries';
-import {
-  LISTING_STATUS_LABELS,
-  PROPERTY_TYPE_LABELS,
-} from '@/features/listings/types';
+import { LISTING_STATUS_LABELS, listingFacts } from '@/features/listings/types';
 import { openPhoneCall, openWhatsApp } from '@/lib/contact';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { openInMaps } from '@/lib/maps';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
 
 /** Collapsed height for a long description, in lines. */
 const DESCRIPTION_LINES = 6;
@@ -41,7 +38,8 @@ export default function ListingDetailScreen() {
 
   const location = formatLocation(listing.sector, listing.district);
   const hasCoords = listing.latitude !== null && listing.longitude !== null;
-  const contactPhone = listing.profiles?.whatsapp_phone ?? listing.profiles?.phone ?? null;
+  const contactPhone =
+    listing.profiles?.whatsapp_phone ?? listing.profiles?.phone ?? null;
 
   const contactContext = {
     listingTitle: listing.title,
@@ -49,15 +47,7 @@ export default function ListingDetailScreen() {
     location,
   };
 
-  const facts = [
-    PROPERTY_TYPE_LABELS[listing.property_type],
-    listing.bedrooms === null
-      ? null
-      : listing.bedrooms === 0
-        ? 'Studio'
-        : `${listing.bedrooms} bedroom${listing.bedrooms === 1 ? '' : 's'}`,
-    listing.furnished ? 'Furnished' : 'Unfurnished',
-  ].filter(Boolean) as string[];
+  const facts = listingFacts(listing);
 
   return (
     <View style={styles.container}>
@@ -72,6 +62,7 @@ export default function ListingDetailScreen() {
               {formatPrice(listing.price_rwf)}
               <Text style={styles.perMonth}> / month</Text>
             </Text>
+            <View style={styles.priceRule} />
             <Text style={styles.title}>{listing.title}</Text>
             <Text style={styles.location}>{location}</Text>
             {!!listing.address && <Text style={styles.address}>{listing.address}</Text>}
@@ -163,7 +154,6 @@ export default function ListingDetailScreen() {
               </Pressable>
             </View>
           )}
-
         </View>
       </ScrollView>
 
@@ -201,19 +191,42 @@ const styles = StyleSheet.create({
   body: { padding: spacing.md, gap: spacing.lg },
 
   headerBlock: { gap: 2 },
-  price: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.softBlack },
-  perMonth: { fontSize: fontSize.md, fontWeight: '400', color: colors.muted },
-  title: { fontSize: fontSize.lg, color: colors.charcoal, marginTop: spacing.xs },
-  location: { fontSize: fontSize.md, color: colors.charcoal },
-  address: { fontSize: fontSize.sm, color: colors.muted },
-  posted: { fontSize: fontSize.xs, color: colors.muted, marginTop: spacing.xs },
+  // The single warm mark in the app, anchored to the price. Short and heavy
+  // rather than a full-width divider: it should read as an underline on the
+  // number, not as a section break.
+  priceRule: {
+    width: 44,
+    height: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.gold,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  price: type.priceHero,
+  perMonth: {
+    ...type.body,
+    color: colors.muted,
+  },
+  title: {
+    ...type.h2,
+    marginTop: spacing.xs,
+  },
+  location: type.body,
+  address: type.meta,
+  posted: {
+    ...type.caption,
+    marginTop: spacing.xs,
+  },
 
   statusBanner: {
     backgroundColor: colors.lightGray,
     borderRadius: radius.md,
     padding: spacing.md,
   },
-  statusText: { color: colors.charcoal, fontSize: fontSize.sm, fontWeight: '600' },
+  statusText: {
+    ...type.label,
+    color: colors.charcoal,
+  },
 
   factRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   factPill: {
@@ -222,12 +235,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
   },
-  factText: { fontSize: fontSize.sm, color: colors.charcoal },
+  factText: type.label,
 
   section: { gap: spacing.sm },
-  description: { fontSize: fontSize.md, color: colors.charcoal, lineHeight: 24 },
-  readMore: { fontSize: fontSize.sm, fontWeight: '600', color: colors.softBlack },
-  mapWrap: { position: 'relative', borderRadius: radius.md, overflow: 'hidden' },
+  description: type.body,
+  readMore: {
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.semibold,
+    color: colors.softBlack,
+  },
+  mapWrap: {
+    position: 'relative',
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
   map: { width: '100%', height: 200 },
   mapHint: {
     position: 'absolute',
@@ -241,7 +262,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: radius.pill,
   },
-  mapHintText: { color: colors.white, fontSize: fontSize.xs, fontWeight: '600' },
+  mapHintText: {
+    color: colors.white,
+    fontSize: fontSize.xs,
+    fontFamily: fontFamily.semibold,
+  },
 
   cta: {
     flexDirection: 'row',
@@ -257,6 +282,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     color: colors.muted,
+    fontFamily: fontFamily.regular,
     fontSize: fontSize.sm,
     paddingVertical: spacing.md,
   },

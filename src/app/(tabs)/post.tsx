@@ -30,11 +30,12 @@ import { listingKeys } from '@/features/listings/queries';
 import {
   PROPERTY_TYPES,
   PROPERTY_TYPE_LABELS,
+  listingFacts,
   type PropertyType,
 } from '@/features/listings/types';
 import { formatPrice } from '@/lib/format';
 import { KIGALI_CENTER, KIGALI_DISTRICTS, sectorsFor } from '@/lib/locations';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
 
 type Step = 'photos' | 'details' | 'location' | 'review';
 
@@ -66,7 +67,10 @@ export default function PostListingScreen() {
   const [district, setDistrict] = useState<string | null>(null);
   const [sector, setSector] = useState<string | null>(null);
   const [address, setAddress] = useState('');
-  const [pin, setPin] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [pin, setPin] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -169,7 +173,9 @@ export default function PostListingScreen() {
       setProgress('Publishing…');
       await publishListing(draft.id);
 
-      await queryClient.invalidateQueries({ queryKey: listingKeys.mine(userId) });
+      await queryClient.invalidateQueries({
+        queryKey: listingKeys.mine(userId),
+      });
       await queryClient.invalidateQueries({ queryKey: ['listings', 'feed'] });
 
       resetForm();
@@ -200,20 +206,27 @@ export default function PostListingScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <SectionTitle>{STEP_TITLES[step]}</SectionTitle>
 
         {step === 'photos' && (
           <View style={styles.section}>
             <Text style={styles.help}>
-              Add up to {MAX_IMAGES} photos. They are resized before upload, so this works
-              on a slow connection.
+              Add up to {MAX_IMAGES} photos. They are resized before upload, so this
+              works on a slow connection.
             </Text>
 
             <View style={styles.thumbGrid}>
               {images.map((img, index) => (
                 <View key={`${img.uri}-${index}`} style={styles.thumbWrap}>
-                  <Image source={{ uri: img.uri }} style={styles.thumb} contentFit="cover" />
+                  <Image
+                    source={{ uri: img.uri }}
+                    style={styles.thumb}
+                    contentFit="cover"
+                  />
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`Remove photo ${index + 1}`}
@@ -379,7 +392,8 @@ export default function PostListingScreen() {
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>Drop a pin</Text>
                 <Text style={styles.help}>
-                  Tap the map where the property is. Tenants see this pin on the listing.
+                  Tap the map where the property is. Tenants see this pin on the
+                  listing.
                 </Text>
                 <MapView
                   provider={PROVIDER_GOOGLE}
@@ -413,12 +427,14 @@ export default function PostListingScreen() {
                 <Text style={styles.reviewMeta}>
                   {[
                     [sector, district].filter(Boolean).join(', ') || 'Location not set',
-                    propertyType ? PROPERTY_TYPE_LABELS[propertyType] : null,
-                    bedrooms === null ? null : bedrooms === 0 ? 'Studio' : `${bedrooms} bed`,
-                    furnished ? 'Furnished' : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
+                    ...(propertyType
+                      ? listingFacts({
+                          property_type: propertyType,
+                          bedrooms,
+                          furnished,
+                        })
+                      : []),
+                  ].join(' · ')}
                 </Text>
                 <Text style={styles.reviewMeta}>
                   {images.length} photo{images.length === 1 ? '' : 's'}
@@ -474,15 +490,37 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   flexTwo: { flex: 2 },
   field: { gap: spacing.sm },
-  fieldLabel: { fontSize: fontSize.sm, fontWeight: '600', color: colors.charcoal },
+  fieldLabel: {
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.semibold,
+    color: colors.charcoal,
+  },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  help: { fontSize: fontSize.sm, color: colors.muted, lineHeight: 20 },
-  error: { color: colors.danger, fontSize: fontSize.xs },
-  textArea: { minHeight: 120, paddingTop: spacing.md, textAlignVertical: 'top' },
+  help: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+    lineHeight: 20,
+  },
+  error: {
+    color: colors.danger,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xs,
+  },
+  textArea: {
+    minHeight: 120,
+    paddingTop: spacing.md,
+    textAlignVertical: 'top',
+  },
 
   thumbGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   thumbWrap: { position: 'relative' },
-  thumb: { width: 96, height: 96, borderRadius: radius.md, backgroundColor: colors.lightGray },
+  thumb: {
+    width: 96,
+    height: 96,
+    borderRadius: radius.md,
+    backgroundColor: colors.lightGray,
+  },
   thumbRemove: {
     position: 'absolute',
     top: 4,
@@ -498,12 +536,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 4,
     left: 4,
-    backgroundColor: colors.gold,
+    // Neutral, not gold. The accent is reserved for featured placement and the
+    // price rule; spending it on a build-time affordance dilutes both.
+    backgroundColor: 'rgba(17,24,39,0.8)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radius.pill,
   },
-  coverText: { fontSize: 10, fontWeight: '700', color: colors.softBlack },
+  coverText: {
+    fontSize: 10,
+    fontFamily: fontFamily.bold,
+    color: colors.softBlack,
+  },
 
   pickerMap: { width: '100%', height: 240, borderRadius: radius.md },
 
@@ -513,13 +557,38 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     overflow: 'hidden',
   },
-  reviewImage: { width: '100%', aspectRatio: 4 / 3, backgroundColor: colors.lightGray },
+  reviewImage: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    backgroundColor: colors.lightGray,
+  },
   reviewBody: { padding: spacing.md, gap: 2 },
-  reviewPrice: { fontSize: fontSize.lg, fontWeight: '700', color: colors.softBlack },
-  reviewPerMonth: { fontSize: fontSize.sm, fontWeight: '400', color: colors.muted },
-  reviewTitle: { fontSize: fontSize.md, color: colors.charcoal },
-  reviewMeta: { fontSize: fontSize.sm, color: colors.muted },
-  progressText: { fontSize: fontSize.sm, color: colors.charcoal, textAlign: 'center' },
+  reviewPrice: {
+    fontSize: fontSize.lg,
+    fontFamily: fontFamily.bold,
+    color: colors.softBlack,
+  },
+  reviewPerMonth: {
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.regular,
+    color: colors.muted,
+  },
+  reviewTitle: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.md,
+    color: colors.charcoal,
+  },
+  reviewMeta: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+  },
+  progressText: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    color: colors.charcoal,
+    textAlign: 'center',
+  },
 
   footer: {
     flexDirection: 'row',

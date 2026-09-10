@@ -38,7 +38,11 @@ export async function pickImages(remainingSlots: number): Promise<PickedImage[]>
   });
 
   if (result.canceled) return [];
-  return result.assets.map((a) => ({ uri: a.uri, width: a.width, height: a.height }));
+  return result.assets.map((a) => ({
+    uri: a.uri,
+    width: a.width,
+    height: a.height,
+  }));
 }
 
 /** Opens the camera for a single shot. */
@@ -46,7 +50,10 @@ export async function captureImage(): Promise<PickedImage | null> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) return null;
 
-  const result = await ImagePicker.launchCameraAsync({ quality: 1, exif: false });
+  const result = await ImagePicker.launchCameraAsync({
+    quality: 1,
+    exif: false,
+  });
   if (result.canceled || !result.assets[0]) return null;
 
   const a = result.assets[0];
@@ -152,7 +159,10 @@ export async function uploadListingImages(
 
     const { error: uploadError } = await supabase.storage
       .from('listing-images')
-      .upload(path, decode(base64), { contentType: 'image/jpeg', upsert: true });
+      .upload(path, decode(base64), {
+        contentType: 'image/jpeg',
+        upsert: true,
+      });
 
     if (uploadError) throw uploadError;
 

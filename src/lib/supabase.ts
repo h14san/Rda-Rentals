@@ -48,5 +48,6 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 
 /** Public URL for an object in the listing-images bucket. */
 export function imageUrl(storagePath: string): string {
-  return supabase.storage.from('listing-images').getPublicUrl(storagePath).data.publicUrl;
+  return supabase.storage.from('listing-images').getPublicUrl(storagePath).data
+    .publicUrl;
 }

@@ -35,7 +35,10 @@ function defaultMessage({ listingTitle, priceRwf, location }: ContactContext): s
   );
 }
 
-export async function openWhatsApp(phone: string, context: ContactContext): Promise<void> {
+export async function openWhatsApp(
+  phone: string,
+  context: ContactContext,
+): Promise<void> {
   const url = `https://wa.me/${waNumber(phone)}?text=${encodeURIComponent(
     defaultMessage(context),
   )}`;

@@ -47,3 +47,6 @@ example
 
 # Supabase personal access token (local only)
 .supabase-token
+
+# Microsoft Office lock files (created while a doc is open)
+~$*

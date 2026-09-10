@@ -82,7 +82,8 @@ export function normalizeIdentifier(raw: string): string | null {
   return EMAIL_RE.test(trimmed) ? trimmed.toLowerCase() : null;
 }
 
-export const IDENTIFIER_LABEL = AUTH_CHANNEL === 'phone' ? 'Phone number' : 'Email address';
+export const IDENTIFIER_LABEL =
+  AUTH_CHANNEL === 'phone' ? 'Phone number' : 'Email address';
 
 export const IDENTIFIER_PLACEHOLDER =
   AUTH_CHANNEL === 'phone' ? '0788 123 456' : 'you@example.com';
@@ -109,11 +110,20 @@ export async function requestCode(identifier: string): Promise<void> {
 export async function verifyCode(identifier: string, code: string): Promise<Session> {
   const { data, error } =
     AUTH_CHANNEL === 'phone'
-      ? await supabase.auth.verifyOtp({ phone: identifier, token: code, type: 'sms' })
-      : await supabase.auth.verifyOtp({ email: identifier, token: code, type: 'email' });
+      ? await supabase.auth.verifyOtp({
+          phone: identifier,
+          token: code,
+          type: 'sms',
+        })
+      : await supabase.auth.verifyOtp({
+          email: identifier,
+          token: code,
+          type: 'email',
+        });
 
   if (error) throw error;
-  if (!data.session) throw new Error('Verification succeeded but no session was returned.');
+  if (!data.session)
+    throw new Error('Verification succeeded but no session was returned.');
   return data.session;
 }
 

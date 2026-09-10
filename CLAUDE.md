@@ -14,8 +14,10 @@ is not built.
 
 ## Two source docs, one wins
 
-`docs/Rwanda_Rentals_Brief.docx` is authoritative: React Native + Supabase +
-Claude API. `docs/Rwanda Rentals App – Developer Framework.docx` is the older
+`docs/Rwanda_Rentals_Brief.docx` is authoritative: React Native + Supabase, plus
+AI features. The brief names the Claude API; the build uses **Gemini** instead,
+chosen for its free tier. The provider is isolated inside the `smart-search`
+Edge Function — nothing in the app knows or cares which model answers. `docs/Rwanda Rentals App – Developer Framework.docx` is the older
 spec (Flutter + Firebase, no AI) and is **superseded** — consult it only for UI
 direction and the colour palette. If a request seems to assume Flutter or
 Firestore, that is the stale doc talking; say so rather than switching stacks.
@@ -149,11 +151,40 @@ uploads on a weak connection stall each other.
 returns false without one, so the scheme route fails on exactly the devices that
 do have WhatsApp. Call is a separate button, not a fallback.
 
-## Phase 3 constraints (read before adding AI)
+## Smart search (built)
 
-**The Claude API key must never enter the app bundle** — anything shipped in a
-React Native app is extractable. Call Claude from a Supabase Edge Function
-holding `ANTHROPIC_API_KEY` as a secret.
+Natural-language search runs in the `smart-search` Edge Function
+(`supabase/functions/smart-search/`), which holds `GEMINI_API_KEY` (Google AI Studio free tier). **The key
+must never enter the app bundle** — anything shipped in React Native is
+extractable.
+
+The model's only job is to emit a `Filters` object; the existing listings query
+does the searching. Smart search and the manual filter sheet are therefore one
+code path, so a bad parse degrades to a normal inspectable filter rather than a
+mystery result set. The app re-validates the response with its own
+`filtersSchema` before applying it — the function shapes the output, the app
+decides what is valid.
+
+Kigali place names are sent *from* the app (`src/lib/locations.ts`) rather than
+duplicated in the function, so there is one source of truth for the vocabulary
+the model is allowed to use.
+
+**Gemini model names expire for new API keys.** `gemini-2.5-flash` returned
+404 "no longer available to new users" on a 2026 key; the default is now
+`gemini-3.6-flash`. A 404 here means the model name, not the code. `GEMINI_MODEL`
+overrides it without a redeploy.
+
+**Never return raw provider errors to the client** — they are verbose and can
+echo request internals. They go to the function logs; the client gets a short
+message it can act on. (There is no `supabase functions logs` subcommand, so
+diagnosing means temporarily returning the detail, then removing it.)
+
+Deploy with `npx supabase functions deploy smart-search`; Docker is not needed.
+`supabase/functions` is excluded from both `tsconfig.json` and
+`eslint.config.js` — it is Deno, with `npm:` specifiers and a `Deno` global that
+the app's toolchain cannot resolve.
+
+## Remaining Phase 3 constraints
 
 **Sort is not part of `Filters`.** It lives beside it in `filters-context`,
 because `Filters` is the shape Phase 3's parser targets and it should describe

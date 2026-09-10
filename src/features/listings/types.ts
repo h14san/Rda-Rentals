@@ -90,7 +90,9 @@ export type Database = {
       };
       listings: {
         Row: ListingRow;
-        Insert: Omit<ListingRow, 'id' | 'created_at' | 'updated_at'> & { id?: string };
+        Insert: Omit<ListingRow, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+        };
         Update: Partial<Omit<ListingRow, 'id' | 'owner_id'>>;
         Relationships: [];
       };
@@ -146,5 +148,41 @@ export function activeFilterCount(f: Filters): number {
   ].filter(Boolean).length;
 }
 
+/**
+ * The short descriptive facts shown on a card, a detail page, and the post
+ * review step.
+ *
+ * Deduplicated on purpose: a studio has property_type 'studio' AND bedrooms 0,
+ * and both render as "Studio". Left alone that produced "Studio · Studio" in
+ * the UI, and — because the detail page keys its pills by value — a duplicate
+ * React key error that took down the whole screen.
+ */
+export function listingFacts(listing: {
+  property_type: PropertyType;
+  bedrooms: number | null;
+  furnished: boolean;
+}): string[] {
+  const bedrooms =
+    listing.bedrooms === null
+      ? null
+      : listing.bedrooms === 0
+        ? 'Studio'
+        : `${listing.bedrooms} bedroom${listing.bedrooms === 1 ? '' : 's'}`;
+
+  return [
+    ...new Set(
+      [
+        PROPERTY_TYPE_LABELS[listing.property_type],
+        bedrooms,
+        listing.furnished ? 'Furnished' : 'Unfurnished',
+      ].filter((f): f is string => f !== null),
+    ),
+  ];
+}
+
 /** Price bounds for the range slider, in RWF, tuned to the Kigali market. */
-export const PRICE_BOUNDS = { min: 20_000, max: 1_000_000, step: 10_000 } as const;
+export const PRICE_BOUNDS = {
+  min: 20_000,
+  max: 1_000_000,
+  step: 10_000,
+} as const;

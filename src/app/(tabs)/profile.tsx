@@ -19,7 +19,7 @@ import {
 import { formatRwandanPhone, normalizeRwandanPhone, signOut } from '@/lib/auth';
 import { formatLocation, formatPrice } from '@/lib/format';
 import { imageUrl, supabase } from '@/lib/supabase';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -220,8 +220,12 @@ export default function ProfileScreen() {
                       label={action}
                       variant="secondary"
                       style={styles.flex}
-                      loading={setStatus.isPending && setStatus.variables?.id === listing.id}
-                      onPress={() => setStatus.mutate({ id: listing.id, status: target })}
+                      loading={
+                        setStatus.isPending && setStatus.variables?.id === listing.id
+                      }
+                      onPress={() =>
+                        setStatus.mutate({ id: listing.id, status: target })
+                      }
                     />
                   )}
                 </View>
@@ -231,7 +235,9 @@ export default function ProfileScreen() {
                 <Button
                   label="Delete"
                   variant="danger"
-                  loading={deleteListing.isPending && deleteListing.variables === listing.id}
+                  loading={
+                    deleteListing.isPending && deleteListing.variables === listing.id
+                  }
                   onPress={() => confirmDelete(listing)}
                 />
               </View>
@@ -248,7 +254,11 @@ export default function ProfileScreen() {
           // a confirmation even though it destroys nothing.
           Alert.alert('Sign out?', 'You will need a new code to sign back in.', [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
+            {
+              text: 'Sign out',
+              style: 'destructive',
+              onPress: () => void signOut(),
+            },
           ])
         }
       />
@@ -266,8 +276,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   editForm: { gap: spacing.md },
-  name: { fontSize: fontSize.lg, fontWeight: '700', color: colors.softBlack },
-  contact: { fontSize: fontSize.sm, color: colors.muted, marginBottom: spacing.sm },
+  name: {
+    fontSize: fontSize.lg,
+    fontFamily: fontFamily.bold,
+    color: colors.softBlack,
+  },
+  contact: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+    marginBottom: spacing.sm,
+  },
 
   section: { gap: spacing.md },
   row: { flexDirection: 'row', gap: spacing.sm },
@@ -289,8 +308,16 @@ const styles = StyleSheet.create({
   },
   thumbFallback: { backgroundColor: colors.lightGray },
   listingInfo: { flex: 1, gap: 2 },
-  listingTitle: { fontSize: fontSize.md, fontWeight: '600', color: colors.softBlack },
-  listingMeta: { fontSize: fontSize.sm, color: colors.muted },
+  listingTitle: {
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.semibold,
+    color: colors.softBlack,
+  },
+  listingMeta: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+  },
   statusPill: {
     alignSelf: 'flex-start',
     marginTop: spacing.xs,
@@ -300,7 +327,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lightGray,
   },
   statusPillActive: { backgroundColor: colors.success },
-  statusPillText: { fontSize: fontSize.xs, fontWeight: '600', color: colors.charcoal },
+  statusPillText: {
+    fontSize: fontSize.xs,
+    fontFamily: fontFamily.semibold,
+    color: colors.charcoal,
+  },
   statusPillTextActive: { color: colors.white },
   listingActions: { flexDirection: 'row', gap: spacing.sm },
 });

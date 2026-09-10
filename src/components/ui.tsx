@@ -10,7 +10,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
 
 /* -------------------------------------------------------------------------- */
 /* Button                                                                     */
@@ -28,7 +28,10 @@ interface ButtonProps {
   icon?: ReactNode;
 }
 
-const BUTTON_COLORS: Record<ButtonVariant, { bg: string; fg: string; border?: string }> = {
+const BUTTON_COLORS: Record<
+  ButtonVariant,
+  { bg: string; fg: string; border?: string }
+> = {
   primary: { bg: colors.softBlack, fg: colors.white },
   secondary: { bg: colors.white, fg: colors.charcoal, border: colors.border },
   ghost: { bg: 'transparent', fg: colors.charcoal },
@@ -101,7 +104,9 @@ export function Chip({
         pressed && { opacity: 0.8 },
       ]}
     >
-      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>{label}</Text>
+      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -148,7 +153,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   buttonInner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  buttonLabel: { fontSize: fontSize.md, fontWeight: '600' },
+  buttonLabel: {
+    ...type.label,
+    fontSize: fontSize.md,
+  },
 
   chip: {
     paddingHorizontal: spacing.md,
@@ -158,30 +166,35 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.white,
   },
-  chipSelected: { backgroundColor: colors.softBlack, borderColor: colors.softBlack },
-  chipLabel: { color: colors.charcoal, fontSize: fontSize.sm, fontWeight: '500' },
+  chipSelected: {
+    backgroundColor: colors.softBlack,
+    borderColor: colors.softBlack,
+  },
+  chipLabel: type.label,
   chipLabelSelected: { color: colors.white },
 
   fieldWrap: { gap: spacing.xs },
-  fieldLabel: { fontSize: fontSize.sm, fontWeight: '600', color: colors.charcoal },
+  fieldLabel: type.label,
   input: {
     minHeight: 52,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
+    fontFamily: fontFamily.regular,
     fontSize: fontSize.md,
     color: colors.softBlack,
     backgroundColor: colors.white,
   },
   inputError: { borderColor: colors.danger },
-  fieldError: { color: colors.danger, fontSize: fontSize.xs },
-  fieldHint: { color: colors.muted, fontSize: fontSize.xs },
+  fieldError: {
+    ...type.caption,
+    color: colors.danger,
+  },
+  fieldHint: type.caption,
 
   sectionTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: colors.softBlack,
+    ...type.h2,
     marginBottom: spacing.sm,
   },
 });

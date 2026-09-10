@@ -73,7 +73,8 @@ export function useListingsFeed(filters: Filters, sort: SortOrder = 'newest') {
       if (filters.district) query = query.eq('district', filters.district);
       if (filters.sector) query = query.eq('sector', filters.sector);
       if (filters.propertyType) query = query.eq('property_type', filters.propertyType);
-      if (filters.minBedrooms !== null) query = query.gte('bedrooms', filters.minBedrooms);
+      if (filters.minBedrooms !== null)
+        query = query.gte('bedrooms', filters.minBedrooms);
       if (filters.furnishedOnly) query = query.eq('furnished', true);
 
       // Featured listings float to the top only under the default ordering.

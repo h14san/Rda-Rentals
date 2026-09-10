@@ -20,6 +20,13 @@ interface FiltersState {
   // match, not how to order the result.
   sort: SortOrder;
   setSort: (next: SortOrder) => void;
+  /**
+   * What smart search understood, shown back to the user. Held here so that
+   * clearing filters also clears the explanation — leaving a stale "studios
+   * under 150,000" banner above unfiltered results is worse than no banner.
+   */
+  interpretation: string | null;
+  setInterpretation: (next: string | null) => void;
 }
 
 const FiltersContext = createContext<FiltersState | null>(null);
@@ -27,16 +34,22 @@ const FiltersContext = createContext<FiltersState | null>(null);
 export function FiltersProvider({ children }: { children: ReactNode }) {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<SortOrder>('newest');
+  const [interpretation, setInterpretation] = useState<string | null>(null);
 
   const value = useMemo<FiltersState>(
     () => ({
       filters,
       setFilters,
-      resetFilters: () => setFilters(EMPTY_FILTERS),
+      resetFilters: () => {
+        setFilters(EMPTY_FILTERS);
+        setInterpretation(null);
+      },
       sort,
       setSort,
+      interpretation,
+      setInterpretation,
     }),
-    [filters, sort],
+    [filters, sort, interpretation],
   );
 
   return <FiltersContext.Provider value={value}>{children}</FiltersContext.Provider>;

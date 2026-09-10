@@ -20,7 +20,7 @@ import {
   requestCode,
   verifyCode,
 } from '@/lib/auth';
-import { colors, fontSize, spacing } from '@/theme';
+import { colors, fontFamily, fontSize, spacing } from '@/theme';
 
 /** Matches auth.email.max_frequency in supabase/config.toml. */
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -54,7 +54,9 @@ export default function VerifyScreen() {
     resendAt === null ? 0 : Math.max(0, Math.ceil((resendAt - now) / 1000));
 
   const display =
-    AUTH_CHANNEL === 'phone' && identifier ? formatRwandanPhone(identifier) : identifier;
+    AUTH_CHANNEL === 'phone' && identifier
+      ? formatRwandanPhone(identifier)
+      : identifier;
 
   async function onVerify() {
     if (code.length !== OTP_LENGTH) {
@@ -103,54 +105,54 @@ export default function VerifyScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-        <View style={styles.header}>
-          <Text style={styles.title}>Enter your code</Text>
-          <Text style={styles.subtitle}>
-            We sent a {OTP_LENGTH}-digit code to {display}.
-          </Text>
-        </View>
-
-        <TextField
-          label="Verification code"
-          error={error}
-          value={code}
-          onChangeText={(t) => setCode(t.replace(/[^\d]/g, '').slice(0, OTP_LENGTH))}
-          placeholder={"0".repeat(OTP_LENGTH)}
-          keyboardType="number-pad"
-          textContentType="oneTimeCode"
-          autoComplete="one-time-code"
-          maxLength={OTP_LENGTH}
-          style={styles.codeInput}
-          autoFocus
-        />
-
-        <Button
-          label="Verify"
-          onPress={onVerify}
-          loading={submitting}
-          disabled={code.length !== OTP_LENGTH}
-        />
-
-        <View style={styles.footer}>
-          <Pressable
-            onPress={onResend}
-            accessibilityRole="button"
-            disabled={cooldown > 0}
-          >
-            <Text style={[styles.link, cooldown > 0 && styles.linkDisabled]}>
-              {cooldown > 0
-                ? `Resend in ${cooldown}s`
-                : resent
-                  ? 'Code resent'
-                  : 'Resend code'}
+          <View style={styles.header}>
+            <Text style={styles.title}>Enter your code</Text>
+            <Text style={styles.subtitle}>
+              We sent a {OTP_LENGTH}-digit code to {display}.
             </Text>
-          </Pressable>
-          <Pressable onPress={() => router.back()} accessibilityRole="button">
-            <Text style={styles.link}>
-              Change {AUTH_CHANNEL === 'phone' ? 'number' : 'email'}
-            </Text>
-          </Pressable>
-        </View>
+          </View>
+
+          <TextField
+            label="Verification code"
+            error={error}
+            value={code}
+            onChangeText={(t) => setCode(t.replace(/[^\d]/g, '').slice(0, OTP_LENGTH))}
+            placeholder={'0'.repeat(OTP_LENGTH)}
+            keyboardType="number-pad"
+            textContentType="oneTimeCode"
+            autoComplete="one-time-code"
+            maxLength={OTP_LENGTH}
+            style={styles.codeInput}
+            autoFocus
+          />
+
+          <Button
+            label="Verify"
+            onPress={onVerify}
+            loading={submitting}
+            disabled={code.length !== OTP_LENGTH}
+          />
+
+          <View style={styles.footer}>
+            <Pressable
+              onPress={onResend}
+              accessibilityRole="button"
+              disabled={cooldown > 0}
+            >
+              <Text style={[styles.link, cooldown > 0 && styles.linkDisabled]}>
+                {cooldown > 0
+                  ? `Resend in ${cooldown}s`
+                  : resent
+                    ? 'Code resent'
+                    : 'Resend code'}
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => router.back()} accessibilityRole="button">
+              <Text style={styles.link}>
+                Change {AUTH_CHANNEL === 'phone' ? 'number' : 'email'}
+              </Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -160,12 +162,35 @@ export default function VerifyScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.white },
   flex: { flex: 1 },
-  content: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg, gap: spacing.lg },
+  content: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: spacing.lg,
+    gap: spacing.lg,
+  },
   header: { gap: spacing.sm },
-  title: { fontSize: fontSize.xl, fontWeight: '700', color: colors.softBlack },
-  subtitle: { fontSize: fontSize.sm, color: colors.muted, lineHeight: 22 },
-  codeInput: { fontSize: fontSize.xl, letterSpacing: 4, textAlign: 'center' },
+  title: {
+    fontSize: fontSize.xl,
+    fontFamily: fontFamily.bold,
+    color: colors.softBlack,
+  },
+  subtitle: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+    lineHeight: 22,
+  },
+  codeInput: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xl,
+    letterSpacing: 4,
+    textAlign: 'center',
+  },
   footer: { flexDirection: 'row', justifyContent: 'space-between' },
-  link: { color: colors.charcoal, fontSize: fontSize.sm, fontWeight: '600' },
+  link: {
+    color: colors.charcoal,
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.semibold,
+  },
   linkDisabled: { color: colors.muted },
 });

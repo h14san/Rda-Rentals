@@ -117,15 +117,43 @@ supabase/
   rls_check.sql             security assertions
 ```
 
+## Smart search
+
+Natural-language search ("cheap studio near Kimironko") is live. It runs in the
+`smart-search` Edge Function so the model API key never ships in the app.
+
+To enable it, set the key as a **function secret** — not in `.env`:
+
+```bash
+npx supabase secrets set GEMINI_API_KEY=...
+npx supabase functions deploy smart-search   # only after code changes
+```
+
+Until the secret is set the function returns a clear 503 and the search box
+reports that it is not configured; manual filters keep working throughout.
+
+**Model names expire.** Google refuses retired names for newly issued keys —
+`gemini-2.5-flash` was already rejected with "no longer available to new users"
+on a key created in 2026. If search starts failing, check the model first: the
+function returns "pointed at a model that no longer exists" for that case, and
+`GEMINI_MODEL` changes it without a redeploy.
+
+Each search is one Gemini call on the free Google AI Studio tier. The model
+defaults to `gemini-3.6-flash` and can be changed without a redeploy:
+
+```bash
+npx supabase secrets set GEMINI_MODEL=<model-name>
+```
+
 ## Notes for the next phase
 
 - **Filters are the AI's target.** `Filters` in `src/features/listings/types.ts`
   is the single description of what can be searched. Phase 3's natural-language
   parser should produce a `Filters` object rather than build its own query, so
   the AI path and the manual path stay one code path.
-- **The Claude API key must never enter the bundle.** Anything shipped in a
-  React Native app is extractable. Phase 3 calls Claude from a Supabase Edge
-  Function holding `ANTHROPIC_API_KEY` as a secret.
+- **The model API key must never enter the bundle.** Anything shipped in a
+  React Native app is extractable. Smart search calls Gemini from a Supabase Edge
+  Function holding `GEMINI_API_KEY` as a secret.
 - **Listings are drafted before upload.** `create.ts` inserts the row as
   `status='draft'`, uploads images against its id, then flips to `active`. A
   failure part way leaves a private draft, never a live listing with missing

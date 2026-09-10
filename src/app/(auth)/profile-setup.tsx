@@ -13,7 +13,7 @@ import { Button, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
 import { normalizeRwandanPhone } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { colors, fontSize, spacing } from '@/theme';
+import { colors, fontFamily, fontSize, spacing } from '@/theme';
 
 /**
  * One-time completion step.
@@ -26,7 +26,9 @@ export default function ProfileSetupScreen() {
   const { session, profile, refreshProfile } = useAuth();
 
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
-  const [whatsapp, setWhatsapp] = useState(profile?.whatsapp_phone ?? profile?.phone ?? '');
+  const [whatsapp, setWhatsapp] = useState(
+    profile?.whatsapp_phone ?? profile?.phone ?? '',
+  );
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -109,9 +111,27 @@ export default function ProfileSetupScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.white },
   flex: { flex: 1 },
-  content: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg, gap: spacing.lg },
+  content: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: spacing.lg,
+    gap: spacing.lg,
+  },
   header: { gap: spacing.sm },
-  title: { fontSize: fontSize.xl, fontWeight: '700', color: colors.softBlack },
-  subtitle: { fontSize: fontSize.sm, color: colors.muted, lineHeight: 22 },
-  error: { color: colors.danger, fontSize: fontSize.sm },
+  title: {
+    fontSize: fontSize.xl,
+    fontFamily: fontFamily.bold,
+    color: colors.softBlack,
+  },
+  subtitle: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+    lineHeight: 22,
+  },
+  error: {
+    color: colors.danger,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+  },
 });

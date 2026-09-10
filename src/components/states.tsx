@@ -1,7 +1,7 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { colors, radius, spacing, type } from '@/theme';
 
 /**
  * Loading, empty, and error states.
@@ -83,10 +83,9 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.sm,
   },
-  title: { fontSize: fontSize.lg, fontWeight: '700', color: colors.softBlack },
+  title: type.h2,
   muted: {
-    fontSize: fontSize.sm,
-    color: colors.muted,
+    ...type.meta,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
@@ -99,5 +98,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lightGray,
   },
   skeletonBody: { gap: spacing.xs },
-  skeletonLine: { height: 14, borderRadius: radius.sm, backgroundColor: colors.lightGray },
+  skeletonLine: {
+    height: 14,
+    borderRadius: radius.sm,
+    backgroundColor: colors.lightGray,
+  },
 });

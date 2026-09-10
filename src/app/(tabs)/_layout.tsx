@@ -9,7 +9,10 @@ export default function TabsLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.softBlack,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { backgroundColor: colors.white, borderTopColor: colors.border },
+        tabBarStyle: {
+          backgroundColor: colors.white,
+          borderTopColor: colors.border,
+        },
         headerStyle: { backgroundColor: colors.white },
         headerTitleStyle: { color: colors.softBlack },
         headerShadowVisible: false,

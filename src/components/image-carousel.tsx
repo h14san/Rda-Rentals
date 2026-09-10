@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { imageUrl } from '@/lib/supabase';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { colors, radius, spacing, type } from '@/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lightGray,
   },
   fallback: { alignItems: 'center', justifyContent: 'center' },
-  fallbackText: { color: colors.muted, fontSize: fontSize.sm },
+  fallbackText: type.meta,
   counter: {
     position: 'absolute',
     right: spacing.md,
@@ -68,5 +68,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: radius.pill,
   },
-  counterText: { color: colors.white, fontSize: fontSize.xs, fontWeight: '600' },
+  counterText: {
+    ...type.caption,
+    color: colors.white,
+  },
 });

@@ -158,6 +158,10 @@ npx supabase secrets set GEMINI_MODEL=<model-name>
   `status='draft'`, uploads images against its id, then flips to `active`. A
   failure part way leaves a private draft, never a live listing with missing
   photos — and gives auto-describe a row to attach to.
+- **Deleting a listing_images row also needs its storage object removed.**
+  They are not FK-linked; `removeListingImages` deletes the row first, because
+  an orphaned object is invisible while a row pointing at a deleted object
+  renders as a broken image on every card.
 - **Seeded listings have no photos.** Image rows point at objects in the
   storage bucket and there is nothing to point at until a real upload happens.
   Post a listing through the app to exercise that path.

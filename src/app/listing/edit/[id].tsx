@@ -4,15 +4,28 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
+import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
+
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Chip, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
+import {
+  MAX_IMAGES,
+  captureImage,
+  nextImagePosition,
+  pickImages,
+  removeListingImages,
+  uploadListingImages,
+  type PickedImage,
+} from '@/features/listings/create';
 import { useListingDetail, useUpdateListing } from '@/features/listings/queries';
 import {
   PROPERTY_TYPES,
@@ -21,7 +34,8 @@ import {
 } from '@/features/listings/types';
 import { formatPrice } from '@/lib/format';
 import { KIGALI_DISTRICTS, sectorsFor } from '@/lib/locations';
-import { colors, fontFamily, fontSize, spacing } from '@/theme';
+import { imageUrl } from '@/lib/supabase';
+import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
 
 /**
  * Edit an existing listing.
@@ -31,8 +45,9 @@ import { colors, fontFamily, fontSize, spacing } from '@/theme';
  * usually a single correction — a wrong price, a typo — and making someone page
  * through four screens to fix one field is worse than showing them everything.
  *
- * Photos are deliberately not editable here yet; the upload/ordering flow needs
- * more than a field form, and the common edit is textual.
+ * Photo changes are staged, not applied on the spot: nothing is uploaded or
+ * deleted until Save, so backing out of the screen leaves the listing exactly
+ * as it was.
  */
 export default function EditListingScreen() {
   const router = useRouter();
@@ -57,6 +72,16 @@ export default function EditListingScreen() {
   const [address, setAddress] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  /** Existing photos kept, staged removals, and newly picked ones. */
+  const [keptImages, setKeptImages] = useState<{ id: string; storage_path: string }[]>(
+    [],
+  );
+  const [removedImages, setRemovedImages] = useState<
+    { id: string; storage_path: string }[]
+  >([]);
+  const [newImages, setNewImages] = useState<PickedImage[]>([]);
+  const [photoProgress, setPhotoProgress] = useState<string | null>(null);
+
   if (isPending) return <LoadingState label="Loading listing…" />;
   if (isError) return <ErrorState error={error} onRetry={() => void refetch()} />;
 
@@ -77,6 +102,11 @@ export default function EditListingScreen() {
     setDistrict(listing.district);
     setSector(listing.sector);
     setAddress(listing.address ?? '');
+    setKeptImages(
+      listing.listing_images.map((i) => ({ id: i.id, storage_path: i.storage_path })),
+    );
+    setRemovedImages([]);
+    setNewImages([]);
     return <LoadingState label="Loading listing…" />;
   }
 
@@ -94,7 +124,38 @@ export default function EditListingScreen() {
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
+    const totalPhotos = keptImages.length + newImages.length;
+    if (totalPhotos === 0) {
+      setErrors({ photos: 'Keep at least one photo.' });
+      return;
+    }
+
     try {
+      // Removals first: if the upload then fails, the listing is left with
+      // fewer photos rather than more than MAX_IMAGES.
+      if (removedImages.length > 0) {
+        setPhotoProgress('Removing photos…');
+        await removeListingImages(
+          removedImages.map((i) => i.id),
+          removedImages.map((i) => i.storage_path),
+        );
+        setRemovedImages([]);
+      }
+
+      if (newImages.length > 0) {
+        const start = await nextImagePosition(listingId);
+        await uploadListingImages(
+          userId,
+          listingId,
+          newImages,
+          (done, total) => setPhotoProgress(`Uploading photo ${done} of ${total}…`),
+          start,
+        );
+        setNewImages([]);
+      }
+
+      setPhotoProgress(null);
+
       await updateListing.mutateAsync({
         id: listingId,
         patch: {
@@ -111,11 +172,25 @@ export default function EditListingScreen() {
       });
       router.back();
     } catch (e) {
+      setPhotoProgress(null);
       Alert.alert(
         'Could not save',
         e instanceof Error ? e.message : 'Something went wrong. Please try again.',
       );
     }
+  }
+
+  async function onAddPhotos() {
+    const remaining = MAX_IMAGES - (keptImages.length + newImages.length);
+    if (remaining <= 0) return;
+    const picked = await pickImages(remaining);
+    if (picked.length > 0) setNewImages((c) => [...c, ...picked].slice(0, remaining));
+  }
+
+  async function onCapturePhoto() {
+    if (keptImages.length + newImages.length >= MAX_IMAGES) return;
+    const shot = await captureImage();
+    if (shot) setNewImages((c) => [...c, shot]);
   }
 
   return (
@@ -129,6 +204,82 @@ export default function EditListingScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Photos</Text>
+          <Text style={styles.help}>
+            The first photo is what tenants see in the feed.
+          </Text>
+
+          <View style={styles.thumbGrid}>
+            {keptImages.map((img, index) => (
+              <View key={img.id} style={styles.thumbWrap}>
+                <Image
+                  source={{ uri: imageUrl(img.storage_path) }}
+                  style={styles.thumb}
+                  contentFit="cover"
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove photo ${index + 1}`}
+                  style={styles.thumbRemove}
+                  onPress={() => {
+                    setKeptImages((c) => c.filter((k) => k.id !== img.id));
+                    // Staged, not deleted — Save applies it, leaving is a no-op.
+                    setRemovedImages((c) => [...c, img]);
+                  }}
+                >
+                  <Ionicons name="close" size={14} color={colors.white} />
+                </Pressable>
+                {index === 0 && (
+                  <View style={styles.coverBadge}>
+                    <Text style={styles.coverText}>Cover</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+
+            {newImages.map((img, index) => (
+              <View key={`${img.uri}-${index}`} style={styles.thumbWrap}>
+                <Image
+                  source={{ uri: img.uri }}
+                  style={styles.thumb}
+                  contentFit="cover"
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove new photo ${index + 1}`}
+                  style={styles.thumbRemove}
+                  onPress={() => setNewImages((c) => c.filter((_, i) => i !== index))}
+                >
+                  <Ionicons name="close" size={14} color={colors.white} />
+                </Pressable>
+                <View style={styles.newBadge}>
+                  <Text style={styles.coverText}>New</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {!!errors.photos && <Text style={styles.error}>{errors.photos}</Text>}
+
+          {keptImages.length + newImages.length < MAX_IMAGES && (
+            <View style={styles.row}>
+              <Button
+                label="Add photos"
+                variant="secondary"
+                style={styles.flex}
+                onPress={() => void onAddPhotos()}
+              />
+              <Button
+                label="Camera"
+                variant="secondary"
+                style={styles.flex}
+                onPress={() => void onCapturePhoto()}
+              />
+            </View>
+          )}
+        </View>
+
         <TextField
           label="Title"
           value={title}
@@ -238,10 +389,7 @@ export default function EditListingScreen() {
           style={styles.textArea}
         />
 
-        <Text style={styles.note}>
-          Photos cannot be changed here yet. Delete and repost the listing to replace
-          them.
-        </Text>
+        {!!photoProgress && <Text style={styles.note}>{photoProgress}</Text>}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -278,12 +426,48 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     textAlignVertical: 'top',
   },
-  note: {
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.xs,
-    color: colors.muted,
-    lineHeight: 18,
+  note: { ...type.caption, textAlign: 'center' },
+  help: type.meta,
+  error: { ...type.caption, color: colors.danger },
+  row: { flexDirection: 'row', gap: spacing.sm },
+  thumbGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  thumbWrap: { position: 'relative' },
+  thumb: {
+    width: 96,
+    height: 96,
+    borderRadius: radius.md,
+    backgroundColor: colors.lightGray,
   },
+  thumbRemove: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(17,24,39,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverBadge: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    backgroundColor: 'rgba(17,24,39,0.8)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
+  newBadge: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    backgroundColor: colors.success,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
+  coverText: { fontSize: 10, color: colors.white },
   flex: { flex: 1 },
   flexTwo: { flex: 2 },
   footer: {

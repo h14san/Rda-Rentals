@@ -1,0 +1,11 @@
+# Normalise line endings so a clone on macOS or Linux does not show every file
+# as modified. Text is stored LF in the repo and checked out native on Windows.
+* text=auto eol=lf
+
+# Binary assets must never be touched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ttf binary
+*.docx binary
+*.hbc binary

@@ -141,6 +141,21 @@ mid-flow failure leaves a private draft, never a live listing with missing
 photos. `status` also carries `rented`, which answers the brief's complaint that
 there is no way to tell whether a listing is still available.
 
+**Storage object names are unique, never index-based.** Ordering lives in the
+`position` column and the object name is opaque — never parsed. Index names
+(`{listingId}/0.jpg`) broke as soon as editing existed: removing the first photo
+and adding another would overwrite a surviving file.
+
+**Image positions are append-only and may have gaps.** New photos go at
+`max(position) + 1`. Renumbering would collide with the unique
+`(listing_id, position)` constraint partway through, and nothing depends on them
+being contiguous because ordering is `ORDER BY position`.
+
+**Photo edits are staged until Save.** Nothing uploads or deletes while the user
+is still on the edit screen, so backing out leaves the listing untouched. On
+save, removals run before uploads — a failed upload then leaves the listing with
+fewer photos rather than more than `MAX_IMAGES`.
+
 **Photos are compressed before upload** (1600px longest edge, JPEG q0.7, in
 `create.ts`). Raw phone photos are 3–8 MB; this is the main thing making the app
 usable on Rwandan mobile data. Uploads are sequential, not parallel — concurrent
@@ -208,7 +223,7 @@ src/
     (auth)/                 sign-in, verify, profile-setup
     (tabs)/                 index (feed), post, profile
     listing/[id].tsx        detail + map + WhatsApp CTA
-    listing/edit/[id].tsx   edit fields (flat form, not the post wizard)
+    listing/edit/[id].tsx   edit fields + photos (flat form, not the wizard)
     filters.tsx             filter sheet (modal)
   features/
     auth/context.tsx        session + profile, routing gate

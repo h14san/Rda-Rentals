@@ -145,38 +145,103 @@ export async function createDraftListing(input: DraftInput): Promise<ListingRow>
  * hundred-KB uploads compete and all of them stall, and progress reporting
  * stops meaning anything.
  */
+/**
+ * Unique object name for an upload.
+ *
+ * Index-based names ({listingId}/0.jpg) were fine while listings were only ever
+ * created, but editing breaks them: removing the first photo and adding another
+ * would make the new file overwrite an existing one. Ordering is carried by the
+ * `position` column, so the object name only has to be unique — never parsed.
+ *
+ * The first path segment must be the uploader's id; the storage RLS policy
+ * compares it against auth.uid().
+ */
+function storagePathFor(userId: string, listingId: string): string {
+  const unique = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${userId}/${listingId}/${unique}.jpg`;
+}
+
+/**
+ * Compresses and uploads each image, then records it at `startPosition` onward.
+ *
+ * Sequential, not parallel: on a weak connection several concurrent multi-
+ * hundred-KB uploads compete and all of them stall, and progress reporting
+ * stops meaning anything.
+ */
 export async function uploadListingImages(
   userId: string,
   listingId: string,
   images: PickedImage[],
   onProgress?: (done: number, total: number) => void,
+  startPosition = 0,
 ): Promise<void> {
   for (let i = 0; i < images.length; i++) {
     const base64 = await compressToJpeg(images[i]);
-    // First path segment must be the uploader's id — the storage RLS policy
-    // compares it against auth.uid().
-    const path = `${userId}/${listingId}/${i}.jpg`;
+    const path = storagePathFor(userId, listingId);
 
     const { error: uploadError } = await supabase.storage
       .from('listing-images')
-      .upload(path, decode(base64), {
-        contentType: 'image/jpeg',
-        upsert: true,
-      });
+      .upload(path, decode(base64), { contentType: 'image/jpeg' });
 
     if (uploadError) throw uploadError;
 
     const { error: rowError } = await supabase
       .from('listing_images')
-      .upsert(
-        { listing_id: listingId, storage_path: path, position: i },
-        { onConflict: 'listing_id,position' },
-      );
+      .insert({
+        listing_id: listingId,
+        storage_path: path,
+        position: startPosition + i,
+      });
 
     if (rowError) throw rowError;
 
     onProgress?.(i + 1, images.length);
   }
+}
+
+/**
+ * Removes photos from an existing listing.
+ *
+ * The row goes first: an orphaned storage object is invisible and costs a few
+ * hundred KB, whereas a row pointing at a deleted object renders as a broken
+ * image on every listing card.
+ */
+export async function removeListingImages(
+  imageIds: string[],
+  storagePaths: string[],
+): Promise<void> {
+  if (imageIds.length === 0) return;
+
+  const { error } = await supabase
+    .from('listing_images')
+    .delete()
+    .in('id', imageIds);
+
+  if (error) throw error;
+
+  if (storagePaths.length > 0) {
+    await supabase.storage.from('listing-images').remove(storagePaths);
+  }
+}
+
+/**
+ * Next free position for a listing.
+ *
+ * Positions are append-only and may have gaps once photos are removed — that is
+ * deliberate. Renumbering would collide with the unique (listing_id, position)
+ * constraint partway through, and nothing depends on them being contiguous
+ * because ordering is done with ORDER BY position.
+ */
+export async function nextImagePosition(listingId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('listing_images')
+    .select('position')
+    .eq('listing_id', listingId)
+    .order('position', { ascending: false })
+    .limit(1);
+
+  if (error) throw error;
+  return data?.length ? data[0].position + 1 : 0;
 }
 
 /** Flips a finished draft live. */

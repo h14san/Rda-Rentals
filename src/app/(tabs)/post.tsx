@@ -49,10 +49,16 @@ const STEP_TITLES: Record<Step, string> = {
 };
 
 export default function PostListingScreen() {
+  const { session } = useAuth();
+  // Null for a render after sign-out: tabs stay mounted until AuthGate's
+  // redirect effect runs. See ProfileScreen.
+  if (!session) return null;
+  return <SignedInPostListing userId={session.user.id} />;
+}
+
+function SignedInPostListing({ userId }: { userId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { session } = useAuth();
-  const userId = session!.user.id;
 
   const [step, setStep] = useState<Step>('photos');
   const [images, setImages] = useState<PickedImage[]>([]);

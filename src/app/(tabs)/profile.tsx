@@ -22,9 +22,16 @@ import { imageUrl, supabase } from '@/lib/supabase';
 import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
 
 export default function ProfileScreen() {
+  const { session } = useAuth();
+  // Null for a render after sign-out or session expiry: this tab is still
+  // mounted when AuthGate's redirect to sign-in runs, since that is an effect.
+  if (!session) return null;
+  return <SignedInProfile userId={session.user.id} />;
+}
+
+function SignedInProfile({ userId }: { userId: string }) {
   const router = useRouter();
-  const { session, profile, refreshProfile } = useAuth();
-  const userId = session!.user.id;
+  const { profile, refreshProfile } = useAuth();
 
   const { data: listings, isPending, isError, error, refetch } = useMyListings(userId);
   const setStatus = useSetListingStatus(userId);

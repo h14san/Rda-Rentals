@@ -50,10 +50,16 @@ import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
  * as it was.
  */
 export default function EditListingScreen() {
+  const { session } = useAuth();
+  // Null for a render after sign-out or expiry, before AuthGate redirects.
+  // See ProfileScreen.
+  if (!session) return null;
+  return <SignedInEditListing userId={session.user.id} />;
+}
+
+function SignedInEditListing({ userId }: { userId: string }) {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { session } = useAuth();
-  const userId = session!.user.id;
 
   const { data: listing, isPending, isError, error, refetch } = useListingDetail(id);
   const updateListing = useUpdateListing(userId);

@@ -198,7 +198,7 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+email_sent = 30
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -236,14 +236,18 @@ otp_length = 8
 otp_expiry = 3600
 
 # Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# Brevo replaced Resend: Resend's onboarding@resend.dev sender only delivers to
+# the Resend account owner, so every other sign-up failed with "Error sending
+# confirmation email". The key never goes in this file — set BREVO_SMTP_KEY in
+# the environment of `supabase config push`.
+[auth.email.smtp]
+enabled = true
+host = "smtp-relay.brevo.com"
+port = 587
+user = "b8f7cd001@smtp-brevo.com"
+pass = "env(BREVO_SMTP_KEY)"
+admin_email = "kraoul2006@gmail.com"
+sender_name = "Rwanda Rentals"
 
 # Token-based templates so the app receives a typed code, not a magic link.
 # A link to Site URL is useless on a phone; see supabase/templates/*.html.
@@ -298,12 +302,14 @@ max_frequency = "5s"
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
-[auth.sms.twilio]
-enabled = false
-account_sid = ""
-message_service_sid = ""
-# DO NOT commit your Twilio auth token to git. Use environment variable substitution instead:
-auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
+# Deliberately undeclared. The hosted project has Twilio enabled and this file
+# had it disabled, so any `config push` silently switched SMS off remotely.
+# Undeclared properties are left untouched by push.
+# [auth.sms.twilio]
+# enabled = false
+# account_sid = ""
+# message_service_sid = ""
+# auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 
 # Multi-factor-authentication is available to Supabase Pro plan.
 [auth.mfa]

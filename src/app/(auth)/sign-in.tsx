@@ -3,6 +3,7 @@ import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -50,6 +51,18 @@ export default function SignInScreen() {
     }
   }
 
+  // Skips sending. A code issued out of band (scripts/login-code.mjs) is
+  // otherwise unusable, because a failed send never reaches the verify screen.
+  function onHaveCode() {
+    const identifier = normalizeIdentifier(value);
+    if (!identifier) {
+      setError('Enter your email first, then tap this again.');
+      return;
+    }
+    setError(null);
+    router.push({ pathname: '/verify', params: { identifier } });
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -86,6 +99,10 @@ export default function SignInScreen() {
 
           <Button label="Send code" onPress={onSubmit} loading={submitting} />
 
+          <Pressable onPress={onHaveCode} accessibilityRole="button">
+            <Text style={styles.link}>I already have a code</Text>
+          </Pressable>
+
           <Text style={styles.legal}>
             By continuing you agree to be contacted about listings you enquire about.
           </Text>
@@ -115,6 +132,12 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     color: colors.muted,
     lineHeight: 24,
+  },
+  link: {
+    color: colors.charcoal,
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.semibold,
+    textAlign: 'center',
   },
   legal: {
     fontFamily: fontFamily.regular,

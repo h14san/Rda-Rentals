@@ -18,6 +18,17 @@ export const MAX_IMAGES = 8;
 const MAX_EDGE = 1600;
 const JPEG_QUALITY = 0.7;
 
+/**
+ * Smaller budget for the copy sent to auto-describe.
+ *
+ * Nothing is stored, so the only cost is upload time on a connection the
+ * landlord is about to need again for the real upload. Vision models downscale
+ * and tile their input anyway, so a 1600px original buys no extra detail in the
+ * description — it just doubles the data spent on posting one listing.
+ */
+const ANALYSIS_MAX_EDGE = 1024;
+const ANALYSIS_QUALITY = 0.6;
+
 export interface PickedImage {
   uri: string;
   width: number;
@@ -67,26 +78,45 @@ export async function captureImage(): Promise<PickedImage | null> {
  * file:// URI into a Blob; reading it out of the manipulator directly avoids a
  * round trip through the filesystem.
  */
-async function compressToJpeg(image: PickedImage): Promise<string> {
+async function compressToJpeg(
+  image: PickedImage,
+  maxEdge = MAX_EDGE,
+  quality = JPEG_QUALITY,
+): Promise<string> {
   const context = ImageManipulator.manipulate(image.uri);
 
   // Only ever scale down, and constrain the longer edge so portrait and
   // landscape shots both end up under the same pixel budget.
   const longestEdge = Math.max(image.width, image.height);
-  if (longestEdge > MAX_EDGE) {
+  if (longestEdge > maxEdge) {
     const isLandscape = image.width >= image.height;
-    context.resize(isLandscape ? { width: MAX_EDGE } : { height: MAX_EDGE });
+    context.resize(isLandscape ? { width: maxEdge } : { height: maxEdge });
   }
 
   const rendered = await context.renderAsync();
   const saved = await rendered.saveAsync({
-    compress: JPEG_QUALITY,
+    compress: quality,
     format: SaveFormat.JPEG,
     base64: true,
   });
 
   if (!saved.base64) throw new Error('Image compression returned no data.');
   return saved.base64;
+}
+
+/**
+ * base64 JPEG for the auto-describe function, at the smaller analysis budget.
+ *
+ * Sequential for the same reason uploads are: this runs on the phone, and
+ * decoding several multi-megapixel photos at once is what makes a cheap device
+ * drop frames or get killed mid-post.
+ */
+export async function compressForAnalysis(images: PickedImage[]): Promise<string[]> {
+  const out: string[] = [];
+  for (const image of images) {
+    out.push(await compressToJpeg(image, ANALYSIS_MAX_EDGE, ANALYSIS_QUALITY));
+  }
+  return out;
 }
 
 export interface DraftInput {

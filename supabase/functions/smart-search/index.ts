@@ -12,14 +12,9 @@
 
 import { GoogleGenAI, Type } from 'npm:@google/genai@2.21.0';
 
-/**
- * Free-tier default. Override with the GEMINI_MODEL secret without a redeploy.
- *
- * Google retires model names for new API keys — gemini-2.5-flash was already
- * refused ("no longer available to new users") on a key issued in 2026. If this
- * starts returning 404, the model name is the thing to change, not the code.
- */
-const DEFAULT_MODEL = 'gemini-3.6-flash';
+import { CORS, json, modelName, providerErrorResponse } from '../_shared/gemini.ts';
+
+const FEATURE = 'Smart search';
 
 const PROPERTY_TYPES = ['studio', 'apartment', 'shared', 'house'] as const;
 
@@ -54,19 +49,6 @@ const responseSchema = {
     'minBedrooms', 'furnishedOnly', 'interpretation', 'unclear',
   ],
 };
-
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  });
-}
 
 function systemPrompt(districts: string[], sectors: string[]): string {
   return [
@@ -175,7 +157,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const response = await ai.models.generateContent({
-      model: Deno.env.get('GEMINI_MODEL') || DEFAULT_MODEL,
+      model: modelName(),
       contents: query,
       config: {
         systemInstruction: systemPrompt(districts, sectors),
@@ -205,29 +187,6 @@ Deno.serve(async (req: Request) => {
       unclear: parsed.unclear === true,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-
-    // The SDK surfaces HTTP failures as messages rather than typed classes, so
-    // these are matched on status text to give the user something actionable.
-    if (/API key|PERMISSION_DENIED|UNAUTHENTICATED/i.test(message)) {
-      return json({ error: 'Smart search is misconfigured (bad API key).' }, 503);
-    }
-    if (/NOT_FOUND|no longer available|is not found/i.test(message)) {
-      return json(
-        { error: 'Smart search is pointed at a model that no longer exists.' },
-        503,
-      );
-    }
-    if (/RESOURCE_EXHAUSTED|quota|429/i.test(message)) {
-      return json(
-        { error: 'Smart search has hit its free-tier limit. Try again later.' },
-        429,
-      );
-    }
-
-    console.error('smart-search failed', message);
-    // Deliberately not returned to the client: provider errors are verbose and
-    // can echo request internals. The message is in the function logs instead.
-    return json({ error: 'Smart search is unavailable right now.' }, 502);
+    return providerErrorResponse(error, FEATURE);
   }
 });

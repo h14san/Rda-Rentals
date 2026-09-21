@@ -9,15 +9,15 @@ Expo SDK 57 (RN 0.86, React 19.2) + expo-router · Supabase (Postgres/Auth/
 Storage) · TanStack Query · react-native-maps.
 
 **Phases 1 & 2 are done** (auth, feed, filters, detail, posting, profile).
-Phase 3 — the AI chatbot, natural-language search, and photo-to-description —
-is not built.
+Of Phase 3, **natural-language search and photo-to-description are built**; the
+conversational AI chatbot is not.
 
 ## Two source docs, one wins
 
 `docs/Rwanda_Rentals_Brief.docx` is authoritative: React Native + Supabase, plus
 AI features. The brief names the Claude API; the build uses **Gemini** instead,
-chosen for its free tier. The provider is isolated inside the `smart-search`
-Edge Function — nothing in the app knows or cares which model answers. `docs/Rwanda Rentals App – Developer Framework.docx` is the older
+chosen for its free tier. The provider is isolated inside the Edge Functions —
+nothing in the app knows or cares which model answers. `docs/Rwanda Rentals App – Developer Framework.docx` is the older
 spec (Flutter + Firebase, no AI) and is **superseded** — consult it only for UI
 direction and the colour palette. If a request seems to assume Flutter or
 Firestore, that is the stale doc talking; say so rather than switching stacks.
@@ -166,12 +166,18 @@ uploads on a weak connection stall each other.
 returns false without one, so the scheme route fails on exactly the devices that
 do have WhatsApp. Call is a separate button, not a fallback.
 
-## Smart search (built)
+## AI features (smart search + auto-describe, both built)
 
-Natural-language search runs in the `smart-search` Edge Function
-(`supabase/functions/smart-search/`), which holds `GEMINI_API_KEY` (Google AI Studio free tier). **The key
-must never enter the app bundle** — anything shipped in React Native is
-extractable.
+Two Edge Functions, one shared key: `smart-search`
+(`supabase/functions/smart-search/`) and `auto-describe`
+(`supabase/functions/auto-describe/`) both hold `GEMINI_API_KEY` (Google AI
+Studio free tier). **The key must never enter the app bundle** — anything
+shipped in React Native is extractable.
+
+**`supabase/functions/_shared/gemini.ts` is imported by both, so editing it
+means redeploying both.** It holds the model default, CORS, the JSON helper, and
+the provider-error mapping. That mapping was already drifting between two copies
+of the same code, which is why it moved.
 
 The model's only job is to emit a `Filters` object; the existing listings query
 does the searching. Smart search and the manual filter sheet are therefore one
@@ -194,23 +200,53 @@ echo request internals. They go to the function logs; the client gets a short
 message it can act on. (There is no `supabase functions logs` subcommand, so
 diagnosing means temporarily returning the detail, then removing it.)
 
-Deploy with `npx supabase functions deploy smart-search`; Docker is not needed.
+**Auto-describe writes a draft, never a published fact.** The result lands in
+the same Description field the landlord would have typed into, on the post
+wizard's details step, behind a "Write it for me" action on the field's label
+row (`TextField`'s `accessory` slot). The prompt's prohibitions are the load-
+bearing part: no rent, no floor area, no distance to a landmark, no utilities or
+security claims, no describing people in the photos. A tenant who arrives to
+find an invented detail is the problem the brief opens with.
+
+**Price is deliberately withheld from the describe prompt.** It has its own
+field on every card and the detail page, and prose that repeats it contradicts
+the listing the first time the rent is edited.
+
+**Describe photos are compressed smaller than upload photos** (1024px / q0.6 vs
+1600px / q0.7, both in `create.ts`). Vision models tile their input, so a larger
+image buys no extra detail — it just doubles the data spent posting one listing
+on mobile data. Sequential, like the uploads: decoding several multi-megapixel
+photos at once is what makes a cheap device drop frames mid-post.
+
+**Auto-describe is wired into the post wizard only.** The edit screen's existing
+photos are already in storage, so describing them needs a second input mode
+(URLs fetched server-side) — and that URL has to be pinned to this project's own
+storage host before it is safe to accept.
+
+**`temperature` differs by function on purpose:** 0 for smart-search (filter
+extraction has one right answer, and a retry returning different results looks
+broken) and 0.6 for auto-describe (a landlord who dislikes the wording presses
+the button again, and at 0 they get the same paragraph back).
+
+Deploy with `npx supabase functions deploy smart-search` /
+`npx supabase functions deploy auto-describe`; Docker is not needed.
 `supabase/functions` is excluded from both `tsconfig.json` and
 `eslint.config.js` — it is Deno, with `npm:` specifiers and a `Deno` global that
 the app's toolchain cannot resolve.
 
-## Remaining Phase 3 constraints
+## Remaining: the AI chatbot
 
 **Sort is not part of `Filters`.** It lives beside it in `filters-context`,
-because `Filters` is the shape Phase 3's parser targets and it should describe
-what to *match*, not how to order. Featured listings float to the top only under
+because `Filters` is the shape the AI parsers target and it should describe what
+to *match*, not how to order. Featured listings float to the top only under
 the default "newest" ordering — letting paid placement override an explicit
 "price: low to high" makes the sort look broken.
 
 **`Filters` in `src/features/listings/types.ts` is the AI's target.** It is the
-single description of what can be searched. Natural-language search should
-produce a `Filters` object and hand it to the existing query, not build its own
-— that keeps the AI path and the manual path one code path.
+single description of what can be searched. The chatbot should reuse what
+`useSmartSearch` already does — produce a `Filters` object and hand it to the
+existing query, not build its own — so the conversational path, the search bar,
+and the manual sheet stay one code path.
 
 Use `claude-opus-5` unless told otherwise, and check the `claude-api` skill
 before writing SDK calls rather than working from memory.
@@ -227,10 +263,15 @@ src/
     filters.tsx             filter sheet (modal)
   features/
     auth/context.tsx        session + profile, routing gate
-    listings/               types, queries, create, filters-context
-  lib/                      supabase, auth, contact, format, locations
+    listings/               types, queries, create, filters-context,
+                            smart-search, auto-describe
+  lib/                      supabase, auth, contact, format, locations,
+                            edge-functions
   theme/                    colour, spacing, radius, shadow tokens
 supabase/
+  functions/_shared/gemini.ts         shared by both AI functions
+  functions/smart-search/             query -> Filters
+  functions/auto-describe/            photos -> description
   migrations/20260910120000_init.sql  schema, indexes, RLS, storage policies
   seed.sql                  15 demo Kigali listings (no photos — nothing in
                             the storage bucket to point at until a real upload)

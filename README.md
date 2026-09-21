@@ -9,8 +9,8 @@ Built against `Rwanda_Rentals_Brief.docx` (React Native + Supabase). The older
 superseded, but kept for its UI direction and colour palette.
 
 **Status:** Phases 1 & 2 complete — auth, feed, filters, detail, posting,
-profile. The AI features (chatbot, natural-language search, photo-to-
-description) are Phase 3 and are not built yet.
+profile. Of the brief's three AI features, **natural-language search and
+photo-to-description are built**; the conversational chatbot is not.
 
 ## Stack
 
@@ -108,6 +108,8 @@ src/
       types.ts              row types, Database generic, Filters schema
       queries.ts            feed / detail / my-listings / mutations
       create.ts             photo compression, upload, publish
+      smart-search.ts       natural-language query -> Filters
+      auto-describe.ts      photos -> draft description
       filters-context.tsx   filter state shared across routes
   lib/                      supabase, auth, contact, format, locations
   theme/                    colour, spacing, radius, shadow tokens
@@ -115,22 +117,52 @@ supabase/
   migrations/20260910120000_init.sql  schema, indexes, RLS, storage policies
   seed.sql                  demo data
   rls_check.sql             security assertions
+  functions/
+    _shared/gemini.ts       key handling, CORS, provider error mapping
+    smart-search/           query -> Filters
+    auto-describe/          photos -> description
 ```
 
-## Smart search
+## AI features
 
-Natural-language search ("cheap studio near Kimironko") is live. It runs in the
-`smart-search` Edge Function so the model API key never ships in the app.
+Two of the brief's three are built, both as Edge Functions so the model API key
+never ships in the app bundle — anything in a React Native build is extractable.
 
-To enable it, set the key as a **function secret** — not in `.env`:
+| Feature | Function | Where it appears |
+|---|---|---|
+| Natural-language search | `smart-search` | search bar on the feed |
+| Photo-to-description | `auto-describe` | "Write it for me" beside Description in the post wizard |
+
+One key, set as a **function secret** — not in `.env`:
 
 ```bash
 npx supabase secrets set GEMINI_API_KEY=...
-npx supabase functions deploy smart-search   # only after code changes
+npx supabase functions deploy smart-search    # after code changes
+npx supabase functions deploy auto-describe
 ```
 
-Until the secret is set the function returns a clear 503 and the search box
-reports that it is not configured; manual filters keep working throughout.
+Both import `supabase/functions/_shared/gemini.ts`, so **a change there means
+redeploying both.**
+
+Until the secret is set each function returns a clear 503 and the UI says it is
+not configured. Manual filters and a hand-typed description keep working
+throughout — neither feature is on the critical path.
+
+### Photo-to-description
+
+The landlord's photos are compressed to 1024px / q0.6 (smaller than the 1600px
+upload budget: vision models tile their input anyway, so a bigger image buys no
+extra detail and doubles the data spent posting one listing), sent to
+`auto-describe`, and the result lands in the same editable field they would have
+typed into. Nothing is published from it.
+
+What the prompt forbids matters more than what it asks for: no rent, no floor
+area, no distance to a landmark, no utilities or security claims, and no
+describing people in the photos. A tenant arriving to find an invented detail is
+the exact problem the brief opens with, so the model may only name what is
+visible plus the fields the landlord already filled in. Price is withheld from it
+on purpose — the price has its own field everywhere, and prose repeating it goes
+stale the first time the rent is edited.
 
 **Model names expire.** Google refuses retired names for newly issued keys —
 `gemini-2.5-flash` was already rejected with "no longer available to new users"
@@ -152,8 +184,16 @@ npx supabase secrets set GEMINI_MODEL=<model-name>
   parser should produce a `Filters` object rather than build its own query, so
   the AI path and the manual path stay one code path.
 - **The model API key must never enter the bundle.** Anything shipped in a
-  React Native app is extractable. Smart search calls Gemini from a Supabase Edge
-  Function holding `GEMINI_API_KEY` as a secret.
+  React Native app is extractable. Both AI features call Gemini from Supabase
+  Edge Functions holding `GEMINI_API_KEY` as a secret.
+- **The chatbot is what remains.** `useSmartSearch` already turns prose into a
+  validated `Filters` object, so a chat turn is that plus history plus rendering
+  result cards. It should keep the same rule: the model emits `Filters`, the
+  existing query does the searching.
+- **Auto-describe is wired into the post wizard only.** The edit screen's photos
+  already live in storage, so describing them means the function fetching URLs
+  rather than reading an upload — a second input mode that needs the URL pinned
+  to this project's own storage host before it is safe to add.
 - **Listings are drafted before upload.** `create.ts` inserts the row as
   `status='draft'`, uploads images against its id, then flips to `active`. A
   failure part way leaves a private draft, never a live listing with missing

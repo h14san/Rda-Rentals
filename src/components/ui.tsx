@@ -119,12 +119,29 @@ interface TextFieldProps extends TextInputProps {
   label: string;
   error?: string | null;
   hint?: string;
+  /**
+   * Control shown on the label row, right-aligned — e.g. the "Write it for me"
+   * action beside Description. It sits with the label rather than above the
+   * field so it reads as being about that field, and so it cannot be mistaken
+   * for part of the value being edited.
+   */
+  accessory?: ReactNode;
 }
 
-export function TextField({ label, error, hint, style, ...rest }: TextFieldProps) {
+export function TextField({
+  label,
+  error,
+  hint,
+  style,
+  accessory,
+  ...rest
+}: TextFieldProps) {
   return (
     <View style={styles.fieldWrap}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.fieldLabelRow}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+        {accessory}
+      </View>
       <TextInput
         placeholderTextColor={colors.muted}
         style={[styles.input, !!error && styles.inputError, style]}
@@ -174,6 +191,12 @@ const styles = StyleSheet.create({
   chipLabelSelected: { color: colors.white },
 
   fieldWrap: { gap: spacing.xs },
+  fieldLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
   fieldLabel: type.label,
   input: {
     minHeight: 52,

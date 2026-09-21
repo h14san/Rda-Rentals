@@ -49,9 +49,17 @@ function sortImages<T extends { listing_images?: { position: number }[] }>(row: 
  * far more machinery than MVP listing volumes justify. The tradeoff is that a
  * listing published mid-scroll can shift a row across a page boundary.
  */
-export function useListingsFeed(filters: Filters, sort: SortOrder = 'newest') {
+export function useListingsFeed(
+  filters: Filters,
+  sort: SortOrder = 'newest',
+  // The chat tab has no filters until the assistant answers, and fetching the
+  // unfiltered feed in the meantime would spend a request on rows it will not
+  // show.
+  enabled = true,
+) {
   return useInfiniteQuery({
     queryKey: listingKeys.feed(filters, sort),
+    enabled,
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       const from = pageParam * PAGE_SIZE;

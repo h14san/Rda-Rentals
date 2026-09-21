@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { formatPrice } from '@/lib/format';
+
 /**
  * Hand-written to match supabase/migrations/20260910120000_init.sql.
  *
@@ -146,6 +148,39 @@ export function activeFilterCount(f: Filters): number {
     f.minBedrooms !== null,
     f.furnishedOnly,
   ].filter(Boolean).length;
+}
+
+/**
+ * The filters in force, as short chips.
+ *
+ * The chatbot needs to show what it actually searched for: a reply saying "here
+ * are furnished studios in Kacyiru" is the model's claim, whereas these chips
+ * are read back off the `Filters` object the query really ran with. When the two
+ * disagree, the chips are the truth.
+ */
+export function filterSummary(f: Filters): string[] {
+  const chips: string[] = [];
+
+  if (f.minPrice !== null && f.maxPrice !== null) {
+    chips.push(`${formatPrice(f.minPrice)} – ${formatPrice(f.maxPrice)}`);
+  } else if (f.maxPrice !== null) {
+    chips.push(`Under ${formatPrice(f.maxPrice)}`);
+  } else if (f.minPrice !== null) {
+    chips.push(`From ${formatPrice(f.minPrice)}`);
+  }
+
+  if (f.sector) chips.push(f.sector);
+  else if (f.district) chips.push(f.district);
+
+  if (f.propertyType) chips.push(PROPERTY_TYPE_LABELS[f.propertyType]);
+
+  if (f.minBedrooms !== null) {
+    chips.push(f.minBedrooms === 0 ? 'Studio' : `${f.minBedrooms}+ bedrooms`);
+  }
+
+  if (f.furnishedOnly) chips.push('Furnished');
+
+  return chips;
 }
 
 /**

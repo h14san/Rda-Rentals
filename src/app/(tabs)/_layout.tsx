@@ -30,6 +30,18 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'Ask',
+          headerTitle: 'Ask about rentals',
+          // Same sparkles mark as the feed's smart search bar and the
+          // "Write it for me" action: one icon means "a model did this".
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="sparkles-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="post"
         options={{
           title: 'Post',

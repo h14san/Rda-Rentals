@@ -12,42 +12,32 @@
 
 import { GoogleGenAI, Type } from 'npm:@google/genai@2.21.0';
 
+import {
+  FILTER_FIELDS,
+  filterRules,
+  filterSchemaProperties,
+  toFilters,
+  type FilterOutput,
+} from '../_shared/filters.ts';
 import { CORS, json, modelName, providerErrorResponse } from '../_shared/gemini.ts';
 
 const FEATURE = 'Smart search';
 
-const PROPERTY_TYPES = ['studio', 'apartment', 'shared', 'house'] as const;
-
-/**
- * Sentinels instead of nulls.
- *
- * Gemini's response schema supports `nullable`, but combining it with `enum`
- * and required fields is where structured output gets flaky across models. It
- * is more robust to demand every field, use an out-of-band value for "not
- * specified", and convert to null here. Note -1 for bedrooms: 0 is a *real*
- * value meaning studio, so it cannot double as the sentinel.
- */
-const UNSET_NUMBER = 0;
-const UNSET_BEDROOMS = -1;
-const UNSET_TYPE = 'any';
-
 const responseSchema = {
   type: Type.OBJECT,
   properties: {
-    minPrice: { type: Type.INTEGER, description: 'Minimum monthly rent in RWF, or 0 if not specified.' },
-    maxPrice: { type: Type.INTEGER, description: 'Maximum monthly rent in RWF, or 0 if not specified.' },
-    district: { type: Type.STRING, description: 'Exact district name from the allowed list, or empty string.' },
-    sector: { type: Type.STRING, description: 'Exact sector name from the allowed list, or empty string.' },
-    propertyType: { type: Type.STRING, enum: [UNSET_TYPE, ...PROPERTY_TYPES] },
-    minBedrooms: { type: Type.INTEGER, description: 'Minimum bedrooms; 0 means studio, -1 if not specified.' },
-    furnishedOnly: { type: Type.BOOLEAN },
-    interpretation: { type: Type.STRING, description: 'One short sentence for the renter describing what was filtered on.' },
-    unclear: { type: Type.BOOLEAN, description: 'True only if the text contains no rental criteria at all.' },
+    ...filterSchemaProperties,
+    interpretation: {
+      type: Type.STRING,
+      description:
+        'One short sentence for the renter describing what was filtered on.',
+    },
+    unclear: {
+      type: Type.BOOLEAN,
+      description: 'True only if the text contains no rental criteria at all.',
+    },
   },
-  required: [
-    'minPrice', 'maxPrice', 'district', 'sector', 'propertyType',
-    'minBedrooms', 'furnishedOnly', 'interpretation', 'unclear',
-  ],
+  required: [...FILTER_FIELDS, 'interpretation', 'unclear'],
 };
 
 function systemPrompt(districts: string[], sectors: string[]): string {
@@ -56,22 +46,7 @@ function systemPrompt(districts: string[], sectors: string[]): string {
     'rental marketplace in Kigali, Rwanda. Prices are Rwandan francs (RWF).',
     '',
     'Rules:',
-    '- Only fill a field the user actually implied. Use the "not specified"',
-    '  value for everything else: 0 for prices, "" for district and sector,',
-    `  "${UNSET_TYPE}" for propertyType, -1 for minBedrooms.`,
-    '- Never invent a location. district must be one of: ' + districts.join(', ') + '.',
-    '- sector must be one of: ' + sectors.join(', ') + '.',
-    '- If a place is named that is not in those lists, leave both empty and say',
-    '  so in the interpretation rather than guessing a nearby sector.',
-    '- "studio" sets propertyType to studio, not minBedrooms 0.',
-    '- Vague budget words map to ranges a Kigali renter would expect:',
-    '  "cheap"/"affordable"/"budget" -> maxPrice 150000;',
-    '  "mid-range" -> minPrice 150000 and maxPrice 400000;',
-    '  "luxury"/"executive" -> minPrice 500000.',
-    '- "under X" sets maxPrice X. "from X"/"at least X" sets minPrice X.',
-    '- Handle typos and local spellings ("apratment" -> apartment,',
-    '  "Kimirongo" -> Kimironko).',
-    '- Treat a bare number above 20000 as a monthly budget ceiling.',
+    ...filterRules(districts, sectors),
     '- Set unclear true only when there are no rental criteria at all.',
     '',
     'interpretation is one short sentence in plain English addressed to the',
@@ -79,48 +54,9 @@ function systemPrompt(districts: string[], sectors: string[]): string {
   ].join('\n');
 }
 
-interface ModelOutput {
-  minPrice: number;
-  maxPrice: number;
-  district: string;
-  sector: string;
-  propertyType: string;
-  minBedrooms: number;
-  furnishedOnly: boolean;
+interface ModelOutput extends FilterOutput {
   interpretation: string;
   unclear: boolean;
-}
-
-/**
- * Converts sentinels to nulls and drops anything outside the allowed
- * vocabulary. The prompt tells the model not to invent places; this makes it
- * true regardless of whether it complied.
- */
-function toFilters(out: ModelOutput, districts: string[], sectors: string[]) {
-  const positive = (n: unknown) =>
-    typeof n === 'number' && Number.isFinite(n) && n > UNSET_NUMBER
-      ? Math.round(n)
-      : null;
-
-  const inList = (value: string, list: string[]) =>
-    list.find((v) => v.toLowerCase() === value.trim().toLowerCase()) ?? null;
-
-  return {
-    minPrice: positive(out.minPrice),
-    maxPrice: positive(out.maxPrice),
-    district: out.district ? inList(out.district, districts) : null,
-    sector: out.sector ? inList(out.sector, sectors) : null,
-    propertyType:
-      out.propertyType && out.propertyType !== UNSET_TYPE &&
-      (PROPERTY_TYPES as readonly string[]).includes(out.propertyType)
-        ? out.propertyType
-        : null,
-    minBedrooms:
-      typeof out.minBedrooms === 'number' && out.minBedrooms > UNSET_BEDROOMS
-        ? Math.round(out.minBedrooms)
-        : null,
-    furnishedOnly: out.furnishedOnly === true,
-  };
 }
 
 Deno.serve(async (req: Request) => {

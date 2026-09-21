@@ -8,9 +8,11 @@ landlords over WhatsApp; landlords post rentals with photos.
 Expo SDK 57 (RN 0.86, React 19.2) + expo-router · Supabase (Postgres/Auth/
 Storage) · TanStack Query · react-native-maps.
 
-**Phases 1 & 2 are done** (auth, feed, filters, detail, posting, profile).
-Of Phase 3, **natural-language search and photo-to-description are built**; the
-conversational AI chatbot is not.
+**Every feature the brief marks MVP is built**: auth, feed, filters, detail,
+posting, profile, and all three AI features (chatbot, natural-language search,
+photo-to-description). Sign-in is email OTP rather than the brief's phone OTP —
+that needs a paid SMS provider, not code. Phase 4 (testing, perf, beta) has not
+started; there are no tests and no CI.
 
 ## Two source docs, one wins
 
@@ -32,6 +34,10 @@ npx eslint .
 npm run db:push        # apply supabase/migrations
 npm run db:seed        # demo data — NON-PRODUCTION ONLY
 npm run db:rls-check   # asserts the RLS policies hold
+
+npx supabase functions deploy chat           # the three AI functions;
+npx supabase functions deploy smart-search   # no Docker needed to deploy
+npx supabase functions deploy auto-describe
 ```
 
 Install native deps with `npx expo install <pkg>`, never plain `npm install` —
@@ -56,6 +62,17 @@ and `Relationships: []` on every table.** Same failure mode as above.
 **Env vars are inlined at build time.** Editing `.env` requires a dev-server
 restart. Only `EXPO_PUBLIC_*` reaches the client; `GOOGLE_MAPS_API_KEY` is
 deliberately unprefixed because `app.config.ts` bakes it into native config.
+
+**The AI features cannot be tested before the functions are deployed.** There is
+no local path: `supabase functions serve` needs Docker, and the app calls the
+deployed function by name. Deploying is independent of the app, so the order is
+always deploy first, then run the client. Everything non-AI — auth, feed,
+filters, detail, posting, profile — is testable in Expo Go with nothing deployed.
+
+**Edge Functions verify the JWT by default.** There is no `[functions.*]` block in
+`config.toml`, so all three require a session; supabase-js attaches it
+automatically and every screen that calls them is behind the auth gate. A 401
+from one of them means the caller is signed out, not that the function is broken.
 
 **The map needs a development build.** Expo Go cannot apply the native Maps
 key, so the map is blank there. Every other screen works in Expo Go — don't
@@ -166,23 +183,25 @@ uploads on a weak connection stall each other.
 returns false without one, so the scheme route fails on exactly the devices that
 do have WhatsApp. Call is a separate button, not a fallback.
 
-## AI features (smart search + auto-describe, both built)
+## AI features (all three built)
 
-Two Edge Functions, one shared key: `smart-search`
-(`supabase/functions/smart-search/`) and `auto-describe`
-(`supabase/functions/auto-describe/`) both hold `GEMINI_API_KEY` (Google AI
-Studio free tier). **The key must never enter the app bundle** — anything
-shipped in React Native is extractable.
+Three Edge Functions, one shared key: `smart-search`, `chat` and `auto-describe`
+under `supabase/functions/`, all holding `GEMINI_API_KEY` (Google AI Studio free
+tier). **The key must never enter the app bundle** — anything shipped in React
+Native is extractable.
 
-**`supabase/functions/_shared/gemini.ts` is imported by both, so editing it
-means redeploying both.** It holds the model default, CORS, the JSON helper, and
-the provider-error mapping. That mapping was already drifting between two copies
-of the same code, which is why it moved.
+**`supabase/functions/_shared/` is imported by all three, so editing it means
+redeploying all three.** `gemini.ts` holds the model default, CORS, the JSON
+helper and the provider-error mapping; `filters.ts` holds the filter contract —
+response schema, sentinel decoding, and the Kigali vocabulary rules — shared by
+`smart-search` and `chat`. Both files exist because the duplication was already
+drifting between copies, and the place-name rules are the last thing that should
+disagree between two entry points.
 
 The model's only job is to emit a `Filters` object; the existing listings query
-does the searching. Smart search and the manual filter sheet are therefore one
-code path, so a bad parse degrades to a normal inspectable filter rather than a
-mystery result set. The app re-validates the response with its own
+does the searching. The chatbot, the search bar and the manual filter sheet are
+therefore one code path, so a bad parse degrades to a normal inspectable filter
+rather than a mystery result set. The app re-validates the response with its own
 `filtersSchema` before applying it — the function shapes the output, the app
 decides what is valid.
 
@@ -228,13 +247,43 @@ extraction has one right answer, and a retry returning different results looks
 broken) and 0.6 for auto-describe (a landlord who dislikes the wording presses
 the button again, and at 0 they get the same paragraph back).
 
+**The chatbot never sees a listing row, on purpose.** The brief describes an
+assistant that "reads the live database"; `chat` instead returns a reply plus a
+complete `Filters` object, and the app runs `useListingsFeed` and renders the
+real rows under the reply. A model that cannot see listings cannot invent a
+property, quote a stale rent, or promise availability — the three failures that
+would make the assistant worse than the WhatsApp groups the app replaces. The
+prompt forbids stating counts or naming a property for the same reason.
+
+**Chat criteria chips are read off `Filters`, not off the reply.** `filterSummary`
+in `types.ts` renders what the query actually ran with, so a reply whose wording
+drifts from the filters is visibly contradicted rather than believed.
+
+**Chat filters are complete every turn, not deltas.** The filters in force are
+described to the model in prose (`currentStateLine`), and it returns the whole
+set it wants applied — that is what makes "under 200,000" keep the sector from
+two turns ago, and "start over" clear everything.
+
+**"Cheapest" is a sort, not a filter.** `chat` returns `sort` beside the filters
+and the app maps it to the feed's existing `SortOrder`. Letting the model invent
+a `maxPrice` for "cheapest" would silently hide the cheap listings above its
+guess.
+
+**`useListingsFeed` takes an `enabled` flag** so the Ask tab does not fetch the
+unfiltered feed before the assistant has answered.
+
+**Only the newest chat turn shows results.** One query per historical bubble
+would spend requests on rows the renter has scrolled past, on connections where
+a hanging request is the normal case.
+
 Deploy with `npx supabase functions deploy smart-search` /
+`npx supabase functions deploy chat` /
 `npx supabase functions deploy auto-describe`; Docker is not needed.
 `supabase/functions` is excluded from both `tsconfig.json` and
 `eslint.config.js` — it is Deno, with `npm:` specifiers and a `Deno` global that
 the app's toolchain cannot resolve.
 
-## Remaining: the AI chatbot
+## Search-path constraints (hold for every entry point)
 
 **Sort is not part of `Filters`.** It lives beside it in `filters-context`,
 because `Filters` is the shape the AI parsers target and it should describe what
@@ -243,10 +292,10 @@ the default "newest" ordering — letting paid placement override an explicit
 "price: low to high" makes the sort look broken.
 
 **`Filters` in `src/features/listings/types.ts` is the AI's target.** It is the
-single description of what can be searched. The chatbot should reuse what
-`useSmartSearch` already does — produce a `Filters` object and hand it to the
-existing query, not build its own — so the conversational path, the search bar,
-and the manual sheet stay one code path.
+single description of what can be searched. All three paths — the chatbot, the
+search bar and the manual filter sheet — produce a `Filters` object and hand it
+to the same query. Nothing should ever build its own listings query; that is what
+keeps a bad parse inspectable instead of mysterious.
 
 Use `claude-opus-5` unless told otherwise, and check the `claude-api` skill
 before writing SDK calls rather than working from memory.
@@ -257,20 +306,22 @@ before writing SDK calls rather than working from memory.
 src/
   app/                      expo-router routes
     (auth)/                 sign-in, verify, profile-setup
-    (tabs)/                 index (feed), post, profile
+    (tabs)/                 index (feed), chat (Ask), post, profile
     listing/[id].tsx        detail + map + WhatsApp CTA
     listing/edit/[id].tsx   edit fields + photos (flat form, not the wizard)
     filters.tsx             filter sheet (modal)
   features/
     auth/context.tsx        session + profile, routing gate
     listings/               types, queries, create, filters-context,
-                            smart-search, auto-describe
+                            smart-search, chat, auto-describe
   lib/                      supabase, auth, contact, format, locations,
                             edge-functions
   theme/                    colour, spacing, radius, shadow tokens
 supabase/
-  functions/_shared/gemini.ts         shared by both AI functions
+  functions/_shared/gemini.ts         key, CORS, provider errors (all three)
+  functions/_shared/filters.ts        filter contract (smart-search + chat)
   functions/smart-search/             query -> Filters
+  functions/chat/                     conversation -> reply + Filters
   functions/auto-describe/            photos -> description
   migrations/20260910120000_init.sql  schema, indexes, RLS, storage policies
   seed.sql                  15 demo Kigali listings (no photos — nothing in

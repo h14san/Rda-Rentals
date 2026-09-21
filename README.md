@@ -8,9 +8,11 @@ Built against `Rwanda_Rentals_Brief.docx` (React Native + Supabase). The older
 `Rwanda Rentals App – Developer Framework.docx` specifies Flutter + Firebase —
 superseded, but kept for its UI direction and colour palette.
 
-**Status:** Phases 1 & 2 complete — auth, feed, filters, detail, posting,
-profile. Of the brief's three AI features, **natural-language search and
-photo-to-description are built**; the conversational chatbot is not.
+**Status:** every feature the brief marks MVP is built — auth, feed, filters,
+detail, posting, profile, and all three AI features (chatbot, natural-language
+search, photo-to-description). Two caveats: sign-in is email OTP rather than
+phone OTP (see below — it needs a paid SMS provider, not code), and Phase 4
+(testing, performance tuning, beta) has not started.
 
 ## Stack
 
@@ -99,7 +101,7 @@ first, or the code request fails. See `src/lib/auth.ts`.
 src/
   app/                      expo-router routes
     (auth)/                 sign-in, verify, profile-setup
-    (tabs)/                 feed, post, profile
+    (tabs)/                 feed, chat (Ask), post, profile
     listing/[id].tsx        detail + map + WhatsApp CTA
     filters.tsx             filter sheet (modal)
   features/
@@ -109,6 +111,7 @@ src/
       queries.ts            feed / detail / my-listings / mutations
       create.ts             photo compression, upload, publish
       smart-search.ts       natural-language query -> Filters
+      chat.ts               conversation turn -> reply + Filters
       auto-describe.ts      photos -> draft description
       filters-context.tsx   filter state shared across routes
   lib/                      supabase, auth, contact, format, locations
@@ -119,7 +122,9 @@ supabase/
   rls_check.sql             security assertions
   functions/
     _shared/gemini.ts       key handling, CORS, provider error mapping
+    _shared/filters.ts      the filter contract both search paths target
     smart-search/           query -> Filters
+    chat/                   conversation -> reply + Filters
     auto-describe/          photos -> description
 ```
 
@@ -130,23 +135,49 @@ never ships in the app bundle — anything in a React Native build is extractabl
 
 | Feature | Function | Where it appears |
 |---|---|---|
-| Natural-language search | `smart-search` | search bar on the feed |
+| Chatbot | `chat` | the Ask tab |
+| Natural-language search | `smart-search` | search bar on the Explore tab |
 | Photo-to-description | `auto-describe` | "Write it for me" beside Description in the post wizard |
 
 One key, set as a **function secret** — not in `.env`:
 
 ```bash
 npx supabase secrets set GEMINI_API_KEY=...
-npx supabase functions deploy smart-search    # after code changes
+npx supabase functions deploy chat
+npx supabase functions deploy smart-search
 npx supabase functions deploy auto-describe
 ```
 
-Both import `supabase/functions/_shared/gemini.ts`, so **a change there means
-redeploying both.**
+All three import `supabase/functions/_shared/`, so **a change there means
+redeploying all three.** `chat` and `smart-search` additionally share
+`_shared/filters.ts`, which is the one server-side description of the filter
+contract — the response schema, the sentinel decoding, and the Kigali
+vocabulary rules.
 
 Until the secret is set each function returns a clear 503 and the UI says it is
 not configured. Manual filters and a hand-typed description keep working
-throughout — neither feature is on the critical path.
+throughout — no AI feature is on the critical path.
+
+### Chatbot
+
+The Ask tab is a conversational front end to the same feed query. Each turn
+returns a reply plus a complete `Filters` object; the app runs
+`useListingsFeed` with it and renders the real matching rows under the reply,
+with "Show all N in Explore" handing the filters to the feed through
+`filters-context`.
+
+**The model never sees a listing row**, which is the point. It cannot name a
+property that does not exist, quote a rent that has since changed, or promise
+something is still available — the three failures that would make an AI
+assistant worse than the WhatsApp groups this app replaces. Its reply only
+proves the question was understood; the cards are the answer. The criteria
+chips under a reply are read back off the `Filters` the query actually ran
+with, so if the wording and the filters ever disagree, the chips are the truth.
+
+Follow-ups refine rather than restart: the filters in force are sent with each
+turn, and the model returns the full set it wants applied. "Cheapest" is
+handled as a sort, not an invented `maxPrice` — sort lives beside `Filters`,
+not inside it.
 
 ### Photo-to-description
 
@@ -186,10 +217,6 @@ npx supabase secrets set GEMINI_MODEL=<model-name>
 - **The model API key must never enter the bundle.** Anything shipped in a
   React Native app is extractable. Both AI features call Gemini from Supabase
   Edge Functions holding `GEMINI_API_KEY` as a secret.
-- **The chatbot is what remains.** `useSmartSearch` already turns prose into a
-  validated `Filters` object, so a chat turn is that plus history plus rendering
-  result cards. It should keep the same rule: the model emits `Filters`, the
-  existing query does the searching.
 - **Auto-describe is wired into the post wizard only.** The edit screen's photos
   already live in storage, so describing them means the function fetching URLs
   rather than reading an upload — a second input mode that needs the URL pinned

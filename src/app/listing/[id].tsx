@@ -2,11 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { ImageCarousel } from '@/components/image-carousel';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, SectionTitle } from '@/components/ui';
+import { useAuth } from '@/features/auth/context';
 import { useListingDetail } from '@/features/listings/queries';
 import { LISTING_STATUS_LABELS, listingFacts } from '@/features/listings/types';
 import { openPhoneCall, openWhatsApp } from '@/lib/contact';
@@ -28,8 +29,16 @@ const DESCRIPTION_LINES = 6;
  */
 const DESCRIPTION_TRUNCATE_AT = 240;
 
+/**
+ * Must match the 500 m disc the offset is drawn from in
+ * 20261024120000_private_location.sql: the real point is anywhere inside it,
+ * so a smaller circle would sometimes exclude the property it describes.
+ */
+const APPROX_RADIUS_M = 500;
+
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { session } = useAuth();
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const { data: listing, isPending, isError, error, refetch } = useListingDetail(id);
 
@@ -37,9 +46,18 @@ export default function ListingDetailScreen() {
   if (isError) return <ErrorState error={error} onRetry={() => void refetch()} />;
 
   const location = formatLocation(listing.sector, listing.district);
-  const hasCoords = listing.latitude !== null && listing.longitude !== null;
-  const contactPhone =
-    listing.profiles?.whatsapp_phone ?? listing.profiles?.phone ?? null;
+  const isOwner = session?.user.id === listing.owner_id;
+  // Only ever non-null for the owner; RLS hides the row from everyone else.
+  const exact = listing.listing_locations;
+  const exactPin =
+    exact?.latitude != null && exact.longitude != null
+      ? { latitude: exact.latitude, longitude: exact.longitude }
+      : null;
+  const approxCenter =
+    listing.approx_latitude !== null && listing.approx_longitude !== null
+      ? { latitude: listing.approx_latitude, longitude: listing.approx_longitude }
+      : null;
+  const contactPhone = listing.profiles?.whatsapp_phone ?? null;
 
   const contactContext = {
     listingTitle: listing.title,
@@ -65,7 +83,11 @@ export default function ListingDetailScreen() {
             <View style={styles.priceRule} />
             <Text style={styles.title}>{listing.title}</Text>
             <Text style={styles.location}>{location}</Text>
-            {!!listing.address && <Text style={styles.address}>{listing.address}</Text>}
+            {!!exact?.address && (
+              <Text style={styles.address}>
+                {exact.address} · only you can see this
+              </Text>
+            )}
             <Text style={styles.posted}>Posted {timeAgo(listing.created_at)}</Text>
           </View>
 
@@ -107,7 +129,7 @@ export default function ListingDetailScreen() {
             </View>
           )}
 
-          {hasCoords && Platform.OS !== 'web' && (
+          {exactPin && isOwner && Platform.OS !== 'web' && (
             <View style={styles.section}>
               <SectionTitle>Location</SectionTitle>
               {/*
@@ -120,7 +142,7 @@ export default function ListingDetailScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Open this location in Maps"
                 onPress={() =>
-                  void openInMaps(listing.latitude!, listing.longitude!, listing.title)
+                  void openInMaps(exactPin.latitude, exactPin.longitude, listing.title)
                 }
                 style={({ pressed }) => [styles.mapWrap, pressed && { opacity: 0.85 }]}
               >
@@ -131,20 +153,9 @@ export default function ListingDetailScreen() {
                   provider={PROVIDER_GOOGLE}
                   style={styles.map}
                   pointerEvents="none"
-                  initialRegion={{
-                    latitude: listing.latitude!,
-                    longitude: listing.longitude!,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  }}
+                  initialRegion={{ ...exactPin, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
                 >
-                  <Marker
-                    coordinate={{
-                      latitude: listing.latitude!,
-                      longitude: listing.longitude!,
-                    }}
-                    title={listing.title}
-                  />
+                  <Marker coordinate={exactPin} title={listing.title} />
                 </MapView>
 
                 <View style={styles.mapHint}>
@@ -152,6 +163,39 @@ export default function ListingDetailScreen() {
                   <Text style={styles.mapHintText}>Open in Maps</Text>
                 </View>
               </Pressable>
+              <Text style={styles.mapCaption}>
+                Tenants see an approximate area, not this pin.
+              </Text>
+            </View>
+          )}
+
+          {!isOwner && approxCenter && Platform.OS !== 'web' && (
+            <View style={styles.section}>
+              <SectionTitle>Approximate area</SectionTitle>
+              {/*
+                No "Open in Maps" here: navigating to the circle's centre would
+                lead a tenant to the wrong street with confidence.
+              */}
+              <View style={styles.mapWrap}>
+                <MapView
+                  provider={PROVIDER_GOOGLE}
+                  style={styles.map}
+                  pointerEvents="none"
+                  initialRegion={{ ...approxCenter, latitudeDelta: 0.025, longitudeDelta: 0.025 }}
+                >
+                  <Circle
+                    center={approxCenter}
+                    radius={APPROX_RADIUS_M}
+                    strokeColor={colors.charcoal}
+                    strokeWidth={1.5}
+                    fillColor="rgba(31,41,55,0.12)"
+                  />
+                </MapView>
+              </View>
+              <Text style={styles.mapCaption}>
+                The property is somewhere in this circle. Ask the landlord for the
+                exact address.
+              </Text>
             </View>
           )}
         </View>
@@ -250,6 +294,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   map: { width: '100%', height: 200 },
+  mapCaption: type.caption,
   mapHint: {
     position: 'absolute',
     right: spacing.sm,

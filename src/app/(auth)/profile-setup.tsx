@@ -27,7 +27,7 @@ export default function ProfileSetupScreen() {
 
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
   const [whatsapp, setWhatsapp] = useState(
-    profile?.whatsapp_phone ?? profile?.phone ?? '',
+    profile?.whatsapp_phone ?? session?.user.phone ?? '',
   );
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const [saving, setSaving] = useState(false);

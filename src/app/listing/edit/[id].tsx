@@ -23,6 +23,7 @@ import {
   nextImagePosition,
   pickImages,
   removeListingImages,
+  saveListingLocation,
   uploadListingImages,
   type PickedImage,
 } from '@/features/listings/create';
@@ -107,7 +108,7 @@ function SignedInEditListing({ userId }: { userId: string }) {
     setFurnished(listing.furnished);
     setDistrict(listing.district);
     setSector(listing.sector);
-    setAddress(listing.address ?? '');
+    setAddress(listing.listing_locations?.address ?? '');
     setKeptImages(
       listing.listing_images.map((i) => ({ id: i.id, storage_path: i.storage_path })),
     );
@@ -162,6 +163,10 @@ function SignedInEditListing({ userId }: { userId: string }) {
 
       setPhotoProgress(null);
 
+      // Before the listing update, whose success invalidates the detail query
+      // that carries the location embed.
+      await saveListingLocation(listingId, { address: address.trim() || null });
+
       await updateListing.mutateAsync({
         id: listingId,
         patch: {
@@ -173,7 +178,6 @@ function SignedInEditListing({ userId }: { userId: string }) {
           furnished,
           district,
           sector,
-          address: address.trim() || null,
         },
       });
       router.back();
@@ -384,6 +388,7 @@ function SignedInEditListing({ userId }: { userId: string }) {
           label="Address or landmark"
           value={address}
           onChangeText={setAddress}
+          hint="Private. Tenants see the sector and an approximate area only."
         />
 
         <TextField

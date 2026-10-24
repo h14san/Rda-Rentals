@@ -503,14 +503,15 @@ function SignedInPostListing({ userId }: { userId: string }) {
               value={address}
               onChangeText={setAddress}
               placeholder="Near Kimironko market, KG 11 Ave"
+              hint="Private. Tenants see the sector and an approximate area only."
             />
 
             {Platform.OS !== 'web' && (
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>Drop a pin</Text>
                 <Text style={styles.help}>
-                  Tap the map where the property is. Tenants see this pin on the
-                  listing.
+                  Tap the map where the property is. Only you see this pin;
+                  tenants see a circle about a kilometre across around it.
                 </Text>
                 <MapView
                   provider={PROVIDER_GOOGLE}

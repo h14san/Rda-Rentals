@@ -21,6 +21,7 @@ declare
   a_draft_listing uuid;
   visible int;
   affected int;
+  approx_lat double precision;
 begin
   -- Look these up as the table owner, before dropping into a restricted role.
   select id into a_active_listing
@@ -35,6 +36,25 @@ begin
 
   if a_active_listing is null or a_draft_listing is null then
     raise exception 'Seed data missing. Run supabase/seed.sql first.';
+  end if;
+
+  if not exists (
+    select 1 from public.listing_locations where listing_id = a_active_listing
+  ) then
+    raise exception 'Seed data missing a location for listing %.', a_active_listing;
+  end if;
+
+  -- The approximate point must exist and must not equal the real one. Checked
+  -- as owner: a trigger that silently copied the exact pin would pass every
+  -- visibility check below.
+  if exists (
+    select 1 from public.listings l
+    join public.listing_locations p on p.listing_id = l.id
+    where l.id = a_active_listing
+      and (l.approx_latitude is null
+           or (l.approx_latitude = p.latitude and l.approx_longitude = p.longitude))
+  ) then
+    raise exception 'FAIL: approximate point missing or identical to the exact pin.';
   end if;
 
   -- Become user B.
@@ -79,6 +99,27 @@ begin
     raise exception 'FAIL: user B modified user A''s profile.';
   end if;
 
+  -- 5b. B must NOT see A's exact location (Blueprint rules 3/4), but MUST
+  --     see the approximate point the map draws.
+  select count(*) into visible
+  from public.listing_locations where listing_id = a_active_listing;
+  if visible <> 0 then
+    raise exception 'FAIL: user B can read user A''s exact location.';
+  end if;
+
+  select approx_latitude into approx_lat
+  from public.listings where id = a_active_listing;
+  if approx_lat is null then
+    raise exception 'FAIL: user B cannot see the approximate point.';
+  end if;
+
+  -- 5c. B must NOT be able to plant a location on A's listing.
+  update public.listing_locations set latitude = 0 where listing_id = a_active_listing;
+  get diagnostics affected = row_count;
+  if affected <> 0 then
+    raise exception 'FAIL: user B moved user A''s pin.';
+  end if;
+
   -- 6. B must NOT be able to insert a listing owned by A.
   begin
     insert into public.listings (owner_id, title, price_rwf, property_type, status)
@@ -107,6 +148,12 @@ begin
   select count(*) into visible from public.listings where id = a_draft_listing;
   if visible <> 0 then
     raise exception 'FAIL: anonymous user can see a draft listing.';
+  end if;
+
+  -- 9. Anonymous users get nothing from the exact-location table.
+  select count(*) into visible from public.listing_locations;
+  if visible <> 0 then
+    raise exception 'FAIL: anonymous user can read exact locations.';
   end if;
 
   raise notice 'All RLS checks passed.';

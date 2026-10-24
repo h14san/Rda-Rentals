@@ -2,27 +2,97 @@
 
 # Rwanda Rentals
 
-Mobile rental marketplace for Kigali. Tenants browse/filter listings and contact
-landlords over WhatsApp; landlords post rentals with photos.
+Long-term rental marketplace for Rwanda, starting in Kigali. Tenants browse,
+filter and ask an AI assistant for listings; landlords post rentals with photos.
+The target product is a privacy-controlled marketplace with in-app chat,
+specific verification badges, booking and an admin console. Contact is still
+over WhatsApp until in-app chat ships.
 
 Expo SDK 57 (RN 0.86, React 19.2) + expo-router · Supabase (Postgres/Auth/
 Storage) · TanStack Query · react-native-maps.
 
-**Every feature the brief marks MVP is built**: auth, feed, filters, detail,
-posting, profile, and all three AI features (chatbot, natural-language search,
-photo-to-description). Sign-in is email OTP rather than the brief's phone OTP —
-that needs a paid SMS provider, not code. Phase 4 (testing, perf, beta) has not
-started; there are no tests and no CI.
+**Built:** auth (email OTP), feed, filters, detail, posting, editing, profile,
+and the three AI features (assistant, natural-language search,
+photo-to-description). The exact location is private (Phase 1 below). There are
+no tests and no CI.
 
-## Two source docs, one wins
+## Source docs: the Blueprint wins
 
-`docs/Rwanda_Rentals_Brief.docx` is authoritative: React Native + Supabase, plus
-AI features. The brief names the Claude API; the build uses **Gemini** instead,
-chosen for its free tier. The provider is isolated inside the Edge Functions —
-nothing in the app knows or cares which model answers. `docs/Rwanda Rentals App – Developer Framework.docx` is the older
-spec (Flutter + Firebase, no AI) and is **superseded** — consult it only for UI
-direction and the colour palette. If a request seems to assume Flutter or
-Firestore, that is the stale doc talking; say so rather than switching stacks.
+Authoritative, as of 2026-10-24:
+
+- `docs/RWANDA RENTALS blue print.docx` covers architecture, product rules, the
+  MVP definition and the 9 implementation phases.
+- `docs/Rwanda_Rentals_Features.pdf` is the 69-feature catalogue. It is
+  consistent with the Blueprint and is the newer of the two.
+- `docs/Rwanda_Rentals_Third_Party_Services.pdf` lists vendor categories as
+  examples only. Nothing in it is a final selection.
+
+Historical, for context only:
+
+- `docs/Rwanda_Rentals_Brief.docx` was the original MVP spec, and the build up
+  to Phase 0 followed it.
+- `docs/RWANDA RENTALS.pdf` is the 16-item backlog the Blueprint was built
+  from. Its "Viewing Requests & Scheduling" is **explicitly rejected** by the
+  Blueprint (§29) and the Features doc (#30): viewings are arranged in chat, so
+  don't build a scheduler.
+- `docs/Rwanda Rentals App – Developer Framework.docx` is the original Flutter +
+  Firebase spec. Use it only for UI direction and the palette. If a request
+  assumes Flutter or Firestore, that is this doc talking, so say so rather than
+  switching stacks.
+
+The docs suggest OpenAI as an example AI provider. The build uses **Gemini**,
+chosen for its free tier and isolated inside the Edge Functions. Nothing in the
+app knows which model answers.
+
+### Product rules (Blueprint §68): check every change against these
+
+1. No landlord phone number on public listings. *Temporary exception: the
+   WhatsApp CTA stays until in-app chat (Phase 3), then goes.*
+2. No landlord email on public listings.
+3. No exact address before the appropriate booking or payment stage.
+4. No exact map pin before that stage.
+5. Communication is primarily through Rwanda Rentals.
+6. Both Instant Book and Request to Book are supported.
+7. Landlords choose which booking mode they allow.
+8. Verification is explicit about what was checked. Never show a bare
+   "Verified".
+9. Landlord verification is required before public publishing.
+10. Sensitive information is not collected unless necessary.
+11. AI cannot invent property information.
+12. AI does not make consequential rental decisions on its own.
+13. Reviews are tied to legitimate completed rentals.
+14. Payments are designed into the architecture but introduced progressively.
+15. Rwanda Rentals initially manages only rentals that originate on the
+    platform.
+16. The MVP proves the marketplace before expanding into property management.
+
+Paid placement (`is_featured`) must never look like a verification badge.
+
+### Roadmap status
+
+The plan maps the Blueprint's phases onto what was already built:
+
+- **Phase 0 (done):** docs and rules.
+- **Phase 1 (done in code):** private location. Login phone dropped from
+  `profiles`.
+- **Phase 2:** richer listing fields, the full status model with "availability
+  confirmed", favorites, compare, and a list/map toggle.
+- **Phase 3:** roles, in-app chat (which removes WhatsApp), push, reports,
+  verification, and the admin console.
+- **Later:** booking, AI matching and alerts, payments, digital rental, and
+  agencies.
+
+### Open non-code decisions
+
+- **Data residency.** Blueprint §50 cites the Rwanda DPP law: storing data
+  outside Rwanda needs authorization, and controllers must register. Supabase is
+  in eu-central-1, and Gemini processes prompts outside Rwanda. Settle this
+  before production.
+- **Phone OTP.** Pindo, a Rwandan SMS provider, can sit behind a Supabase Send
+  SMS auth hook (an Edge Function), with no screen changes. It needs pricing, a
+  sender ID and a decision.
+- **Sentry and PostHog** wait for beta. Each goes behind a `src/lib/` wrapper,
+  and only after its data location has been checked.
 
 ## Commands
 
@@ -117,6 +187,27 @@ rejected with `42501` when inserting. Note that `profiles` is readable only by
 authenticated users, so an anonymous client gets `profiles: null` on a listing
 and the WhatsApp CTA has no number — if anonymous browsing is ever enabled, that
 policy needs revisiting.
+
+**The exact location is in `listing_locations`, never on `listings`.** The
+`listings` row is readable by anon, so any column on it is public no matter
+what the UI hides. `listing_locations` (address, lat/lng) is owner-only. A
+trigger writes `approx_latitude/approx_longitude` back onto the listing, offset
+from the real pin by a random bearing and distance drawn uniformly over a
+500 m disc.
+
+- The offset is random and stored once, never derived from the id. A
+  deterministic offset could be reversed by anyone reading the migration, and
+  a fresh offset per edit could be averaged away.
+- The detail screen draws a 500 m circle (`APPROX_RADIUS_M`). It must match
+  the disc, or the circle sometimes misses the property.
+- Non-owners get no "Open in Maps", because navigating to the circle's centre
+  sends them to the wrong street.
+- Phase 4 booking widens the `listing_locations` policy to the confirmed
+  renter. Nothing else should.
+
+**`profiles` has no `phone` column.** The login number lives in `auth.users`
+and reaches its owner through `session.user.phone`. `profiles` is readable by
+every signed-in user, so whatever is added there is public to them.
 
 **Email OTP needs two things the defaults get wrong.** Supabase's stock
 templates send `{{ .ConfirmationURL }}` — a magic link to Site URL
@@ -324,6 +415,8 @@ supabase/
   functions/chat/                     conversation -> reply + Filters
   functions/auto-describe/            photos -> description
   migrations/20260910120000_init.sql  schema, indexes, RLS, storage policies
+  migrations/20261024120000_private_location.sql  listing_locations, approx point,
+                                                  drops profiles.phone
   seed.sql                  15 demo Kigali listings (no photos — nothing in
                             the storage bucket to point at until a real upload)
   rls_check.sql             security assertions

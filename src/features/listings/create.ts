@@ -2,7 +2,11 @@ import { decode } from 'base64-arraybuffer';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 
-import type { ListingRow, PropertyType } from '@/features/listings/types';
+import type {
+  ListingLocationRow,
+  ListingRow,
+  PropertyType,
+} from '@/features/listings/types';
 import { supabase } from '@/lib/supabase';
 
 export const MAX_IMAGES = 8;
@@ -155,9 +159,6 @@ export async function createDraftListing(input: DraftInput): Promise<ListingRow>
       furnished: input.furnished,
       district: input.district,
       sector: input.sector,
-      address: input.address,
-      latitude: input.latitude,
-      longitude: input.longitude,
       status: 'draft',
       is_featured: false,
     })
@@ -165,7 +166,42 @@ export async function createDraftListing(input: DraftInput): Promise<ListingRow>
     .single();
 
   if (error) throw error;
+
+  await saveListingLocation(data.id, {
+    address: input.address,
+    latitude: input.latitude,
+    longitude: input.longitude,
+  });
+
   return data as ListingRow;
+}
+
+/**
+ * Writes the exact location to its owner-only table.
+ *
+ * Kept off `listings` because that row is publicly readable; the database
+ * derives the approximate point tenants see. Upserting only the fields passed
+ * means an address edit leaves an existing pin alone. Nothing to store means no
+ * row, so a listing without a location has no approximate point either.
+ */
+export async function saveListingLocation(
+  listingId: string,
+  location: Partial<Pick<ListingLocationRow, 'address' | 'latitude' | 'longitude'>>,
+): Promise<void> {
+  if (Object.values(location).every((v) => v === null || v === undefined)) {
+    const { error } = await supabase
+      .from('listing_locations')
+      .update(location)
+      .eq('listing_id', listingId);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase
+    .from('listing_locations')
+    .upsert({ listing_id: listingId, ...location }, { onConflict: 'listing_id' });
+
+  if (error) throw error;
 }
 
 /**

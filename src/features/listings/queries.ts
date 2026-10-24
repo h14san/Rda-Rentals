@@ -116,7 +116,12 @@ export function useListingDetail(id: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('listings')
-        .select(`*, ${IMAGE_SELECT}, profiles (id, full_name, whatsapp_phone, phone)`)
+        // listing_locations is owner-only, so for everyone else this embed is
+        // null; one request either way, rather than a second round trip for
+        // the owner on a slow connection.
+        .select(
+          `*, ${IMAGE_SELECT}, profiles (id, full_name, whatsapp_phone), listing_locations (address, latitude, longitude)`,
+        )
         .eq('id', id)
         .single();
 
@@ -175,7 +180,6 @@ export interface ListingEdit {
   furnished: boolean;
   district: string | null;
   sector: string | null;
-  address: string | null;
 }
 
 export function useUpdateListing(userId: string) {

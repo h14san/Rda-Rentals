@@ -33,7 +33,6 @@ export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
 export type ProfileRow = {
   id: string;
   full_name: string | null;
-  phone: string | null;
   whatsapp_phone: string | null;
   avatar_url: string | null;
   created_at: string;
@@ -51,9 +50,12 @@ export type ListingRow = {
   furnished: boolean;
   district: string | null;
   sector: string | null;
-  address: string | null;
-  latitude: number | null;
-  longitude: number | null;
+  /**
+   * A point up to 500 m from the property, derived by trigger from
+   * listing_locations. Never write these; the exact pin is private.
+   */
+  approx_latitude: number | null;
+  approx_longitude: number | null;
   status: ListingStatus;
   is_featured: boolean;
   created_at: string;
@@ -68,6 +70,20 @@ export type ListingImageRow = {
   created_at: string;
 };
 
+/**
+ * The exact location. Owner-only under RLS, so for anyone else the embed on a
+ * listing comes back null rather than erroring.
+ */
+export type ListingLocationRow = {
+  listing_id: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  offset_bearing: number;
+  offset_m: number;
+  updated_at: string;
+};
+
 /** A listing joined with its images, as the feed and detail screens consume it. */
 export type ListingWithImages = ListingRow & {
   listing_images: Pick<ListingImageRow, 'id' | 'storage_path' | 'position'>[];
@@ -75,7 +91,8 @@ export type ListingWithImages = ListingRow & {
 
 /** Detail screen additionally needs the landlord's contact number. */
 export type ListingDetail = ListingWithImages & {
-  profiles: Pick<ProfileRow, 'id' | 'full_name' | 'whatsapp_phone' | 'phone'> | null;
+  profiles: Pick<ProfileRow, 'id' | 'full_name' | 'whatsapp_phone'> | null;
+  listing_locations: Pick<ListingLocationRow, 'address' | 'latitude' | 'longitude'> | null;
 };
 
 export type Database = {
@@ -92,10 +109,23 @@ export type Database = {
       };
       listings: {
         Row: ListingRow;
-        Insert: Omit<ListingRow, 'id' | 'created_at' | 'updated_at'> & {
+        Insert: Omit<
+          ListingRow,
+          'id' | 'created_at' | 'updated_at' | 'approx_latitude' | 'approx_longitude'
+        > & {
           id?: string;
         };
-        Update: Partial<Omit<ListingRow, 'id' | 'owner_id'>>;
+        Update: Partial<
+          Omit<ListingRow, 'id' | 'owner_id' | 'approx_latitude' | 'approx_longitude'>
+        >;
+        Relationships: [];
+      };
+      listing_locations: {
+        Row: ListingLocationRow;
+        // The offsets are set once by the database; the app never supplies them.
+        Insert: Pick<ListingLocationRow, 'listing_id'> &
+          Partial<Pick<ListingLocationRow, 'address' | 'latitude' | 'longitude'>>;
+        Update: Partial<Pick<ListingLocationRow, 'address' | 'latitude' | 'longitude'>>;
         Relationships: [];
       };
       listing_images: {

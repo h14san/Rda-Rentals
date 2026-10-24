@@ -46,7 +46,7 @@ values
   )
 on conflict (id) do nothing;
 
--- The trigger fills id/phone/full_name; add the contact numbers the app needs
+-- The trigger fills id/full_name; add the contact numbers the app needs
 -- for the WhatsApp CTA.
 update public.profiles
 set full_name = 'Aline Uwase', whatsapp_phone = '+250788111222'
@@ -61,8 +61,20 @@ where id = 'aaaaaaaa-0000-4000-8000-000000000002';
 -- ---------------------------------------------------------------------------
 -- Prices reflect the Kigali market: studios 80-150k, one-beds 150-250k,
 -- two-beds 250-450k, family houses 500k+.
+--
+-- Staged through a temp table because the exact address and pin live in the
+-- owner-only listing_locations table, not on listings; writing them there fires
+-- the trigger that derives the public approximate point.
 
-insert into public.listings (
+create temp table seed_listings (
+  owner_id uuid, title text, description text, price_rwf integer,
+  property_type text, bedrooms smallint, furnished boolean,
+  district text, sector text, address text,
+  latitude double precision, longitude double precision,
+  status text, is_featured boolean default false, created_at timestamptz
+) on commit drop;
+
+insert into seed_listings (
   owner_id, title, description, price_rwf, property_type, bedrooms, furnished,
   district, sector, address, latitude, longitude, status, is_featured, created_at
 )
@@ -159,7 +171,7 @@ values
 
 -- One rented and one draft listing, so the profile screen's status states and
 -- the feed's "active only" filter can both be verified.
-insert into public.listings (
+insert into seed_listings (
   owner_id, title, description, price_rwf, property_type, bedrooms, furnished,
   district, sector, address, status, created_at
 )
@@ -175,5 +187,20 @@ values
    null,
    200000, 'apartment', 2, false, 'Gasabo', 'Kacyiru', null,
    'draft', now() - interval '1 hour');
+
+insert into public.listings (
+  owner_id, title, description, price_rwf, property_type, bedrooms, furnished,
+  district, sector, status, is_featured, created_at
+)
+select owner_id, title, description, price_rwf, property_type, bedrooms, furnished,
+       district, sector, status, is_featured, created_at
+from seed_listings;
+
+insert into public.listing_locations (listing_id, address, latitude, longitude)
+select l.id, s.address, s.latitude, s.longitude
+from seed_listings s
+join public.listings l on l.owner_id = s.owner_id and l.title = s.title
+where s.address is not null or s.latitude is not null
+on conflict (listing_id) do nothing;
 
 commit;

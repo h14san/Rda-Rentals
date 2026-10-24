@@ -55,7 +55,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "db:push": "supabase db push --linked",
+    "db:push": "npx --yes supabase@latest db push --linked",
     "db:seed": "node scripts/run-sql.mjs supabase/seed.sql",
     "db:rls-check": "node scripts/run-sql.mjs supabase/rls_check.sql"
   },

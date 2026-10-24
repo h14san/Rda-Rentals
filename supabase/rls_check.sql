@@ -26,7 +26,7 @@ begin
   -- Look these up as the table owner, before dropping into a restricted role.
   select id into a_active_listing
   from public.listings
-  where owner_id = user_a and status = 'active'
+  where owner_id = user_a and status = 'published'
   limit 1;
 
   select id into a_draft_listing
@@ -65,10 +65,10 @@ begin
     true
   );
 
-  -- 1. B can see A's ACTIVE listing (the feed must work across landlords).
+  -- 1. B can see A's PUBLISHED listing (the feed must work across landlords).
   select count(*) into visible from public.listings where id = a_active_listing;
   if visible <> 1 then
-    raise exception 'FAIL: user B cannot see user A''s active listing.';
+    raise exception 'FAIL: user B cannot see user A''s published listing.';
   end if;
 
   -- 2. B must NOT see A's DRAFT listing.
@@ -123,7 +123,7 @@ begin
   -- 6. B must NOT be able to insert a listing owned by A.
   begin
     insert into public.listings (owner_id, title, price_rwf, property_type, status)
-    values (user_a, 'Forged listing', 100000, 'studio', 'active');
+    values (user_a, 'Forged listing', 100000, 'studio', 'draft');
     raise exception 'FAIL: user B inserted a listing owned by user A.';
   exception
     when insufficient_privilege then null;  -- expected: with-check violation
@@ -141,7 +141,54 @@ begin
     raise exception 'FAIL: user B cannot update its own listing.';
   end if;
 
-  -- 8. Anonymous users see active listings only.
+  -- 7b. A landlord cannot skip moderation. Publishing a draft is allowed
+  --     until verification exists; suspending or approving is staff-only.
+  update public.listings set status = 'published'
+  where owner_id = user_b and title = 'B own listing';
+
+  begin
+    update public.listings set status = 'suspended'
+    where owner_id = user_b and title = 'B own listing';
+    raise exception 'FAIL: user B set its own listing to suspended.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.listings (owner_id, title, price_rwf, property_type, status)
+    values (user_b, 'Born published', 100000, 'studio', 'published');
+    raise exception 'FAIL: user B inserted a listing that skipped draft.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- 7c. Availability confirmation is stamped with the server clock.
+  update public.listings set availability_confirmed_at = '2100-01-01'
+  where owner_id = user_b and title = 'B own listing';
+  if exists (
+    select 1 from public.listings
+    where owner_id = user_b and title = 'B own listing'
+      and availability_confirmed_at > now() + interval '1 minute'
+  ) then
+    raise exception 'FAIL: a client-supplied availability date was stored.';
+  end if;
+
+  -- 7d. Status history: B reads its own, never A's.
+  select count(*) into visible
+  from public.listing_status_history h
+  join public.listings l on l.id = h.listing_id
+  where l.owner_id = user_b and l.title = 'B own listing';
+  if visible < 2 then
+    raise exception 'FAIL: user B cannot read its own status history (% rows).', visible;
+  end if;
+
+  select count(*) into visible
+  from public.listing_status_history where listing_id = a_active_listing;
+  if visible <> 0 then
+    raise exception 'FAIL: user B can read user A''s status history.';
+  end if;
+
+  -- 8. Anonymous users see published listings only.
   set local role anon;
   perform set_config('request.jwt.claims', null, true);
 

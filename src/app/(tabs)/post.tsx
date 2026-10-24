@@ -23,15 +23,18 @@ import {
   useAutoDescribe,
 } from '@/features/listings/auto-describe';
 import {
+  EMPTY_TERMS,
   MAX_IMAGES,
   captureImage,
   createDraftListing,
   pickImages,
   publishListing,
   uploadListingImages,
+  type ListingTerms,
   type PickedImage,
 } from '@/features/listings/create';
 import { listingKeys } from '@/features/listings/queries';
+import { ListingTermsFields, validateTerms } from '@/features/listings/terms-fields';
 import {
   PROPERTY_TYPES,
   PROPERTY_TYPE_LABELS,
@@ -42,13 +45,16 @@ import { formatPrice } from '@/lib/format';
 import { KIGALI_CENTER, KIGALI_DISTRICTS, sectorsFor } from '@/lib/locations';
 import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
 
-type Step = 'photos' | 'details' | 'location' | 'review';
+type Step = 'photos' | 'details' | 'terms' | 'location' | 'review';
 
-const STEP_ORDER: Step[] = ['photos', 'details', 'location', 'review'];
+const STEP_ORDER: Step[] = ['photos', 'details', 'terms', 'location', 'review'];
 
 const STEP_TITLES: Record<Step, string> = {
   photos: 'Add photos',
   details: 'Describe the place',
+  // Its own step rather than more fields on Details: everything here is
+  // optional, and a landlord should be able to skip it with one tap.
+  terms: 'Rental terms',
   location: 'Set the location',
   review: 'Review and publish',
 };
@@ -74,6 +80,7 @@ function SignedInPostListing({ userId }: { userId: string }) {
   const [propertyType, setPropertyType] = useState<PropertyType | null>(null);
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [furnished, setFurnished] = useState(false);
+  const [terms, setTerms] = useState<ListingTerms>(EMPTY_TERMS);
 
   const [district, setDistrict] = useState<string | null>(null);
   const [sector, setSector] = useState<string | null>(null);
@@ -106,6 +113,7 @@ function SignedInPostListing({ userId }: { userId: string }) {
     setPropertyType(null);
     setBedrooms(null);
     setFurnished(false);
+    setTerms(EMPTY_TERMS);
     setDistrict(null);
     setSector(null);
     setAddress('');
@@ -209,7 +217,11 @@ function SignedInPostListing({ userId }: { userId: string }) {
       setErrors({});
       setStep('details');
     } else if (step === 'details') {
-      if (validateDetails()) setStep('location');
+      if (validateDetails()) setStep('terms');
+    } else if (step === 'terms') {
+      const next = validateTerms(terms);
+      setErrors(next);
+      if (Object.keys(next).length === 0) setStep('location');
     } else if (step === 'location') {
       setStep('review');
     }
@@ -244,6 +256,7 @@ function SignedInPostListing({ userId }: { userId: string }) {
         address: address.trim() || null,
         latitude: pin?.latitude ?? null,
         longitude: pin?.longitude ?? null,
+        terms,
       });
 
       await uploadListingImages(userId, draft.id, images, (done, total) =>
@@ -461,6 +474,10 @@ function SignedInPostListing({ userId }: { userId: string }) {
               }
             />
           </View>
+        )}
+
+        {step === 'terms' && (
+          <ListingTermsFields terms={terms} onChange={setTerms} errors={errors} />
         )}
 
         {step === 'location' && (

@@ -28,9 +28,9 @@ import { activeFilterCount } from '@/features/listings/types';
 import { LAUNCH_SECTORS, districtForSector } from '@/lib/locations';
 import { colors, radius, spacing, type } from '@/theme';
 
-const SORT_CYCLE: SortOrder[] = ['newest', 'price_asc', 'price_desc'];
+const SORT_CYCLE: SortOrder[] = ['newest', 'price_asc', 'price_desc', 'confirmed'];
 
-/** Tap cycles the ordering — three options do not justify a modal picker. */
+/** Tap cycles the ordering — four options do not justify a modal picker. */
 function nextSort(current: SortOrder): SortOrder {
   return SORT_CYCLE[(SORT_CYCLE.indexOf(current) + 1) % SORT_CYCLE.length];
 }

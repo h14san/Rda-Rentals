@@ -17,12 +17,13 @@ import { supabase } from '@/lib/supabase';
 export const PAGE_SIZE = 10;
 
 /** Feed orderings offered in the UI. */
-export type SortOrder = 'newest' | 'price_asc' | 'price_desc';
+export type SortOrder = 'newest' | 'price_asc' | 'price_desc' | 'confirmed';
 
 export const SORT_LABELS: Record<SortOrder, string> = {
   newest: 'Newest',
   price_asc: 'Price: low to high',
   price_desc: 'Price: high to low',
+  confirmed: 'Recently confirmed available',
 };
 
 const IMAGE_SELECT = 'listing_images (id, storage_path, position)';
@@ -74,7 +75,7 @@ export function useListingsFeed(
         // count:'exact' so the feed can show how many rentals matched, which is
         // the fastest way for a tenant to tell a filter was too narrow.
         .select(`*, ${IMAGE_SELECT}`, { count: 'exact' })
-        .eq('status', 'active');
+        .eq('status', 'published');
 
       if (filters.minPrice !== null) query = query.gte('price_rwf', filters.minPrice);
       if (filters.maxPrice !== null) query = query.lte('price_rwf', filters.maxPrice);
@@ -84,6 +85,19 @@ export function useListingsFeed(
       if (filters.minBedrooms !== null)
         query = query.gte('bedrooms', filters.minBedrooms);
       if (filters.furnishedOnly) query = query.eq('furnished', true);
+      if (filters.minBathrooms !== null)
+        query = query.gte('bathrooms', filters.minBathrooms);
+      if (filters.amenities.length > 0)
+        query = query.contains('amenities', filters.amenities);
+      // Unstated terms match rather than drop out. A landlord who never filled
+      // in a minimum stay or a move-in date has not said "no", and hiding their
+      // listing would punish the most common case for being incomplete.
+      if (filters.maxMinRentalMonths !== null)
+        query = query.or(
+          `min_rental_months.is.null,min_rental_months.lte.${filters.maxMinRentalMonths}`,
+        );
+      if (filters.availableBy !== null)
+        query = query.or(`available_from.is.null,available_from.lte.${filters.availableBy}`);
 
       // Featured listings float to the top only under the default ordering.
       // Letting paid placement override an explicit "price: low to high" would
@@ -92,6 +106,11 @@ export function useListingsFeed(
       if (sort === 'newest') {
         query = query.order('is_featured', { ascending: false });
         query = query.order('created_at', { ascending: false });
+      } else if (sort === 'confirmed') {
+        query = query.order('availability_confirmed_at', {
+          ascending: false,
+          nullsFirst: false,
+        });
       } else {
         query = query.order('price_rwf', { ascending: sort === 'price_asc' });
       }
@@ -180,6 +199,40 @@ export interface ListingEdit {
   furnished: boolean;
   district: string | null;
   sector: string | null;
+  bathrooms: number | null;
+  size_sqm: number | null;
+  deposit_rwf: number | null;
+  min_rental_months: number | null;
+  available_from: string | null;
+  amenities: string[];
+}
+
+/**
+ * "Still available": the landlord re-confirms a live listing.
+ *
+ * The value sent is irrelevant; the listings_guard_status trigger replaces any
+ * change to this column with the server's now(), so a wrong phone clock cannot
+ * make a listing look freshly confirmed.
+ */
+export function useConfirmAvailability(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase
+        .from('listings')
+        .update({ availability_confirmed_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ListingRow;
+    },
+    onSuccess: (row) => {
+      void qc.invalidateQueries({ queryKey: listingKeys.mine(userId) });
+      void qc.invalidateQueries({ queryKey: listingKeys.detail(row.id) });
+      void qc.invalidateQueries({ queryKey: ['listings', 'feed'] });
+    },
+  });
 }
 
 export function useUpdateListing(userId: string) {

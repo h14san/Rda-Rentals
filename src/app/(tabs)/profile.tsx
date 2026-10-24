@@ -7,17 +7,18 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Button, SectionTitle, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
 import {
+  useConfirmAvailability,
   useDeleteListing,
   useMyListings,
   useSetListingStatus,
 } from '@/features/listings/queries';
 import {
+  LANDLORD_STATUS_ACTIONS,
   LISTING_STATUS_LABELS,
-  type ListingStatus,
   type ListingWithImages,
 } from '@/features/listings/types';
 import { formatRwandanPhone, normalizeRwandanPhone, signOut } from '@/lib/auth';
-import { formatLocation, formatPrice } from '@/lib/format';
+import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { imageUrl, supabase } from '@/lib/supabase';
 import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
 
@@ -35,6 +36,7 @@ function SignedInProfile({ userId }: { userId: string }) {
 
   const { data: listings, isPending, isError, error, refetch } = useMyListings(userId);
   const setStatus = useSetListingStatus(userId);
+  const confirmAvailability = useConfirmAvailability(userId);
   const deleteListing = useDeleteListing(userId);
 
   const [editing, setEditing] = useState(false);
@@ -85,21 +87,6 @@ function SignedInProfile({ userId }: { userId: string }) {
         },
       ],
     );
-  }
-
-  /** Rented and live are the two states a landlord actually toggles between. */
-  function nextStatus(current: ListingStatus): ListingStatus | null {
-    if (current === 'active') return 'rented';
-    if (current === 'rented') return 'active';
-    if (current === 'draft') return 'active';
-    return null;
-  }
-
-  function statusActionLabel(current: ListingStatus): string | null {
-    if (current === 'active') return 'Mark rented';
-    if (current === 'rented') return 'Mark available';
-    if (current === 'draft') return 'Publish';
-    return null;
   }
 
   return (
@@ -169,8 +156,8 @@ function SignedInProfile({ userId }: { userId: string }) {
         ) : (
           listings.map((listing) => {
             const cover = listing.listing_images?.[0];
-            const action = statusActionLabel(listing.status);
-            const target = nextStatus(listing.status);
+            const actions = LANDLORD_STATUS_ACTIONS[listing.status] ?? [];
+            const isLive = listing.status === 'published';
 
             return (
               <View key={listing.id} style={styles.listingRow}>
@@ -197,21 +184,18 @@ function SignedInProfile({ userId }: { userId: string }) {
                       {formatPrice(listing.price_rwf)} ·{' '}
                       {formatLocation(listing.sector, listing.district)}
                     </Text>
-                    <View
-                      style={[
-                        styles.statusPill,
-                        listing.status === 'active' && styles.statusPillActive,
-                      ]}
-                    >
+                    <View style={[styles.statusPill, isLive && styles.statusPillActive]}>
                       <Text
-                        style={[
-                          styles.statusPillText,
-                          listing.status === 'active' && styles.statusPillTextActive,
-                        ]}
+                        style={[styles.statusPillText, isLive && styles.statusPillTextActive]}
                       >
                         {LISTING_STATUS_LABELS[listing.status]}
                       </Text>
                     </View>
+                    {isLive && !!listing.availability_confirmed_at && (
+                      <Text style={styles.listingMeta}>
+                        Confirmed available {timeAgo(listing.availability_confirmed_at)}
+                      </Text>
+                    )}
                   </View>
                 </Pressable>
 
@@ -222,20 +206,44 @@ function SignedInProfile({ userId }: { userId: string }) {
                     style={styles.flex}
                     onPress={() => router.push(`/listing/edit/${listing.id}`)}
                   />
-                  {action && target && (
+                  {actions.map((action) => (
                     <Button
-                      label={action}
+                      key={action.to}
+                      label={action.label}
                       variant="secondary"
                       style={styles.flex}
                       loading={
-                        setStatus.isPending && setStatus.variables?.id === listing.id
+                        setStatus.isPending &&
+                        setStatus.variables?.id === listing.id &&
+                        setStatus.variables.status === action.to
                       }
                       onPress={() =>
-                        setStatus.mutate({ id: listing.id, status: target })
+                        setStatus.mutate(
+                          { id: listing.id, status: action.to },
+                          {
+                            onError: (e) =>
+                              Alert.alert('Could not change the status', e.message),
+                          },
+                        )
                       }
                     />
-                  )}
+                  ))}
                 </View>
+
+                {/* Its own row: re-confirming is the routine action on a live
+                    listing, and the one the feed's "recently confirmed" sort
+                    rewards, so it should not be squeezed between the others. */}
+                {isLive && (
+                  <Button
+                    label="Still available"
+                    variant="secondary"
+                    loading={
+                      confirmAvailability.isPending &&
+                      confirmAvailability.variables === listing.id
+                    }
+                    onPress={() => confirmAvailability.mutate(listing.id)}
+                  />
+                )}
 
                 {/* Destructive action sits on its own row so it is never a
                     mis-tap away from Edit or a status toggle. */}

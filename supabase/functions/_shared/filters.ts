@@ -16,6 +16,25 @@ import { Type } from 'npm:@google/genai@2.21.0';
 export const PROPERTY_TYPES = ['studio', 'apartment', 'shared', 'house'] as const;
 
 /**
+ * Mirrors src/lib/amenities.ts. Unlike place names this list is not sent by
+ * the app: it is short, it is part of the response schema's enum, and the app
+ * re-validates every value against its own copy anyway, so a drift here can
+ * only drop an amenity, never apply one the app does not know.
+ */
+export const AMENITIES = [
+  'water_tank',
+  'backup_power',
+  'hot_water',
+  'parking',
+  'security',
+  'fenced',
+  'wifi',
+  'balcony',
+  'garden',
+  'pets_allowed',
+] as const;
+
+/**
  * Sentinels instead of nulls.
  *
  * Gemini's response schema supports `nullable`, but combining it with `enum` and
@@ -27,6 +46,7 @@ export const PROPERTY_TYPES = ['studio', 'apartment', 'shared', 'house'] as cons
 export const UNSET_NUMBER = 0;
 export const UNSET_BEDROOMS = -1;
 export const UNSET_TYPE = 'any';
+export const UNSET_DATE = '';
 
 /** The filter half of a response schema, spread into each function's own. */
 export const filterSchemaProperties = {
@@ -52,6 +72,24 @@ export const filterSchemaProperties = {
     description: 'Minimum bedrooms; 0 means studio, -1 if not specified.',
   },
   furnishedOnly: { type: Type.BOOLEAN },
+  minBathrooms: {
+    type: Type.INTEGER,
+    description: 'Minimum bathrooms, or 0 if not specified.',
+  },
+  amenities: {
+    type: Type.ARRAY,
+    items: { type: Type.STRING, enum: [...AMENITIES] },
+    description: 'Amenities the renter requires, all of them. Empty if none.',
+  },
+  maxMinRentalMonths: {
+    type: Type.INTEGER,
+    description:
+      'Longest lease in months the renter can commit to, or 0 if not specified.',
+  },
+  availableBy: {
+    type: Type.STRING,
+    description: 'Date the renter must move in by, as YYYY-MM-DD, or empty string.',
+  },
 };
 
 /** Every filter field is required; "not specified" is carried by the sentinels. */
@@ -65,6 +103,10 @@ export interface FilterOutput {
   propertyType: string;
   minBedrooms: number;
   furnishedOnly: boolean;
+  minBathrooms: number;
+  amenities: string[];
+  maxMinRentalMonths: number;
+  availableBy: string;
 }
 
 /**
@@ -101,6 +143,17 @@ export function toFilters(
         ? Math.round(out.minBedrooms)
         : null,
     furnishedOnly: out.furnishedOnly === true,
+    minBathrooms: positive(out.minBathrooms),
+    amenities: Array.isArray(out.amenities)
+      ? [...new Set(out.amenities)].filter((a) =>
+          (AMENITIES as readonly string[]).includes(a),
+        )
+      : [],
+    maxMinRentalMonths: positive(out.maxMinRentalMonths),
+    availableBy:
+      typeof out.availableBy === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(out.availableBy)
+        ? out.availableBy
+        : null,
   };
 }
 
@@ -115,7 +168,8 @@ export function toFilters(
 export function filterRules(districts: string[], sectors: string[]): string[] {
   return [
     '- Only fill a field the user actually implied. Use the "not specified"',
-    '  value for everything else: 0 for prices, "" for district and sector,',
+    '  value for everything else: 0 for prices, bathrooms and lease length,',
+    '  "" for district, sector and availableBy, [] for amenities,',
     `  "${UNSET_TYPE}" for propertyType, ${UNSET_BEDROOMS} for minBedrooms.`,
     '- Never invent a location. district must be one of: ' + districts.join(', ') + '.',
     '- sector must be one of: ' + sectors.join(', ') + '.',
@@ -131,5 +185,14 @@ export function filterRules(districts: string[], sectors: string[]): string[] {
     '- Handle typos and local spellings ("apratment" -> apartment,',
     '  "Kimirongo" -> Kimironko).',
     '- Treat a bare number above 20000 as a monthly budget ceiling.',
+    '- amenities only from: ' + AMENITIES.join(', ') + '. "generator" or',
+    '  "inverter" -> backup_power; "guard" -> security; "compound wall" ->',
+    '  fenced. Anything else (a pool, a lift) is not searchable; leave it out',
+    '  and say so.',
+    '- "short stay"/"month to month" -> maxMinRentalMonths 1; "for 6 months"',
+    '  -> 6. A lease length is not a move-in date.',
+    `- Today is ${new Date().toISOString().slice(0, 10)}. "next month" ->`,
+    '  availableBy the first day of next month; "now"/"immediately" -> today.',
+    `  Use "${UNSET_DATE}" when no move-in timing is given.`,
   ];
 }

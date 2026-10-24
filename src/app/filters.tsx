@@ -5,18 +5,24 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Chip, SectionTitle } from '@/components/ui';
 import { useFilters } from '@/features/listings/filters-context';
+import { moveInOptions } from '@/features/listings/terms-fields';
 import {
   EMPTY_FILTERS,
   PRICE_BOUNDS,
   PROPERTY_TYPES,
   PROPERTY_TYPE_LABELS,
+  formatShortDate,
   type Filters,
 } from '@/features/listings/types';
+import { AMENITIES, AMENITY_LABELS, type Amenity } from '@/lib/amenities';
 import { formatPriceCompact } from '@/lib/format';
 import { KIGALI_DISTRICTS, sectorsFor } from '@/lib/locations';
 import { colors, fontFamily, fontSize, spacing } from '@/theme';
 
 const BEDROOM_OPTIONS = [0, 1, 2, 3, 4] as const;
+const BATHROOM_OPTIONS = [1, 2, 3] as const;
+/** "I can commit to at most N months." Matches the landlord-side choices. */
+const STAY_OPTIONS = [1, 3, 6, 12] as const;
 
 /**
  * Filter sheet.
@@ -45,6 +51,14 @@ export default function FiltersScreen() {
 
   function patch(next: Partial<Filters>) {
     setDraft((d) => ({ ...d, ...next }));
+  }
+
+  function toggleAmenity(a: Amenity) {
+    patch({
+      amenities: draft.amenities.includes(a)
+        ? draft.amenities.filter((x) => x !== a)
+        : [...draft.amenities, a],
+    });
   }
 
   function apply() {
@@ -181,6 +195,69 @@ export default function FiltersScreen() {
               onPress={() => patch({ furnishedOnly: !draft.furnishedOnly })}
             />
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>Bathrooms</SectionTitle>
+          <View style={styles.chipWrap}>
+            {BATHROOM_OPTIONS.map((n) => (
+              <Chip
+                key={n}
+                label={`${n}+`}
+                selected={draft.minBathrooms === n}
+                onPress={() =>
+                  patch({ minBathrooms: draft.minBathrooms === n ? null : n })
+                }
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>Amenities</SectionTitle>
+          <View style={styles.chipWrap}>
+            {AMENITIES.map((a) => (
+              <Chip
+                key={a}
+                label={AMENITY_LABELS[a]}
+                selected={draft.amenities.includes(a)}
+                onPress={() => toggleAmenity(a)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>Longest lease you can commit to</SectionTitle>
+          <View style={styles.chipWrap}>
+            {STAY_OPTIONS.map((n) => (
+              <Chip
+                key={n}
+                label={n === 1 ? '1 month' : `${n} months`}
+                selected={draft.maxMinRentalMonths === n}
+                onPress={() =>
+                  patch({ maxMinRentalMonths: draft.maxMinRentalMonths === n ? null : n })
+                }
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>Move in by</SectionTitle>
+          <View style={styles.chipWrap}>
+            {moveInOptions().map((d) => (
+              <Chip
+                key={d}
+                label={formatShortDate(d)}
+                selected={draft.availableBy === d}
+                onPress={() => patch({ availableBy: draft.availableBy === d ? null : d })}
+              />
+            ))}
+          </View>
+          <Text style={styles.sliderLabel}>
+            Listings without a stated date are always included.
+          </Text>
         </View>
       </ScrollView>
 

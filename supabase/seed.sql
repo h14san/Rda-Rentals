@@ -83,94 +83,94 @@ values
    'Bright studio near Kimironko market',
    'Self-contained studio with its own entrance, water tank and 24/7 security. Walking distance to Kimironko market and the bus stage.',
    110000, 'studio', 0, false, 'Gasabo', 'Kimironko', 'KG 11 Ave, near the market',
-   -1.9407, 30.1265, 'active', true, now() - interval '2 days'),
+   -1.9407, 30.1265, 'published', true, now() - interval '2 days'),
 
   ('aaaaaaaa-0000-4000-8000-000000000001',
    'Furnished 1-bedroom in Remera',
    'Fully furnished with fridge, cooker and hot water. Ideal for a young professional working around Remera or the airport road.',
    230000, 'apartment', 1, true, 'Gasabo', 'Remera', 'Near Amahoro Stadium',
-   -1.9536, 30.1096, 'active', false, now() - interval '3 days'),
+   -1.9536, 30.1096, 'published', false, now() - interval '3 days'),
 
   ('aaaaaaaa-0000-4000-8000-000000000002',
    'Spacious 2-bedroom apartment, Kacyiru',
    'Two large bedrooms, open kitchen, balcony with a city view. Quiet compound with parking. Water and garbage collection included.',
    380000, 'apartment', 2, false, 'Gasabo', 'Kacyiru', 'KG 7 Ave',
-   -1.9366, 30.0930, 'active', false, now() - interval '5 days'),
+   -1.9366, 30.0930, 'published', false, now() - interval '5 days'),
 
   ('aaaaaaaa-0000-4000-8000-000000000002',
    'Affordable shared room in Nyamirambo',
    'Shared house with three other tenants. Room is private, kitchen and bathroom shared. Good option for students.',
    65000, 'shared', 1, false, 'Nyarugenge', 'Nyamirambo', 'Near the Green Mosque',
-   -1.9797, 30.0442, 'active', false, now() - interval '1 day'),
+   -1.9797, 30.0442, 'published', false, now() - interval '1 day'),
 
   ('aaaaaaaa-0000-4000-8000-000000000001',
    'Modern studio in Gisozi',
    'Newly built studio, tiled throughout, with a small private yard. Reliable water supply.',
    95000, 'studio', 0, false, 'Gasabo', 'Gisozi', 'Near Gisozi Genocide Memorial',
-   -1.9182, 30.0705, 'active', false, now() - interval '6 days'),
+   -1.9182, 30.0705, 'published', false, now() - interval '6 days'),
 
   ('aaaaaaaa-0000-4000-8000-000000000002',
    'Family house with garden, Kanombe',
    'Three bedrooms, sitting room, separate dining, and a large garden. Boys quarter included. Good for a family.',
    650000, 'house', 3, false, 'Kicukiro', 'Kanombe', 'Off the airport road',
-   -1.9700, 30.1400, 'active', false, now() - interval '8 days'),
+   -1.9700, 30.1400, 'published', false, now() - interval '8 days'),
 
   ('aaaaaaaa-0000-4000-8000-000000000001',
    'Cosy 1-bedroom near Kimironko',
    'Compact one-bedroom in a small compound. Water tank, parking for one car, and a shared courtyard.',
    165000, 'apartment', 1, false, 'Gasabo', 'Kimironko', 'KG 203 St',
-   -1.9430, 30.1230, 'active', false, now() - interval '4 days'),
+   -1.9430, 30.1230, 'published', false, now() - interval '4 days'),
 
   ('aaaaaaaa-0000-4000-8000-000000000002',
    'Furnished 2-bedroom, Kimihurura',
    'Fully furnished, ready to move in. Backup power and a generator for the compound. Suits expats and NGO staff.',
    750000, 'apartment', 2, true, 'Gasabo', 'Kimihurura', 'KG 5 Ave',
-   -1.9505, 30.0930, 'active', true, now() - interval '7 days'),
+   -1.9505, 30.0930, 'published', true, now() - interval '7 days'),
 
   ('aaaaaaaa-0000-4000-8000-000000000001',
    'Budget studio in Gatenga',
    'Simple studio, shared water point, secure gate. Cheapest option in the area.',
    55000, 'studio', 0, false, 'Kicukiro', 'Gatenga', 'Near Gatenga sector office',
-   -1.9880, 30.0930, 'active', false, now() - interval '9 days'),
+   -1.9880, 30.0930, 'published', false, now() - interval '9 days'),
 
   ('aaaaaaaa-0000-4000-8000-000000000002',
    'Three-bedroom house in Kicukiro',
    'Standalone house with a walled compound, borehole water and space for two cars.',
    520000, 'house', 3, false, 'Kicukiro', 'Kicukiro', 'Kicukiro centre',
-   -1.9840, 30.1020, 'active', false, now() - interval '11 days'),
+   -1.9840, 30.1020, 'published', false, now() - interval '11 days'),
 
   ('aaaaaaaa-0000-4000-8000-000000000001',
    'Shared apartment room, Remera',
    'One room in a two-bedroom apartment. Shared kitchen and sitting room with one other tenant.',
    80000, 'shared', 1, true, 'Gasabo', 'Remera', 'Near Giporoso',
-   -1.9570, 30.1150, 'active', false, now() - interval '2 days'),
+   -1.9570, 30.1150, 'published', false, now() - interval '2 days'),
 
   ('aaaaaaaa-0000-4000-8000-000000000002',
    'One-bedroom in Nyamirambo',
    'Bright one-bedroom on the upper floor with a small balcony. Lively neighbourhood, good transport links.',
    140000, 'apartment', 1, false, 'Nyarugenge', 'Nyamirambo', 'KN 2 Ave',
-   -1.9760, 30.0470, 'active', false, now() - interval '10 days'),
+   -1.9760, 30.0470, 'published', false, now() - interval '10 days'),
 
   ('aaaaaaaa-0000-4000-8000-000000000001',
    'Executive 2-bedroom, Kacyiru',
    'High-end finishes, fitted wardrobes, and a shared gym in the building. Close to the embassies.',
    900000, 'apartment', 2, true, 'Gasabo', 'Kacyiru', 'KG 9 Ave',
-   -1.9340, 30.0900, 'active', false, now() - interval '12 days'),
+   -1.9340, 30.0900, 'published', false, now() - interval '12 days'),
 
   ('aaaaaaaa-0000-4000-8000-000000000002',
    'Studio near University of Rwanda campus',
    'Small studio popular with students. Prepaid electricity and a shared water tap.',
    70000, 'studio', 0, false, 'Gasabo', 'Remera', 'Near the UR Remera campus',
-   -1.9590, 30.1080, 'active', false, now() - interval '1 day'),
+   -1.9590, 30.1080, 'published', false, now() - interval '1 day'),
 
   ('aaaaaaaa-0000-4000-8000-000000000001',
    'Two-bedroom in Kinyinya',
    'Quiet residential area, newly tarmacked road, and a small garden. Water and power reliable.',
    290000, 'apartment', 2, false, 'Gasabo', 'Kinyinya', 'Kinyinya, near the health centre',
-   -1.9210, 30.0980, 'active', false, now() - interval '14 days');
+   -1.9210, 30.0980, 'published', false, now() - interval '14 days');
 
 -- One rented and one draft listing, so the profile screen's status states and
--- the feed's "active only" filter can both be verified.
+-- the feed's "published only" filter can both be verified.
 insert into seed_listings (
   owner_id, title, description, price_rwf, property_type, bedrooms, furnished,
   district, sector, address, status, created_at
@@ -195,6 +195,24 @@ insert into public.listings (
 select owner_id, title, description, price_rwf, property_type, bedrooms, furnished,
        district, sector, status, is_featured, created_at
 from seed_listings;
+
+-- Demo rental terms, derived rather than hand-written per row: enough variety
+-- for the bathrooms, amenities, minimum-stay and move-in filters to return
+-- something different from the unfiltered feed.
+update public.listings l
+set bathrooms         = greatest(1, coalesce(l.bedrooms, 1) - 1 + (l.price_rwf / 400000)),
+    deposit_rwf       = l.price_rwf,
+    min_rental_months = case when l.property_type in ('studio', 'shared') then 1
+                             when l.price_rwf >= 500000 then 12 else 6 end,
+    available_from    = case when l.created_at < now() - interval '7 days'
+                             then null else (date_trunc('month', now()) + interval '1 month')::date end,
+    amenities         = case
+                          when l.price_rwf >= 500000 then array['parking', 'security', 'water_tank', 'backup_power', 'hot_water', 'wifi']
+                          when l.furnished           then array['security', 'water_tank', 'hot_water']
+                          else array['water_tank']
+                        end
+from seed_listings s
+where l.owner_id = s.owner_id and l.title = s.title;
 
 insert into public.listing_locations (listing_id, address, latitude, longitude)
 select l.id, s.address, s.latitude, s.longitude

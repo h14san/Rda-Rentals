@@ -2,10 +2,11 @@ import { decode } from 'base64-arraybuffer';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 
-import type {
-  ListingLocationRow,
-  ListingRow,
-  PropertyType,
+import {
+  PUBLISH_TARGET,
+  type ListingLocationRow,
+  type ListingRow,
+  type PropertyType,
 } from '@/features/listings/types';
 import { supabase } from '@/lib/supabase';
 
@@ -136,7 +137,28 @@ export interface DraftInput {
   address: string | null;
   latitude: number | null;
   longitude: number | null;
+  terms: ListingTerms;
 }
+
+/** The structured rental terms, edited by the same fields on post and edit. */
+export type ListingTerms = Pick<
+  ListingRow,
+  | 'bathrooms'
+  | 'size_sqm'
+  | 'deposit_rwf'
+  | 'min_rental_months'
+  | 'available_from'
+  | 'amenities'
+>;
+
+export const EMPTY_TERMS: ListingTerms = {
+  bathrooms: null,
+  size_sqm: null,
+  deposit_rwf: null,
+  min_rental_months: null,
+  available_from: null,
+  amenities: [],
+};
 
 /**
  * Creates the listing row up front, as a draft.
@@ -159,6 +181,7 @@ export async function createDraftListing(input: DraftInput): Promise<ListingRow>
       furnished: input.furnished,
       district: input.district,
       sector: input.sector,
+      ...input.terms,
       status: 'draft',
       is_featured: false,
     })
@@ -310,11 +333,11 @@ export async function nextImagePosition(listingId: string): Promise<number> {
   return data?.length ? data[0].position + 1 : 0;
 }
 
-/** Flips a finished draft live. */
+/** Moves a finished draft to PUBLISH_TARGET. */
 export async function publishListing(listingId: string): Promise<void> {
   const { error } = await supabase
     .from('listings')
-    .update({ status: 'active' })
+    .update({ status: PUBLISH_TARGET })
     .eq('id', listingId);
 
   if (error) throw error;

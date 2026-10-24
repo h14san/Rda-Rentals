@@ -9,7 +9,12 @@ import { ErrorState, LoadingState } from '@/components/states';
 import { Button, SectionTitle } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
 import { useListingDetail } from '@/features/listings/queries';
-import { LISTING_STATUS_LABELS, listingFacts } from '@/features/listings/types';
+import {
+  LISTING_STATUS_LABELS,
+  listingFacts,
+  listingTermRows,
+} from '@/features/listings/types';
+import { AMENITY_LABELS, knownAmenities } from '@/lib/amenities';
 import { openPhoneCall, openWhatsApp } from '@/lib/contact';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { openInMaps } from '@/lib/maps';
@@ -66,6 +71,7 @@ export default function ListingDetailScreen() {
   };
 
   const facts = listingFacts(listing);
+  const amenities = knownAmenities(listing.amenities);
 
   return (
     <View style={styles.container}>
@@ -88,10 +94,15 @@ export default function ListingDetailScreen() {
                 {exact.address} · only you can see this
               </Text>
             )}
-            <Text style={styles.posted}>Posted {timeAgo(listing.created_at)}</Text>
+            <Text style={styles.posted}>
+              Posted {timeAgo(listing.created_at)}
+              {listing.status === 'published' && !!listing.availability_confirmed_at
+                ? ` · Availability confirmed ${timeAgo(listing.availability_confirmed_at)}`
+                : ''}
+            </Text>
           </View>
 
-          {listing.status !== 'active' && (
+          {listing.status !== 'published' && (
             <View style={styles.statusBanner}>
               <Text style={styles.statusText}>
                 This listing is {LISTING_STATUS_LABELS[listing.status].toLowerCase()}.
@@ -106,6 +117,32 @@ export default function ListingDetailScreen() {
               </View>
             ))}
           </View>
+
+          <View style={styles.section}>
+            <SectionTitle>Rental terms</SectionTitle>
+            <View style={styles.terms}>
+              {listingTermRows(listing).map((row) => (
+                <View key={row.label} style={styles.termRow}>
+                  <Text style={styles.termLabel}>{row.label}</Text>
+                  <Text style={styles.termValue}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {amenities.length > 0 && (
+            <View style={styles.section}>
+              <SectionTitle>Amenities</SectionTitle>
+              <View style={styles.factRow}>
+                {amenities.map((a) => (
+                  <View key={a} style={styles.factPill}>
+                    <Text style={styles.factText}>{AMENITY_LABELS[a]}</Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={styles.mapCaption}>As stated by the landlord.</Text>
+            </View>
+          )}
 
           {!!listing.description && (
             <View style={styles.section}>
@@ -282,6 +319,21 @@ const styles = StyleSheet.create({
   factText: type.label,
 
   section: { gap: spacing.sm },
+  terms: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  termRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  termLabel: type.meta,
+  termValue: type.bodyStrong,
   description: type.body,
   readMore: {
     fontSize: fontSize.sm,

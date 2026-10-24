@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { listingFacts, type ListingWithImages } from '@/features/listings/types';
-import { formatLocation, formatPrice } from '@/lib/format';
+import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { imageUrl } from '@/lib/supabase';
 import { colors, fontFamily, radius, shadow, spacing, type } from '@/theme';
 
@@ -63,6 +63,11 @@ export function ListingCard({
         <Text style={styles.meta} numberOfLines={1}>
           {[formatLocation(listing.sector, listing.district), ...facts].join(' · ')}
         </Text>
+        {!!listing.availability_confirmed_at && (
+          <Text style={styles.confirmed} numberOfLines={1}>
+            Availability confirmed {timeAgo(listing.availability_confirmed_at)}
+          </Text>
+        )}
       </View>
     </Pressable>
   );
@@ -117,4 +122,5 @@ const styles = StyleSheet.create({
     color: colors.charcoal,
   },
   meta: type.meta,
+  confirmed: type.caption,
 });

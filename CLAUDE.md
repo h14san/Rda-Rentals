@@ -73,10 +73,11 @@ Paid placement (`is_featured`) must never look like a verification badge.
 The plan maps the Blueprint's phases onto what was already built:
 
 - **Phase 0 (done):** docs and rules.
-- **Phase 1 (done in code):** private location. Login phone dropped from
+- **Phase 1 (done, live):** private location. Login phone dropped from
   `profiles`.
-- **Phase 2:** richer listing fields, the full status model with "availability
-  confirmed", favorites, compare, and a list/map toggle.
+- **Phase 2:** rental terms and the full status model with "availability
+  confirmed" are done and live. Favorites, compare and a list/map toggle are
+  still to do.
 - **Phase 3:** roles, in-app chat (which removes WhatsApp), push, reports,
   verification, and the admin console.
 - **Later:** booking, AI matching and alerts, payments, digital rental, and
@@ -244,10 +245,38 @@ both are the same two-step code flow. Don't replace this with email+password —
 that is a different screen that would be thrown away.
 
 **Listings are drafted before upload.** `create.ts` inserts the row as
-`status='draft'`, uploads images against its id, then flips to `active`. A
-mid-flow failure leaves a private draft, never a live listing with missing
-photos. `status` also carries `rented`, which answers the brief's complaint that
-there is no way to tell whether a listing is still available.
+`status='draft'`, uploads images against its id, then moves it to
+`PUBLISH_TARGET` (`published` until Phase 3 verification, then
+`pending_review`). A mid-flow failure leaves a private draft, never a live
+listing with missing photos.
+
+**The status rules live in a trigger, not the UI.** `listings_guard_status`
+decides which moves a landlord may make. Only `published` is public. Landlords
+can never set `pending_review→published`, `rejected` or `suspended`, and every
+insert must start as `draft`. The trigger only restricts `current_user =
+'authenticated'` (PostgREST requests). The SQL editor, the service role and
+security-definer functions are staff and pass through.
+`LANDLORD_STATUS_ACTIONS` in `types.ts` offers only moves the trigger accepts.
+Change the two together.
+
+**`availability_confirmed_at` is always the server's clock.** Any change to
+it, and every move to `published`, is overwritten with `now()` in the same
+trigger, so a client can't backdate or pre-date a confirmation. "Still
+available" therefore sends any value; it is the change that counts.
+
+**`listing_status_history` is written only by trigger** and is readable only by
+the owner. There are deliberately no write policies.
+
+**Unstated rental terms match filters.** `maxMinRentalMonths` and
+`availableBy` are built as `or=(col.is.null,col.lte.X)`, because a landlord who
+left the field blank hasn't said no. Several `or=` params AND together in
+PostgREST (verified), so the two filters combine correctly. `amenities` is
+all-of (`cs`), not any-of.
+
+**Amenity keys exist in two copies:** `src/lib/amenities.ts` and
+`supabase/functions/_shared/filters.ts`. The function's copy is a schema enum,
+not sent by the app. Drift can only make the AI drop an amenity, because the
+app re-validates with its own enum, but keep them identical.
 
 **Storage object names are unique, never index-based.** Ordering lives in the
 `position` column and the object name is opaque — never parsed. Index names

@@ -18,6 +18,7 @@ import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Chip, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
 import {
+  EMPTY_TERMS,
   MAX_IMAGES,
   captureImage,
   nextImagePosition,
@@ -25,9 +26,11 @@ import {
   removeListingImages,
   saveListingLocation,
   uploadListingImages,
+  type ListingTerms,
   type PickedImage,
 } from '@/features/listings/create';
 import { useListingDetail, useUpdateListing } from '@/features/listings/queries';
+import { ListingTermsFields, validateTerms } from '@/features/listings/terms-fields';
 import {
   PROPERTY_TYPES,
   PROPERTY_TYPE_LABELS,
@@ -74,6 +77,7 @@ function SignedInEditListing({ userId }: { userId: string }) {
   const [propertyType, setPropertyType] = useState<PropertyType>('apartment');
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [furnished, setFurnished] = useState(false);
+  const [terms, setTerms] = useState<ListingTerms>(EMPTY_TERMS);
   const [district, setDistrict] = useState<string | null>(null);
   const [sector, setSector] = useState<string | null>(null);
   const [address, setAddress] = useState('');
@@ -106,6 +110,14 @@ function SignedInEditListing({ userId }: { userId: string }) {
     setPropertyType(listing.property_type);
     setBedrooms(listing.bedrooms);
     setFurnished(listing.furnished);
+    setTerms({
+      bathrooms: listing.bathrooms,
+      size_sqm: listing.size_sqm,
+      deposit_rwf: listing.deposit_rwf,
+      min_rental_months: listing.min_rental_months,
+      available_from: listing.available_from,
+      amenities: listing.amenities,
+    });
     setDistrict(listing.district);
     setSector(listing.sector);
     setAddress(listing.listing_locations?.address ?? '');
@@ -123,7 +135,7 @@ function SignedInEditListing({ userId }: { userId: string }) {
   const listingId = listing.id;
 
   async function onSave() {
-    const next: Record<string, string> = {};
+    const next: Record<string, string> = validateTerms(terms);
     if (title.trim().length < 3) next.title = 'Give the listing a short title.';
     if (!Number.isFinite(priceValue) || priceValue <= 0) {
       next.price = 'Enter the monthly rent in RWF.';
@@ -178,6 +190,7 @@ function SignedInEditListing({ userId }: { userId: string }) {
           furnished,
           district,
           sector,
+          ...terms,
         },
       });
       router.back();
@@ -349,6 +362,8 @@ function SignedInEditListing({ userId }: { userId: string }) {
             />
           </View>
         </View>
+
+        <ListingTermsFields terms={terms} onChange={setTerms} errors={errors} />
 
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>District</Text>

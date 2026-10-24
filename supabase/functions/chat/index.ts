@@ -113,6 +113,15 @@ function currentStateLine(filters: Partial<FilterOutput> | null, sort: string): 
     );
   }
   if (filters.furnishedOnly === true) parts.push('furnished only');
+  const baths = num(filters.minBathrooms);
+  if (baths) parts.push(`at least ${baths} bathrooms`);
+  if (Array.isArray(filters.amenities) && filters.amenities.length > 0) {
+    parts.push(`with ${filters.amenities.join(', ')}`);
+  }
+  const lease = num(filters.maxMinRentalMonths);
+  if (lease) parts.push(`minimum lease at most ${lease} months`);
+  const by = str(filters.availableBy);
+  if (by) parts.push(`available by ${by}`);
 
   const ordering =
     sort === 'price_asc'
@@ -263,7 +272,7 @@ Deno.serve(async (req: Request) => {
 
     const nextFilters = toFilters(parsed, districts, sectors);
     const hasCriteria = Object.values(nextFilters).some(
-      (v) => v !== null && v !== false,
+      (v) => v !== null && v !== false && !(Array.isArray(v) && v.length === 0),
     );
 
     return json({

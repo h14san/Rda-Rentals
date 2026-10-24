@@ -25,3 +25,12 @@ export async function openInMaps(
     Alert.alert('Could not open Maps', `The property is at ${query}.`);
   }
 }
+
+/**
+ * Radius of the circle drawn around a listing's approximate point.
+ *
+ * Must match the 500 m disc the offset is drawn from in
+ * 20261024120000_private_location.sql: the real point is anywhere inside it,
+ * so a smaller circle would sometimes exclude the property it describes.
+ */
+export const APPROX_RADIUS_M = 500;

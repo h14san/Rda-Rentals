@@ -97,7 +97,9 @@ export function useListingsFeed(
           `min_rental_months.is.null,min_rental_months.lte.${filters.maxMinRentalMonths}`,
         );
       if (filters.availableBy !== null)
-        query = query.or(`available_from.is.null,available_from.lte.${filters.availableBy}`);
+        query = query.or(
+          `available_from.is.null,available_from.lte.${filters.availableBy}`,
+        );
 
       // Featured listings float to the top only under the default ordering.
       // Letting paid placement override an explicit "price: low to high" would
@@ -150,7 +152,30 @@ export function useListingDetail(id: string) {
   });
 }
 
-/** The landlord's own listings, including drafts and archived ones. */
+/**
+ * Several listings by id, for comparison, returned in the order asked for so
+ * the columns match the order the renter picked them in. Ids RLS hides (a
+ * listing suspended since it was saved) are simply absent.
+ */
+export function useListingsByIds(ids: string[]) {
+  return useQuery({
+    queryKey: ['listings', 'byIds', ids] as const,
+    enabled: ids.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('listings')
+        .select(`*, ${IMAGE_SELECT}`)
+        .in('id', ids);
+      if (error) throw error;
+      const rows = (data as unknown as ListingWithImages[]).map(sortImages);
+      return ids
+        .map((id) => rows.find((r) => r.id === id))
+        .filter((r): r is ListingWithImages => r !== undefined);
+    },
+  });
+}
+
+/** The landlord's own listings, including drafts and paused ones. */
 export function useMyListings(userId: string) {
   return useQuery({
     queryKey: listingKeys.mine(userId),

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -14,9 +15,12 @@ import { colors, fontFamily, radius, shadow, spacing, type } from '@/theme';
 export function ListingCard({
   listing,
   onPress,
+  favorite,
 }: {
   listing: ListingWithImages;
   onPress: () => void;
+  /** Omitted where saving makes no sense, e.g. a landlord's own listings. */
+  favorite?: { saved: boolean; onToggle: () => void };
 }) {
   const cover = listing.listing_images?.[0];
   const facts = listingFacts(listing);
@@ -49,6 +53,23 @@ export function ListingCard({
           <View style={styles.featuredBadge}>
             <Text style={styles.featuredText}>Featured</Text>
           </View>
+        )}
+
+        {favorite && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={favorite.saved ? 'Remove from saved' : 'Save'}
+            accessibilityState={{ selected: favorite.saved }}
+            hitSlop={8}
+            onPress={favorite.onToggle}
+            style={styles.heart}
+          >
+            <Ionicons
+              name={favorite.saved ? 'heart' : 'heart-outline'}
+              size={20}
+              color={colors.white}
+            />
+          </Pressable>
         )}
       </View>
 
@@ -107,6 +128,20 @@ const styles = StyleSheet.create({
     ...type.caption,
     fontFamily: fontFamily.bold,
     color: colors.softBlack,
+  },
+
+  heart: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Same scrim as the photo badges elsewhere: legible on any photo without
+    // spending the accent colour, which is reserved for price and featured.
+    backgroundColor: 'rgba(17,24,39,0.55)',
   },
 
   body: { padding: spacing.md, gap: spacing.xs },

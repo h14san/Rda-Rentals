@@ -236,7 +236,9 @@ export default function FiltersScreen() {
                 label={n === 1 ? '1 month' : `${n} months`}
                 selected={draft.maxMinRentalMonths === n}
                 onPress={() =>
-                  patch({ maxMinRentalMonths: draft.maxMinRentalMonths === n ? null : n })
+                  patch({
+                    maxMinRentalMonths: draft.maxMinRentalMonths === n ? null : n,
+                  })
                 }
               />
             ))}
@@ -251,7 +253,9 @@ export default function FiltersScreen() {
                 key={d}
                 label={formatShortDate(d)}
                 selected={draft.availableBy === d}
-                onPress={() => patch({ availableBy: draft.availableBy === d ? null : d })}
+                onPress={() =>
+                  patch({ availableBy: draft.availableBy === d ? null : d })
+                }
               />
             ))}
           </View>

@@ -86,6 +86,7 @@ function AuthGate() {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="listing/[id]" options={{ title: '' }} />
+      <Stack.Screen name="compare" options={{ title: 'Compare' }} />
       <Stack.Screen
         name="filters"
         options={{ presentation: 'modal', title: 'Filters' }}

@@ -3,7 +3,12 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Chip, TextField } from '@/components/ui';
 import type { ListingTerms } from '@/features/listings/create';
 import { formatShortDate } from '@/features/listings/types';
-import { AMENITIES, AMENITY_LABELS, knownAmenities, type Amenity } from '@/lib/amenities';
+import {
+  AMENITIES,
+  AMENITY_LABELS,
+  knownAmenities,
+  type Amenity,
+} from '@/lib/amenities';
 import { formatPrice } from '@/lib/format';
 import { colors, fontFamily, fontSize, spacing } from '@/theme';
 

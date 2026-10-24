@@ -184,9 +184,14 @@ function SignedInProfile({ userId }: { userId: string }) {
                       {formatPrice(listing.price_rwf)} ·{' '}
                       {formatLocation(listing.sector, listing.district)}
                     </Text>
-                    <View style={[styles.statusPill, isLive && styles.statusPillActive]}>
+                    <View
+                      style={[styles.statusPill, isLive && styles.statusPillActive]}
+                    >
                       <Text
-                        style={[styles.statusPillText, isLive && styles.statusPillTextActive]}
+                        style={[
+                          styles.statusPillText,
+                          isLive && styles.statusPillTextActive,
+                        ]}
                       >
                         {LISTING_STATUS_LABELS[listing.status]}
                       </Text>

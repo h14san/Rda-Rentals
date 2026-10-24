@@ -8,6 +8,7 @@ import { ImageCarousel } from '@/components/image-carousel';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, SectionTitle } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
+import { useFavoriteControl } from '@/features/listings/favorites';
 import { useListingDetail } from '@/features/listings/queries';
 import {
   LISTING_STATUS_LABELS,
@@ -17,7 +18,7 @@ import {
 import { AMENITY_LABELS, knownAmenities } from '@/lib/amenities';
 import { openPhoneCall, openWhatsApp } from '@/lib/contact';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
-import { openInMaps } from '@/lib/maps';
+import { APPROX_RADIUS_M, openInMaps } from '@/lib/maps';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
 
 /** Collapsed height for a long description, in lines. */
@@ -34,16 +35,10 @@ const DESCRIPTION_LINES = 6;
  */
 const DESCRIPTION_TRUNCATE_AT = 240;
 
-/**
- * Must match the 500 m disc the offset is drawn from in
- * 20261024120000_private_location.sql: the real point is anywhere inside it,
- * so a smaller circle would sometimes exclude the property it describes.
- */
-const APPROX_RADIUS_M = 500;
-
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
+  const favorites = useFavoriteControl(session?.user.id ?? null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const { data: listing, isPending, isError, error, refetch } = useListingDetail(id);
 
@@ -75,7 +70,32 @@ export default function ListingDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: '' }} />
+      <Stack.Screen
+        options={{
+          title: '',
+          headerRight: () => {
+            const heart = isOwner ? undefined : favorites.propsFor(listing.id);
+            // A listing that is no longer live can be unsaved but not saved:
+            // the database only accepts favorites on published listings.
+            if (!heart || (!heart.saved && listing.status !== 'published')) return null;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={heart.saved ? 'Remove from saved' : 'Save'}
+                accessibilityState={{ selected: heart.saved }}
+                hitSlop={8}
+                onPress={heart.onToggle}
+              >
+                <Ionicons
+                  name={heart.saved ? 'heart' : 'heart-outline'}
+                  size={24}
+                  color={colors.softBlack}
+                />
+              </Pressable>
+            );
+          },
+        }}
+      />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <ImageCarousel paths={listing.listing_images.map((i) => i.storage_path)} />

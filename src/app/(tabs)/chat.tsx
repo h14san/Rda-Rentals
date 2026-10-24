@@ -16,6 +16,8 @@ import {
 
 import { ListingCard } from '@/components/listing-card';
 import { Button } from '@/components/ui';
+import { useAuth } from '@/features/auth/context';
+import { useFavoriteControl } from '@/features/listings/favorites';
 import {
   MAX_CHAT_INPUT,
   useChatTurn,
@@ -59,6 +61,8 @@ function messageId(): string {
 export default function ChatScreen() {
   const router = useRouter();
   const { setFilters, setSort, setInterpretation } = useFilters();
+  const { session } = useAuth();
+  const favorites = useFavoriteControl(session?.user.id ?? null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -252,6 +256,11 @@ export default function ChatScreen() {
                     key={listing.id}
                     listing={listing}
                     onPress={() => router.push(`/listing/${listing.id}`)}
+                    favorite={
+                      listing.owner_id === session?.user.id
+                        ? undefined
+                        : favorites.propsFor(listing.id)
+                    }
                   />
                 ))}
 

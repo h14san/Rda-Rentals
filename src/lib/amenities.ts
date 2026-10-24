@@ -39,7 +39,9 @@ export const AMENITY_LABELS: Record<Amenity, string> = {
 };
 
 /** Drops keys the app does not know, so a stale or hand-edited row cannot crash a label lookup. */
-export function knownAmenities(values: readonly string[] | null | undefined): Amenity[] {
+export function knownAmenities(
+  values: readonly string[] | null | undefined,
+): Amenity[] {
   return (values ?? []).filter((v): v is Amenity =>
     (AMENITIES as readonly string[]).includes(v),
   );

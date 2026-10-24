@@ -75,9 +75,9 @@ The plan maps the Blueprint's phases onto what was already built:
 - **Phase 0 (done):** docs and rules.
 - **Phase 1 (done, live):** private location. Login phone dropped from
   `profiles`.
-- **Phase 2:** rental terms and the full status model with "availability
-  confirmed" are done and live. Favorites, compare and a list/map toggle are
-  still to do.
+- **Phase 2 (done, live):** rental terms, the full status model with
+  "availability confirmed", favorites, 2–4-way comparison, and a list/map
+  toggle on the feed.
 - **Phase 3:** roles, in-app chat (which removes WhatsApp), push, reports,
   verification, and the admin console.
 - **Later:** booking, AI matching and alerts, payments, digital rental, and
@@ -273,6 +273,23 @@ left the field blank hasn't said no. Several `or=` params AND together in
 PostgREST (verified), so the two filters combine correctly. `amenities` is
 all-of (`cs`), not any-of.
 
+**Favorited listings stay visible after they stop being published.**
+`listings_select_favorited` lets a renter keep reading a saved listing once it
+is paused, unavailable or rented. That is the point of favorites: knowing it
+went. Moderation states (`rejected`, `suspended`) still hide it. To stop that
+policy from becoming a back door, a favorite can only be *created* on a
+`published` listing. `price_at_save` is captured by trigger, so the "price
+dropped" badge can't be faked from the client.
+
+**The feed map shows only loaded pages** and draws every listing at its
+approximate point with a 500 m circle. The tap target is the price bubble,
+because circles aren't tappable on iOS. Both maps import `APPROX_RADIUS_M`
+from `src/lib/maps.ts`.
+
+**Typed routes come from the dev server.** A new route file isn't a valid
+`router.push` target for `tsc` until `.expo/types/router.d.ts` is regenerated
+by `npx expo start` (it was, for `/compare`).
+
 **Amenity keys exist in two copies:** `src/lib/amenities.ts` and
 `supabase/functions/_shared/filters.ts`. The function's copy is a schema enum,
 not sent by the app. Drift can only make the AI drop an amenity, because the
@@ -426,7 +443,9 @@ before writing SDK calls rather than working from memory.
 src/
   app/                      expo-router routes
     (auth)/                 sign-in, verify, profile-setup
-    (tabs)/                 index (feed), chat (Ask), post, profile
+    (tabs)/                 index (feed + map), chat (Ask), saved, post, profile
+    (tabs)/saved.tsx        favorites, with select-to-compare
+    compare.tsx             2–4 listings side by side
     listing/[id].tsx        detail + map + WhatsApp CTA
     listing/edit/[id].tsx   edit fields + photos (flat form, not the wizard)
     filters.tsx             filter sheet (modal)
@@ -446,6 +465,9 @@ supabase/
   migrations/20260910120000_init.sql  schema, indexes, RLS, storage policies
   migrations/20261024120000_private_location.sql  listing_locations, approx point,
                                                   drops profiles.phone
+  migrations/20261024130000_listing_terms_and_status.sql  terms, status model,
+                                                  guard trigger, history
+  migrations/20261024140000_favorites.sql        favorites + saved visibility
   seed.sql                  15 demo Kigali listings (no photos — nothing in
                             the storage bucket to point at until a real upload)
   rls_check.sql             security assertions

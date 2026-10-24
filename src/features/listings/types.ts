@@ -203,6 +203,18 @@ export type Database = {
         Update: Partial<Pick<ListingLocationRow, 'address' | 'latitude' | 'longitude'>>;
         Relationships: [];
       };
+      favorites: {
+        Row: {
+          user_id: string;
+          listing_id: string;
+          price_at_save: number | null;
+          created_at: string;
+        };
+        // price_at_save is captured by trigger; the client never supplies it.
+        Insert: { user_id: string; listing_id: string };
+        Update: never;
+        Relationships: [];
+      };
       listing_status_history: {
         Row: {
           id: number;

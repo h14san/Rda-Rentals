@@ -14,9 +14,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FeedMap } from '@/components/feed-map';
 import { ListingCard } from '@/components/listing-card';
 import { EmptyState, ErrorState, ListingCardSkeleton } from '@/components/states';
 import { Chip } from '@/components/ui';
+import { useAuth } from '@/features/auth/context';
+import { useFavoriteControl } from '@/features/listings/favorites';
 import { useFilters } from '@/features/listings/filters-context';
 import {
   SORT_LABELS,
@@ -48,7 +51,10 @@ export default function FeedScreen() {
   } = useFilters();
 
   const [searchText, setSearchText] = useState('');
+  const [view, setView] = useState<'list' | 'map'>('list');
   const smartSearch = useSmartSearch();
+  const { session } = useAuth();
+  const favorites = useFavoriteControl(session?.user.id ?? null);
 
   function runSmartSearch() {
     const query = searchText.trim();
@@ -187,19 +193,43 @@ export default function FeedScreen() {
               {total === 0 ? 'No rentals' : `${total} rental${total === 1 ? '' : 's'}`}
             </Text>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Sort: ${SORT_LABELS[sort]}. Tap to change.`}
-              onPress={() => setSort(nextSort(sort))}
-              style={({ pressed }) => [styles.sortButton, pressed && { opacity: 0.7 }]}
-            >
-              <Ionicons
-                name="swap-vertical-outline"
-                size={16}
-                color={colors.charcoal}
-              />
-              <Text style={styles.sortLabel}>{SORT_LABELS[sort]}</Text>
-            </Pressable>
+            <View style={styles.resultActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  view === 'list' ? 'Show on a map' : 'Show as a list'
+                }
+                onPress={() => setView(view === 'list' ? 'map' : 'list')}
+                style={({ pressed }) => [
+                  styles.sortButton,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Ionicons
+                  name={view === 'list' ? 'map-outline' : 'list-outline'}
+                  size={16}
+                  color={colors.charcoal}
+                />
+                <Text style={styles.sortLabel}>{view === 'list' ? 'Map' : 'List'}</Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Sort: ${SORT_LABELS[sort]}. Tap to change.`}
+                onPress={() => setSort(nextSort(sort))}
+                style={({ pressed }) => [
+                  styles.sortButton,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Ionicons
+                  name="swap-vertical-outline"
+                  size={16}
+                  color={colors.charcoal}
+                />
+                <Text style={styles.sortLabel}>{SORT_LABELS[sort]}</Text>
+              </Pressable>
+            </View>
           </View>
         )}
       </View>
@@ -223,14 +253,29 @@ export default function FeedScreen() {
           actionLabel={filterCount > 0 ? 'Clear filters' : undefined}
           onAction={filterCount > 0 ? resetFilters : undefined}
         />
+      ) : view === 'map' ? (
+        <FeedMap
+          listings={listings}
+          total={total}
+          hasMore={!!hasNextPage}
+          loadingMore={isFetchingNextPage}
+          onLoadMore={() => void fetchNextPage()}
+          onOpen={(id) => router.push(`/listing/${id}`)}
+        />
       ) : (
         <FlashList
           data={listings}
           keyExtractor={(item) => item.id}
+          extraData={favorites.savedIds}
           renderItem={({ item }) => (
             <ListingCard
               listing={item}
               onPress={() => router.push(`/listing/${item.id}`)}
+              favorite={
+                item.owner_id === session?.user.id
+                  ? undefined
+                  : favorites.propsFor(item.id)
+              }
             />
           )}
           contentContainerStyle={styles.listContent}
@@ -311,6 +356,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   resultCount: type.meta,
+  resultActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   sortButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   sortLabel: type.label,
   listContent: { padding: spacing.md },

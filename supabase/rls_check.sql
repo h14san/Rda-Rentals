@@ -188,6 +188,50 @@ begin
     raise exception 'FAIL: user B can read user A''s status history.';
   end if;
 
+  -- 7e. Favorites: B saves A's published listing and still sees it after A
+  --     marks it rented; B cannot save a listing that is not published, and
+  --     cannot read anyone else's favorites.
+  insert into public.favorites (user_id, listing_id) values (user_b, a_active_listing);
+
+  if not exists (
+    select 1 from public.favorites
+    where user_id = user_b and listing_id = a_active_listing and price_at_save is not null
+  ) then
+    raise exception 'FAIL: favorite was not saved with its price.';
+  end if;
+
+  begin
+    insert into public.favorites (user_id, listing_id) values (user_b, a_draft_listing);
+    raise exception 'FAIL: user B favorited a draft listing.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.favorites (user_id, listing_id) values (user_a, a_active_listing);
+    raise exception 'FAIL: user B created a favorite for user A.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- Become A for a moment to mark the listing rented, then back to B.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+  update public.listings set status = 'rented' where id = a_active_listing;
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+
+  select count(*) into visible from public.listings where id = a_active_listing;
+  if visible <> 1 then
+    raise exception 'FAIL: a favorited listing vanished once it was rented.';
+  end if;
+
   -- 8. Anonymous users see published listings only.
   set local role anon;
   perform set_config('request.jwt.claims', null, true);

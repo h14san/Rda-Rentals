@@ -1,0 +1,752 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+
+import { Button, Chip, SectionTitle, TextField } from '@/components/ui';
+import { useAuth } from '@/features/auth/context';
+import {
+  DESCRIBE_IDEAL_IMAGES,
+  useAutoDescribe,
+} from '@/features/listings/auto-describe';
+import {
+  EMPTY_TERMS,
+  MAX_IMAGES,
+  captureImage,
+  createDraftListing,
+  pickImages,
+  publishListing,
+  uploadListingImages,
+  type ListingTerms,
+  type PickedImage,
+} from '@/features/listings/create';
+import { listingKeys } from '@/features/listings/queries';
+import { ListingTermsFields, validateTerms } from '@/features/listings/terms-fields';
+import {
+  PROPERTY_TYPES,
+  PROPERTY_TYPE_LABELS,
+  listingFacts,
+  type PropertyType,
+} from '@/features/listings/types';
+import { formatPrice } from '@/lib/format';
+import { KIGALI_CENTER, KIGALI_DISTRICTS, sectorsFor } from '@/lib/locations';
+import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
+
+type Step = 'photos' | 'details' | 'terms' | 'location' | 'review';
+
+const STEP_ORDER: Step[] = ['photos', 'details', 'terms', 'location', 'review'];
+
+const STEP_TITLES: Record<Step, string> = {
+  photos: 'Add photos',
+  details: 'Describe the place',
+  // Its own step rather than more fields on Details: everything here is
+  // optional, and a landlord should be able to skip it with one tap.
+  terms: 'Rental terms',
+  location: 'Set the location',
+  review: 'Review and publish',
+};
+
+export default function PostListingScreen() {
+  const { session } = useAuth();
+  // Null for a render after sign-out: tabs stay mounted until AuthGate's
+  // redirect effect runs. See ProfileScreen.
+  if (!session) return null;
+  return <SignedInPostListing userId={session.user.id} />;
+}
+
+function SignedInPostListing({ userId }: { userId: string }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const [step, setStep] = useState<Step>('photos');
+  const [images, setImages] = useState<PickedImage[]>([]);
+
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState('');
+  const [propertyType, setPropertyType] = useState<PropertyType | null>(null);
+  const [bedrooms, setBedrooms] = useState<number | null>(null);
+  const [furnished, setFurnished] = useState(false);
+  const [terms, setTerms] = useState<ListingTerms>(EMPTY_TERMS);
+
+  const [district, setDistrict] = useState<string | null>(null);
+  const [sector, setSector] = useState<string | null>(null);
+  const [address, setAddress] = useState('');
+  const [pin, setPin] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+
+  // Set after auto-describe fills the field, to prompt the review the brief
+  // asks for. Cleared on the first keystroke — by then they are reviewing it.
+  const [describedFromPhotos, setDescribedFromPhotos] = useState(false);
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+
+  const autoDescribe = useAutoDescribe();
+
+  const priceValue = Number.parseInt(price.replace(/[^\d]/g, ''), 10);
+  const stepIndex = STEP_ORDER.indexOf(step);
+
+  function resetForm() {
+    setStep('photos');
+    setImages([]);
+    setTitle('');
+    setDescription('');
+    setDescribedFromPhotos(false);
+    setPrice('');
+    setPropertyType(null);
+    setBedrooms(null);
+    setFurnished(false);
+    setTerms(EMPTY_TERMS);
+    setDistrict(null);
+    setSector(null);
+    setAddress('');
+    setPin(null);
+    setErrors({});
+    setProgress(null);
+  }
+
+  async function onAddFromLibrary() {
+    const picked = await pickImages(MAX_IMAGES - images.length);
+    if (picked.length === 0) return;
+    setImages((current) => [...current, ...picked].slice(0, MAX_IMAGES));
+  }
+
+  async function onAddFromCamera() {
+    const shot = await captureImage();
+    if (shot) setImages((current) => [...current, shot].slice(0, MAX_IMAGES));
+  }
+
+  /**
+   * Photo-to-description.
+   *
+   * The result goes into the same field the landlord would have typed in, so a
+   * sentence they disagree with is an edit rather than a listing that overstates
+   * the property. Nothing is published from here.
+   */
+  function runAutoDescribe() {
+    autoDescribe.mutate(
+      {
+        images,
+        facts: { title, propertyType, bedrooms, furnished, district, sector },
+      },
+      {
+        onSuccess: (result) => {
+          if (result.unusable) {
+            Alert.alert(
+              'Nothing to describe yet',
+              'The photos were not clear enough to describe. Try adding a wider shot of the room, or write the description yourself.',
+            );
+            return;
+          }
+          setDescription(result.description);
+          setDescribedFromPhotos(true);
+          setErrors(({ description: _cleared, ...rest }) => rest);
+        },
+        onError: (error) =>
+          Alert.alert('Could not write a description', error.message),
+      },
+    );
+  }
+
+  function onAutoDescribePress() {
+    if (autoDescribe.isPending) return;
+
+    if (images.length === 0) {
+      // Unreachable from the wizard (the photos step gates on this), but the
+      // button must not silently do nothing if that ever changes.
+      setErrors((current) => ({
+        ...current,
+        description: 'Add a photo first — the description is written from them.',
+      }));
+      return;
+    }
+
+    if (description.trim().length === 0) {
+      runAutoDescribe();
+      return;
+    }
+
+    // A modal is too heavy for a validation message but right for discarding
+    // something the landlord typed.
+    Alert.alert(
+      'Replace your description?',
+      'What you have written will be replaced by one written from your photos.',
+      [
+        { text: 'Keep mine', style: 'cancel' },
+        { text: 'Replace', style: 'destructive', onPress: runAutoDescribe },
+      ],
+    );
+  }
+
+  function validateDetails(): boolean {
+    const next: Record<string, string> = {};
+    if (title.trim().length < 3) next.title = 'Give the listing a short title.';
+    if (!Number.isFinite(priceValue) || priceValue <= 0) {
+      next.price = 'Enter the monthly rent in RWF.';
+    }
+    if (!propertyType) next.propertyType = 'Choose a property type.';
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
+  function goNext() {
+    if (step === 'photos') {
+      if (images.length === 0) {
+        // Inline, like every other validation error in this form. A modal for
+        // one missing field is heavier than the mistake.
+        setErrors({ photos: 'Add at least one photo before continuing.' });
+        return;
+      }
+      setErrors({});
+      setStep('details');
+    } else if (step === 'details') {
+      if (validateDetails()) setStep('terms');
+    } else if (step === 'terms') {
+      const next = validateTerms(terms);
+      setErrors(next);
+      if (Object.keys(next).length === 0) setStep('location');
+    } else if (step === 'location') {
+      setStep('review');
+    }
+  }
+
+  function goBack() {
+    if (stepIndex > 0) setStep(STEP_ORDER[stepIndex - 1]);
+  }
+
+  /**
+   * Publish.
+   *
+   * The row is created as a draft first so uploads have a listing id to file
+   * under; it only flips to active once every image has landed. A failure part
+   * way through therefore leaves a draft the landlord can finish, never a live
+   * listing with missing photos.
+   */
+  async function onPublish() {
+    setSubmitting(true);
+    setProgress('Creating listing…');
+    try {
+      const draft = await createDraftListing({
+        ownerId: userId,
+        title: title.trim(),
+        description: description.trim() || null,
+        priceRwf: priceValue,
+        propertyType: propertyType!,
+        bedrooms,
+        furnished,
+        district,
+        sector,
+        address: address.trim() || null,
+        latitude: pin?.latitude ?? null,
+        longitude: pin?.longitude ?? null,
+        terms,
+      });
+
+      await uploadListingImages(userId, draft.id, images, (done, total) =>
+        setProgress(`Uploading photo ${done} of ${total}…`),
+      );
+
+      setProgress('Publishing…');
+      await publishListing(draft.id);
+
+      await queryClient.invalidateQueries({
+        queryKey: listingKeys.mine(userId),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['listings', 'feed'] });
+
+      resetForm();
+      Alert.alert('Listing published', 'Your rental is now live in the feed.');
+      router.push(`/listing/${draft.id}`);
+    } catch (e) {
+      Alert.alert(
+        'Could not publish',
+        e instanceof Error ? e.message : 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setSubmitting(false);
+      setProgress(null);
+    }
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={styles.progressRow}>
+        {STEP_ORDER.map((s, i) => (
+          <View
+            key={s}
+            style={[styles.progressBar, i <= stepIndex && styles.progressBarActive]}
+          />
+        ))}
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <SectionTitle>{STEP_TITLES[step]}</SectionTitle>
+
+        {step === 'photos' && (
+          <View style={styles.section}>
+            <Text style={styles.help}>
+              Add up to {MAX_IMAGES} photos. They are resized before upload, so this
+              works on a slow connection.
+            </Text>
+
+            <View style={styles.thumbGrid}>
+              {images.map((img, index) => (
+                <View key={`${img.uri}-${index}`} style={styles.thumbWrap}>
+                  <Image
+                    source={{ uri: img.uri }}
+                    style={styles.thumb}
+                    contentFit="cover"
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove photo ${index + 1}`}
+                    style={styles.thumbRemove}
+                    onPress={() =>
+                      setImages((current) => current.filter((_, i) => i !== index))
+                    }
+                  >
+                    <Ionicons name="close" size={14} color={colors.white} />
+                  </Pressable>
+                  {index === 0 && (
+                    <View style={styles.coverBadge}>
+                      <Text style={styles.coverText}>Cover</Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+
+            {!!errors.photos && <Text style={styles.error}>{errors.photos}</Text>}
+
+            {images.length < MAX_IMAGES && (
+              <View style={styles.row}>
+                <Button
+                  label="Choose photos"
+                  variant="secondary"
+                  style={styles.flex}
+                  onPress={() => void onAddFromLibrary()}
+                />
+                <Button
+                  label="Camera"
+                  variant="secondary"
+                  style={styles.flex}
+                  onPress={() => void onAddFromCamera()}
+                />
+              </View>
+            )}
+          </View>
+        )}
+
+        {step === 'details' && (
+          <View style={styles.section}>
+            <TextField
+              label="Title"
+              value={title}
+              onChangeText={setTitle}
+              error={errors.title}
+              placeholder="Bright 2-bedroom near Kimironko market"
+              maxLength={120}
+            />
+
+            <TextField
+              label="Monthly rent (RWF)"
+              value={price}
+              onChangeText={(t) => setPrice(t.replace(/[^\d]/g, ''))}
+              error={errors.price}
+              hint={
+                Number.isFinite(priceValue) && priceValue > 0
+                  ? formatPrice(priceValue)
+                  : undefined
+              }
+              placeholder="150000"
+              keyboardType="number-pad"
+            />
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Property type</Text>
+              <View style={styles.chipWrap}>
+                {PROPERTY_TYPES.map((type) => (
+                  <Chip
+                    key={type}
+                    label={PROPERTY_TYPE_LABELS[type]}
+                    selected={propertyType === type}
+                    onPress={() => setPropertyType(type)}
+                  />
+                ))}
+              </View>
+              {!!errors.propertyType && (
+                <Text style={styles.error}>{errors.propertyType}</Text>
+              )}
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Bedrooms</Text>
+              <View style={styles.chipWrap}>
+                {[0, 1, 2, 3, 4, 5].map((n) => (
+                  <Chip
+                    key={n}
+                    label={n === 0 ? 'Studio' : String(n)}
+                    selected={bedrooms === n}
+                    onPress={() => setBedrooms(bedrooms === n ? null : n)}
+                  />
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Furnishing</Text>
+              <View style={styles.chipWrap}>
+                <Chip
+                  label="Furnished"
+                  selected={furnished}
+                  onPress={() => setFurnished(!furnished)}
+                />
+              </View>
+            </View>
+
+            <TextField
+              label="Description"
+              value={description}
+              onChangeText={(t) => {
+                setDescription(t);
+                if (describedFromPhotos) setDescribedFromPhotos(false);
+              }}
+              error={errors.description}
+              hint={
+                describedFromPhotos
+                  ? 'Written from your photos — read it over and fix anything that is not right.'
+                  : images.length < DESCRIBE_IDEAL_IMAGES
+                    ? `Add ${DESCRIBE_IDEAL_IMAGES} or more photos for a fuller description.`
+                    : undefined
+              }
+              placeholder="Water and electricity included, secure compound, 10 minutes from the bus stop…"
+              multiline
+              numberOfLines={5}
+              style={styles.textArea}
+              accessory={
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Write the description from my photos"
+                  accessibilityState={{ busy: autoDescribe.isPending }}
+                  onPress={onAutoDescribePress}
+                  disabled={autoDescribe.isPending}
+                  style={({ pressed }) => [
+                    styles.aiAction,
+                    (pressed || autoDescribe.isPending) && { opacity: 0.6 },
+                  ]}
+                >
+                  {autoDescribe.isPending ? (
+                    <ActivityIndicator size="small" color={colors.muted} />
+                  ) : (
+                    <Ionicons
+                      name="sparkles-outline"
+                      size={14}
+                      color={colors.softBlack}
+                    />
+                  )}
+                  <Text style={styles.aiActionLabel}>
+                    {autoDescribe.isPending ? 'Reading photos…' : 'Write it for me'}
+                  </Text>
+                </Pressable>
+              }
+            />
+          </View>
+        )}
+
+        {step === 'terms' && (
+          <ListingTermsFields terms={terms} onChange={setTerms} errors={errors} />
+        )}
+
+        {step === 'location' && (
+          <View style={styles.section}>
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>District</Text>
+              <View style={styles.chipWrap}>
+                {KIGALI_DISTRICTS.map((d) => (
+                  <Chip
+                    key={d}
+                    label={d}
+                    selected={district === d}
+                    onPress={() => {
+                      setDistrict(d);
+                      setSector(null);
+                    }}
+                  />
+                ))}
+              </View>
+            </View>
+
+            {!!district && (
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Sector</Text>
+                <View style={styles.chipWrap}>
+                  {sectorsFor(district).map((s) => (
+                    <Chip
+                      key={s}
+                      label={s}
+                      selected={sector === s}
+                      onPress={() => setSector(sector === s ? null : s)}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <TextField
+              label="Address or landmark"
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Near Kimironko market, KG 11 Ave"
+              hint="Private. Tenants see the sector and an approximate area only."
+            />
+
+            {Platform.OS !== 'web' && (
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Drop a pin</Text>
+                <Text style={styles.help}>
+                  Tap the map where the property is. Only you see this pin;
+                  tenants see a circle about a kilometre across around it.
+                </Text>
+                <MapView
+                  provider={PROVIDER_GOOGLE}
+                  style={styles.pickerMap}
+                  initialRegion={KIGALI_CENTER}
+                  onPress={(e) => setPin(e.nativeEvent.coordinate)}
+                >
+                  {pin && <Marker coordinate={pin} />}
+                </MapView>
+              </View>
+            )}
+          </View>
+        )}
+
+        {step === 'review' && (
+          <View style={styles.section}>
+            <View style={styles.reviewCard}>
+              {images[0] && (
+                <Image
+                  source={{ uri: images[0].uri }}
+                  style={styles.reviewImage}
+                  contentFit="cover"
+                />
+              )}
+              <View style={styles.reviewBody}>
+                <Text style={styles.reviewPrice}>
+                  {Number.isFinite(priceValue) ? formatPrice(priceValue) : '—'}
+                  <Text style={styles.reviewPerMonth}> / month</Text>
+                </Text>
+                <Text style={styles.reviewTitle}>{title}</Text>
+                <Text style={styles.reviewMeta}>
+                  {[
+                    [sector, district].filter(Boolean).join(', ') || 'Location not set',
+                    ...(propertyType
+                      ? listingFacts({
+                          property_type: propertyType,
+                          bedrooms,
+                          furnished,
+                        })
+                      : []),
+                  ].join(' · ')}
+                </Text>
+                <Text style={styles.reviewMeta}>
+                  {images.length} photo{images.length === 1 ? '' : 's'}
+                  {pin ? ' · Pin set' : ' · No pin'}
+                </Text>
+              </View>
+            </View>
+
+            {!!progress && <Text style={styles.progressText}>{progress}</Text>}
+          </View>
+        )}
+      </ScrollView>
+
+      <View style={styles.footer}>
+        {stepIndex > 0 && (
+          <Button
+            label="Back"
+            variant="ghost"
+            style={styles.flex}
+            onPress={goBack}
+            disabled={submitting}
+          />
+        )}
+        {step === 'review' ? (
+          <Button
+            label="Publish listing"
+            style={styles.flexTwo}
+            onPress={() => void onPublish()}
+            loading={submitting}
+          />
+        ) : (
+          <Button label="Continue" style={styles.flexTwo} onPress={goNext} />
+        )}
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.white },
+  progressRow: { flexDirection: 'row', gap: 4, padding: spacing.md },
+  progressBar: {
+    flex: 1,
+    height: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.lightGray,
+  },
+  progressBarActive: { backgroundColor: colors.softBlack },
+
+  content: { padding: spacing.md, paddingBottom: spacing.xl, gap: spacing.md },
+  section: { gap: spacing.md },
+  row: { flexDirection: 'row', gap: spacing.sm },
+  flex: { flex: 1 },
+  flexTwo: { flex: 2 },
+  field: { gap: spacing.sm },
+  fieldLabel: {
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.semibold,
+    color: colors.charcoal,
+  },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  help: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+    lineHeight: 20,
+  },
+  error: {
+    color: colors.danger,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xs,
+  },
+  /* Same sparkles affordance as the feed's smart search bar: one mark means
+     "the model did this" everywhere in the app. */
+  aiAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.lightGray,
+  },
+  aiActionLabel: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.xs,
+    color: colors.softBlack,
+  },
+
+  textArea: {
+    minHeight: 120,
+    paddingTop: spacing.md,
+    textAlignVertical: 'top',
+  },
+
+  thumbGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  thumbWrap: { position: 'relative' },
+  thumb: {
+    width: 96,
+    height: 96,
+    borderRadius: radius.md,
+    backgroundColor: colors.lightGray,
+  },
+  thumbRemove: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(17,24,39,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverBadge: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    // Neutral, not gold. The accent is reserved for featured placement and the
+    // price rule; spending it on a build-time affordance dilutes both.
+    backgroundColor: 'rgba(17,24,39,0.8)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
+  coverText: {
+    fontSize: 10,
+    fontFamily: fontFamily.bold,
+    color: colors.softBlack,
+  },
+
+  pickerMap: { width: '100%', height: 240, borderRadius: radius.md },
+
+  reviewCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+  },
+  reviewImage: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    backgroundColor: colors.lightGray,
+  },
+  reviewBody: { padding: spacing.md, gap: 2 },
+  reviewPrice: {
+    fontSize: fontSize.lg,
+    fontFamily: fontFamily.bold,
+    color: colors.softBlack,
+  },
+  reviewPerMonth: {
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.regular,
+    color: colors.muted,
+  },
+  reviewTitle: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.md,
+    color: colors.charcoal,
+  },
+  reviewMeta: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+  },
+  progressText: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    color: colors.charcoal,
+    textAlign: 'center',
+  },
+
+  footer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+});

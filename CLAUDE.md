@@ -1,0 +1,488 @@
+@AGENTS.md
+
+# Rwanda Rentals
+
+Long-term rental marketplace for Rwanda, starting in Kigali. Tenants browse,
+filter and ask an AI assistant for listings; landlords post rentals with photos.
+The target product is a privacy-controlled marketplace with in-app chat,
+specific verification badges, booking and an admin console. Contact is still
+over WhatsApp until in-app chat ships.
+
+Expo SDK 57 (RN 0.86, React 19.2) + expo-router · Supabase (Postgres/Auth/
+Storage) · TanStack Query · react-native-maps.
+
+**Built:** auth (email OTP), feed, filters, detail, posting, editing, profile,
+and the three AI features (assistant, natural-language search,
+photo-to-description). The exact location is private (Phase 1 below). There are
+no tests and no CI.
+
+## Source docs: the Blueprint wins
+
+Authoritative, as of 2026-10-24:
+
+- `docs/RWANDA RENTALS blue print.docx` covers architecture, product rules, the
+  MVP definition and the 9 implementation phases.
+- `docs/Rwanda_Rentals_Features.pdf` is the 69-feature catalogue. It is
+  consistent with the Blueprint and is the newer of the two.
+- `docs/Rwanda_Rentals_Third_Party_Services.pdf` lists vendor categories as
+  examples only. Nothing in it is a final selection.
+
+Historical, for context only:
+
+- `docs/Rwanda_Rentals_Brief.docx` was the original MVP spec, and the build up
+  to Phase 0 followed it.
+- `docs/RWANDA RENTALS.pdf` is the 16-item backlog the Blueprint was built
+  from. Its "Viewing Requests & Scheduling" is **explicitly rejected** by the
+  Blueprint (§29) and the Features doc (#30): viewings are arranged in chat, so
+  don't build a scheduler.
+- `docs/Rwanda Rentals App – Developer Framework.docx` is the original Flutter +
+  Firebase spec. Use it only for UI direction and the palette. If a request
+  assumes Flutter or Firestore, that is this doc talking, so say so rather than
+  switching stacks.
+
+The docs suggest OpenAI as an example AI provider. The build uses **Gemini**,
+chosen for its free tier and isolated inside the Edge Functions. Nothing in the
+app knows which model answers.
+
+### Product rules (Blueprint §68): check every change against these
+
+1. No landlord phone number on public listings. *Temporary exception: the
+   WhatsApp CTA stays until in-app chat (Phase 3), then goes.*
+2. No landlord email on public listings.
+3. No exact address before the appropriate booking or payment stage.
+4. No exact map pin before that stage.
+5. Communication is primarily through Rwanda Rentals.
+6. Both Instant Book and Request to Book are supported.
+7. Landlords choose which booking mode they allow.
+8. Verification is explicit about what was checked. Never show a bare
+   "Verified".
+9. Landlord verification is required before public publishing.
+10. Sensitive information is not collected unless necessary.
+11. AI cannot invent property information.
+12. AI does not make consequential rental decisions on its own.
+13. Reviews are tied to legitimate completed rentals.
+14. Payments are designed into the architecture but introduced progressively.
+15. Rwanda Rentals initially manages only rentals that originate on the
+    platform.
+16. The MVP proves the marketplace before expanding into property management.
+
+Paid placement (`is_featured`) must never look like a verification badge.
+
+### Roadmap status
+
+The plan maps the Blueprint's phases onto what was already built:
+
+- **Phase 0 (done):** docs and rules.
+- **Phase 1 (done, live):** private location. Login phone dropped from
+  `profiles`.
+- **Phase 2 (done, live):** rental terms, the full status model with
+  "availability confirmed", favorites, 2–4-way comparison, and a list/map
+  toggle on the feed.
+- **Phase 3:** roles, in-app chat (which removes WhatsApp), push, reports,
+  verification, and the admin console.
+- **Later:** booking, AI matching and alerts, payments, digital rental, and
+  agencies.
+
+### Open non-code decisions
+
+- **Data residency.** Blueprint §50 cites the Rwanda DPP law: storing data
+  outside Rwanda needs authorization, and controllers must register. Supabase is
+  in eu-central-1, and Gemini processes prompts outside Rwanda. Settle this
+  before production.
+- **Phone OTP.** Pindo, a Rwandan SMS provider, can sit behind a Supabase Send
+  SMS auth hook (an Edge Function), with no screen changes. It needs pricing, a
+  sender ID and a decision.
+- **Sentry and PostHog** wait for beta. Each goes behind a `src/lib/` wrapper,
+  and only after its data location has been checked.
+
+## Commands
+
+```bash
+npm start              # Expo Go — everything except the map
+npx expo run:android   # dev build — adds the map
+npm run typecheck      # tsc --noEmit
+npx eslint .
+npm run db:push        # apply supabase/migrations
+npm run db:seed        # demo data — NON-PRODUCTION ONLY
+npm run db:rls-check   # asserts the RLS policies hold
+
+npx supabase functions deploy chat           # the three AI functions;
+npx supabase functions deploy smart-search   # no Docker needed to deploy
+npx supabase functions deploy auto-describe
+```
+
+Install native deps with `npx expo install <pkg>`, never plain `npm install` —
+it pins the SDK 57–compatible version (that is why react-native-maps is 1.27.2,
+not the latest 1.29.0).
+
+## Traps that cost real time
+
+**Supabase row types must be `type`, not `interface`.** postgrest-js requires
+`Record<string, unknown>`, and interfaces have no implicit index signature.
+Declaring `ProfileRow`/`ListingRow`/`ListingImageRow` as interfaces silently
+collapses the whole schema to `never`, and every insert/update fails with
+"not assignable to parameter of type 'never'" — the error points at the call
+site, not the cause.
+
+**The `Database` type needs `__InternalSupabase: { PostgrestVersion: '12' }`
+and `Relationships: []` on every table.** Same failure mode as above.
+
+**`useSegments()` returns a tuple type.** Indexing `segments[1]` errors under
+`typedRoutes`; widen with `as string[]` (see `src/app/_layout.tsx`).
+
+**Env vars are inlined at build time.** Editing `.env` requires a dev-server
+restart. Only `EXPO_PUBLIC_*` reaches the client; `GOOGLE_MAPS_API_KEY` is
+deliberately unprefixed because `app.config.ts` bakes it into native config.
+
+**The AI features cannot be tested before the functions are deployed.** There is
+no local path: `supabase functions serve` needs Docker, and the app calls the
+deployed function by name. Deploying is independent of the app, so the order is
+always deploy first, then run the client. Everything non-AI — auth, feed,
+filters, detail, posting, profile — is testable in Expo Go with nothing deployed.
+
+**Edge Functions verify the JWT by default.** There is no `[functions.*]` block in
+`config.toml`, so all three require a session; supabase-js attaches it
+automatically and every screen that calls them is behind the auth gate. A 401
+from one of them means the caller is signed out, not that the function is broken.
+
+**The map needs a development build.** Expo Go cannot apply the native Maps
+key, so the map is blank there. Every other screen works in Expo Go — don't
+"fix" a blank map that is just running in the wrong client.
+
+**`supabase db query` exits 0 even when the SQL fails** — it reports the error
+as JSON on stdout. Never call it directly from a check script; `db:seed` and
+`db:rls-check` go through `scripts/run-sql.mjs`, which greps the output and
+exits non-zero. A check that cannot fail is worse than no check.
+
+**Spawning npx from Node on Windows needs `shell: true` with a single command
+string.** `npx.cmd` cannot be spawned without a shell (Node raises EINVAL since
+the CVE-2024-27980 fix), and Git Bash only has the extensionless shell script.
+Passing an args array *with* `shell: true` is separately deprecated. See the
+comment in `scripts/run-sql.mjs`.
+
+**No NativeWind.** 4.2.6 predates RN 0.86 and v5 is preview. Style with
+`StyleSheet` over the tokens in `src/theme/index.ts`; that file is the single
+home for the palette. Don't reintroduce Tailwind without checking RN support.
+
+## Live project
+
+Linked to Supabase project `rwanda_rentals` (ref `urfmftxepopqmhhmzpqh`,
+eu-central-1, Postgres 17). Schema, seed, and RLS checks have all been applied
+and verified against it. `.env` holds the URL and publishable key.
+
+The direct DB host is **IPv6-only** (no A record) — fine on an IPv6 network,
+but use the pooler connection string on IPv4-only networks.
+
+## Architecture decisions worth keeping
+
+**RLS is the entire security boundary.** The anon key ships inside the app
+bundle and is extractable. Every table has RLS enabled and no table is reachable
+without a policy naming `auth.uid()`. After touching any policy or table, run
+`npm run db:rls-check` — it impersonates a second landlord via
+`request.jwt.claims` and asserts it cannot read another's drafts or modify their
+listings. Treat a failure as ship-blocking.
+
+Verified end to end against the live project: an anonymous caller sees 15 of 17
+listings (drafts and rented hidden), gets `[]` for a draft query, and is
+rejected with `42501` when inserting. Note that `profiles` is readable only by
+authenticated users, so an anonymous client gets `profiles: null` on a listing
+and the WhatsApp CTA has no number — if anonymous browsing is ever enabled, that
+policy needs revisiting.
+
+**The exact location is in `listing_locations`, never on `listings`.** The
+`listings` row is readable by anon, so any column on it is public no matter
+what the UI hides. `listing_locations` (address, lat/lng) is owner-only. A
+trigger writes `approx_latitude/approx_longitude` back onto the listing, offset
+from the real pin by a random bearing and distance drawn uniformly over a
+500 m disc.
+
+- The offset is random and stored once, never derived from the id. A
+  deterministic offset could be reversed by anyone reading the migration, and
+  a fresh offset per edit could be averaged away.
+- The detail screen draws a 500 m circle (`APPROX_RADIUS_M`). It must match
+  the disc, or the circle sometimes misses the property.
+- Non-owners get no "Open in Maps", because navigating to the circle's centre
+  sends them to the wrong street.
+- Phase 4 booking widens the `listing_locations` policy to the confirmed
+  renter. Nothing else should.
+
+**`profiles` has no `phone` column.** The login number lives in `auth.users`
+and reaches its owner through `session.user.phone`. `profiles` is readable by
+every signed-in user, so whatever is added there is public to them.
+
+**Email OTP needs two things the defaults get wrong.** Supabase's stock
+templates send `{{ .ConfirmationURL }}` — a magic link to Site URL
+(`localhost:3000`), which is meaningless on a phone. The templates in
+`supabase/templates/` render `{{ .Token }}` instead. Both `magic_link` *and*
+`confirmation` are needed: with confirmations enabled, `signInWithOtp` sends the
+confirmation template to users who don't exist yet and magic_link to those who
+do, so fixing one leaves first-time sign-up broken.
+
+**The built-in SMTP is test-only and hard rate-limited** (a couple of emails per
+hour, project-wide — separate from `auth.email.max_frequency`). "Email rate
+limit exceeded" during testing is this, not a bug. Real use needs custom SMTP
+configured in the dashboard.
+
+**`OTP_LENGTH` in `src/lib/auth.ts` is channel-dependent and the two differ.**
+`auth.email.otp_length` is 8; `auth.sms.otp_length` is 6. A mismatch caps the
+input below the real code length so Verify never enables — with no error shown.
+Re-check both before switching `EXPO_PUBLIC_AUTH_CHANNEL`.
+
+**Switching to phone needs more than the env var:** `[auth.sms].enable_signup`
+is `false` on this project, and Twilio credentials must be present. Remote has
+`auth.sms.twilio.enabled = true` with no visible account_sid — verify before
+assuming SMS is wired.
+
+**Do not run `supabase config push` blind.** A push right now would flip
+`auth.sms.twilio.enabled` from true to false on the remote project. Always run
+`supabase config diff` first and reconcile.
+
+**Auth is channel-agnostic on purpose.** The brief wants phone OTP, but Supabase
+delegates SMS to paid providers (Twilio/Vonage/MessageBird) with no free tier
+for Rwandan numbers. `src/lib/auth.ts` abstracts the channel: email OTP today,
+`EXPO_PUBLIC_AUTH_CHANNEL=phone` flips to SMS with no screen changes, because
+both are the same two-step code flow. Don't replace this with email+password —
+that is a different screen that would be thrown away.
+
+**Listings are drafted before upload.** `create.ts` inserts the row as
+`status='draft'`, uploads images against its id, then moves it to
+`PUBLISH_TARGET` (`published` until Phase 3 verification, then
+`pending_review`). A mid-flow failure leaves a private draft, never a live
+listing with missing photos.
+
+**The status rules live in a trigger, not the UI.** `listings_guard_status`
+decides which moves a landlord may make. Only `published` is public. Landlords
+can never set `pending_review→published`, `rejected` or `suspended`, and every
+insert must start as `draft`. The trigger only restricts `current_user =
+'authenticated'` (PostgREST requests). The SQL editor, the service role and
+security-definer functions are staff and pass through.
+`LANDLORD_STATUS_ACTIONS` in `types.ts` offers only moves the trigger accepts.
+Change the two together.
+
+**`availability_confirmed_at` is always the server's clock.** Any change to
+it, and every move to `published`, is overwritten with `now()` in the same
+trigger, so a client can't backdate or pre-date a confirmation. "Still
+available" therefore sends any value; it is the change that counts.
+
+**`listing_status_history` is written only by trigger** and is readable only by
+the owner. There are deliberately no write policies.
+
+**Unstated rental terms match filters.** `maxMinRentalMonths` and
+`availableBy` are built as `or=(col.is.null,col.lte.X)`, because a landlord who
+left the field blank hasn't said no. Several `or=` params AND together in
+PostgREST (verified), so the two filters combine correctly. `amenities` is
+all-of (`cs`), not any-of.
+
+**Favorited listings stay visible after they stop being published.**
+`listings_select_favorited` lets a renter keep reading a saved listing once it
+is paused, unavailable or rented. That is the point of favorites: knowing it
+went. Moderation states (`rejected`, `suspended`) still hide it. To stop that
+policy from becoming a back door, a favorite can only be *created* on a
+`published` listing. `price_at_save` is captured by trigger, so the "price
+dropped" badge can't be faked from the client.
+
+**The feed map shows only loaded pages** and draws every listing at its
+approximate point with a 500 m circle. The tap target is the price bubble,
+because circles aren't tappable on iOS. Both maps import `APPROX_RADIUS_M`
+from `src/lib/maps.ts`.
+
+**Typed routes come from the dev server.** A new route file isn't a valid
+`router.push` target for `tsc` until `.expo/types/router.d.ts` is regenerated
+by `npx expo start` (it was, for `/compare`).
+
+**Amenity keys exist in two copies:** `src/lib/amenities.ts` and
+`supabase/functions/_shared/filters.ts`. The function's copy is a schema enum,
+not sent by the app. Drift can only make the AI drop an amenity, because the
+app re-validates with its own enum, but keep them identical.
+
+**Storage object names are unique, never index-based.** Ordering lives in the
+`position` column and the object name is opaque — never parsed. Index names
+(`{listingId}/0.jpg`) broke as soon as editing existed: removing the first photo
+and adding another would overwrite a surviving file.
+
+**Image positions are append-only and may have gaps.** New photos go at
+`max(position) + 1`. Renumbering would collide with the unique
+`(listing_id, position)` constraint partway through, and nothing depends on them
+being contiguous because ordering is `ORDER BY position`.
+
+**Photo edits are staged until Save.** Nothing uploads or deletes while the user
+is still on the edit screen, so backing out leaves the listing untouched. On
+save, removals run before uploads — a failed upload then leaves the listing with
+fewer photos rather than more than `MAX_IMAGES`.
+
+**Photos are compressed before upload** (1600px longest edge, JPEG q0.7, in
+`create.ts`). Raw phone photos are 3–8 MB; this is the main thing making the app
+usable on Rwandan mobile data. Uploads are sequential, not parallel — concurrent
+uploads on a weak connection stall each other.
+
+**WhatsApp uses the `https://wa.me` link, not the `whatsapp://` scheme.**
+`canOpenURL` on a custom scheme needs an Android `<queries>` manifest entry and
+returns false without one, so the scheme route fails on exactly the devices that
+do have WhatsApp. Call is a separate button, not a fallback.
+
+## AI features (all three built)
+
+Three Edge Functions, one shared key: `smart-search`, `chat` and `auto-describe`
+under `supabase/functions/`, all holding `GEMINI_API_KEY` (Google AI Studio free
+tier). **The key must never enter the app bundle** — anything shipped in React
+Native is extractable.
+
+**`supabase/functions/_shared/` is imported by all three, so editing it means
+redeploying all three.** `gemini.ts` holds the model default, CORS, the JSON
+helper and the provider-error mapping; `filters.ts` holds the filter contract —
+response schema, sentinel decoding, and the Kigali vocabulary rules — shared by
+`smart-search` and `chat`. Both files exist because the duplication was already
+drifting between copies, and the place-name rules are the last thing that should
+disagree between two entry points.
+
+The model's only job is to emit a `Filters` object; the existing listings query
+does the searching. The chatbot, the search bar and the manual filter sheet are
+therefore one code path, so a bad parse degrades to a normal inspectable filter
+rather than a mystery result set. The app re-validates the response with its own
+`filtersSchema` before applying it — the function shapes the output, the app
+decides what is valid.
+
+Kigali place names are sent *from* the app (`src/lib/locations.ts`) rather than
+duplicated in the function, so there is one source of truth for the vocabulary
+the model is allowed to use.
+
+**Gemini model names expire for new API keys.** `gemini-2.5-flash` returned
+404 "no longer available to new users" on a 2026 key; the default is now
+`gemini-3.6-flash`. A 404 here means the model name, not the code. `GEMINI_MODEL`
+overrides it without a redeploy.
+
+**Never return raw provider errors to the client** — they are verbose and can
+echo request internals. They go to the function logs; the client gets a short
+message it can act on. (There is no `supabase functions logs` subcommand, so
+diagnosing means temporarily returning the detail, then removing it.)
+
+**Auto-describe writes a draft, never a published fact.** The result lands in
+the same Description field the landlord would have typed into, on the post
+wizard's details step, behind a "Write it for me" action on the field's label
+row (`TextField`'s `accessory` slot). The prompt's prohibitions are the load-
+bearing part: no rent, no floor area, no distance to a landmark, no utilities or
+security claims, no describing people in the photos. A tenant who arrives to
+find an invented detail is the problem the brief opens with.
+
+**Price is deliberately withheld from the describe prompt.** It has its own
+field on every card and the detail page, and prose that repeats it contradicts
+the listing the first time the rent is edited.
+
+**Describe photos are compressed smaller than upload photos** (1024px / q0.6 vs
+1600px / q0.7, both in `create.ts`). Vision models tile their input, so a larger
+image buys no extra detail — it just doubles the data spent posting one listing
+on mobile data. Sequential, like the uploads: decoding several multi-megapixel
+photos at once is what makes a cheap device drop frames mid-post.
+
+**Auto-describe is wired into the post wizard only.** The edit screen's existing
+photos are already in storage, so describing them needs a second input mode
+(URLs fetched server-side) — and that URL has to be pinned to this project's own
+storage host before it is safe to accept.
+
+**`temperature` differs by function on purpose:** 0 for smart-search (filter
+extraction has one right answer, and a retry returning different results looks
+broken) and 0.6 for auto-describe (a landlord who dislikes the wording presses
+the button again, and at 0 they get the same paragraph back).
+
+**The chatbot never sees a listing row, on purpose.** The brief describes an
+assistant that "reads the live database"; `chat` instead returns a reply plus a
+complete `Filters` object, and the app runs `useListingsFeed` and renders the
+real rows under the reply. A model that cannot see listings cannot invent a
+property, quote a stale rent, or promise availability — the three failures that
+would make the assistant worse than the WhatsApp groups the app replaces. The
+prompt forbids stating counts or naming a property for the same reason.
+
+**Chat criteria chips are read off `Filters`, not off the reply.** `filterSummary`
+in `types.ts` renders what the query actually ran with, so a reply whose wording
+drifts from the filters is visibly contradicted rather than believed.
+
+**Chat filters are complete every turn, not deltas.** The filters in force are
+described to the model in prose (`currentStateLine`), and it returns the whole
+set it wants applied — that is what makes "under 200,000" keep the sector from
+two turns ago, and "start over" clear everything.
+
+**"Cheapest" is a sort, not a filter.** `chat` returns `sort` beside the filters
+and the app maps it to the feed's existing `SortOrder`. Letting the model invent
+a `maxPrice` for "cheapest" would silently hide the cheap listings above its
+guess.
+
+**`useListingsFeed` takes an `enabled` flag** so the Ask tab does not fetch the
+unfiltered feed before the assistant has answered.
+
+**Only the newest chat turn shows results.** One query per historical bubble
+would spend requests on rows the renter has scrolled past, on connections where
+a hanging request is the normal case.
+
+Deploy with `npx supabase functions deploy smart-search` /
+`npx supabase functions deploy chat` /
+`npx supabase functions deploy auto-describe`; Docker is not needed.
+`supabase/functions` is excluded from both `tsconfig.json` and
+`eslint.config.js` — it is Deno, with `npm:` specifiers and a `Deno` global that
+the app's toolchain cannot resolve.
+
+## Search-path constraints (hold for every entry point)
+
+**Sort is not part of `Filters`.** It lives beside it in `filters-context`,
+because `Filters` is the shape the AI parsers target and it should describe what
+to *match*, not how to order. Featured listings float to the top only under
+the default "newest" ordering — letting paid placement override an explicit
+"price: low to high" makes the sort look broken.
+
+**`Filters` in `src/features/listings/types.ts` is the AI's target.** It is the
+single description of what can be searched. All three paths — the chatbot, the
+search bar and the manual filter sheet — produce a `Filters` object and hand it
+to the same query. Nothing should ever build its own listings query; that is what
+keeps a bad parse inspectable instead of mysterious.
+
+Use `claude-opus-5` unless told otherwise, and check the `claude-api` skill
+before writing SDK calls rather than working from memory.
+
+## Layout
+
+```
+src/
+  app/                      expo-router routes
+    (auth)/                 sign-in, verify, profile-setup
+    (tabs)/                 index (feed + map), chat (Ask), saved, post, profile
+    (tabs)/saved.tsx        favorites, with select-to-compare
+    compare.tsx             2–4 listings side by side
+    listing/[id].tsx        detail + map + WhatsApp CTA
+    listing/edit/[id].tsx   edit fields + photos (flat form, not the wizard)
+    filters.tsx             filter sheet (modal)
+  features/
+    auth/context.tsx        session + profile, routing gate
+    listings/               types, queries, create, filters-context,
+                            smart-search, chat, auto-describe
+  lib/                      supabase, auth, contact, format, locations,
+                            edge-functions
+  theme/                    colour, spacing, radius, shadow tokens
+supabase/
+  functions/_shared/gemini.ts         key, CORS, provider errors (all three)
+  functions/_shared/filters.ts        filter contract (smart-search + chat)
+  functions/smart-search/             query -> Filters
+  functions/chat/                     conversation -> reply + Filters
+  functions/auto-describe/            photos -> description
+  migrations/20260910120000_init.sql  schema, indexes, RLS, storage policies
+  migrations/20261024120000_private_location.sql  listing_locations, approx point,
+                                                  drops profiles.phone
+  migrations/20261024130000_listing_terms_and_status.sql  terms, status model,
+                                                  guard trigger, history
+  migrations/20261024140000_favorites.sql        favorites + saved visibility
+  seed.sql                  15 demo Kigali listings (no photos — nothing in
+                            the storage bucket to point at until a real upload)
+  rls_check.sql             security assertions
+```
+
+`@/*` maps to `src/*`. Routes live in `src/app`, not a root-level `app/`.
+
+## Conventions
+
+- Comments explain *why*, not what. Most existing comments record a decision or
+  a trap; match that bar rather than narrating the code.
+- Prices are `integer` RWF — no subunit. Format with `formatPrice`.
+- Rwandan phone numbers are normalised to E.164 in `src/lib/auth.ts`; accept
+  `07…`, `+250 7…`, `2507…`. Never store what the user typed.
+- Kigali districts/sectors are a bundled constant (`src/lib/locations.ts`), not
+  a table — short, static, and needed offline.
+- Every list screen needs loading, empty, and error states. On low-bandwidth
+  connections a hanging spinner is the normal case, not the edge case.

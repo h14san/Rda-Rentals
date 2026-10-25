@@ -1,0 +1,315 @@
+import Slider from '@react-native-community/slider';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+import { Button, Chip, SectionTitle } from '@/components/ui';
+import { useFilters } from '@/features/listings/filters-context';
+import { moveInOptions } from '@/features/listings/terms-fields';
+import {
+  EMPTY_FILTERS,
+  PRICE_BOUNDS,
+  PROPERTY_TYPES,
+  PROPERTY_TYPE_LABELS,
+  formatShortDate,
+  type Filters,
+} from '@/features/listings/types';
+import { AMENITIES, AMENITY_LABELS, type Amenity } from '@/lib/amenities';
+import { formatPriceCompact } from '@/lib/format';
+import { KIGALI_DISTRICTS, sectorsFor } from '@/lib/locations';
+import { colors, fontFamily, fontSize, spacing } from '@/theme';
+
+const BEDROOM_OPTIONS = [0, 1, 2, 3, 4] as const;
+const BATHROOM_OPTIONS = [1, 2, 3] as const;
+/** "I can commit to at most N months." Matches the landlord-side choices. */
+const STAY_OPTIONS = [1, 3, 6, 12] as const;
+
+/**
+ * Filter sheet.
+ *
+ * Edits a local draft and only commits on "Show results", so a half-set filter
+ * never triggers a query — each intermediate state would otherwise be a round
+ * trip on a metered connection.
+ */
+export default function FiltersScreen() {
+  const router = useRouter();
+  const { filters, setFilters } = useFilters();
+  const [draft, setDraft] = useState<Filters>(filters);
+
+  const minPrice = draft.minPrice ?? PRICE_BOUNDS.min;
+  const maxPrice = draft.maxPrice ?? PRICE_BOUNDS.max;
+  const sectors = sectorsFor(draft.district);
+
+  const priceIsSet = draft.minPrice !== null || draft.maxPrice !== null;
+  const priceLabel = !priceIsSet
+    ? 'Any price'
+    : draft.maxPrice === null
+      ? `From ${formatPriceCompact(minPrice)}`
+      : draft.minPrice === null
+        ? `Up to ${formatPriceCompact(maxPrice)}`
+        : `${formatPriceCompact(minPrice)} — ${formatPriceCompact(maxPrice)}`;
+
+  function patch(next: Partial<Filters>) {
+    setDraft((d) => ({ ...d, ...next }));
+  }
+
+  function toggleAmenity(a: Amenity) {
+    patch({
+      amenities: draft.amenities.includes(a)
+        ? draft.amenities.filter((x) => x !== a)
+        : [...draft.amenities, a],
+    });
+  }
+
+  function apply() {
+    setFilters(draft);
+    router.back();
+  }
+
+  return (
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.section}>
+          <SectionTitle>Price per month</SectionTitle>
+          <View style={styles.priceHeader}>
+            <Text style={styles.priceReadout}>{priceLabel}</Text>
+            {priceIsSet && (
+              <Pressable
+                onPress={() => patch({ minPrice: null, maxPrice: null })}
+                accessibilityRole="button"
+              >
+                <Text style={styles.clearLink}>Clear</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <Text style={styles.sliderLabel}>Minimum</Text>
+          <Slider
+            minimumValue={PRICE_BOUNDS.min}
+            maximumValue={PRICE_BOUNDS.max}
+            step={PRICE_BOUNDS.step}
+            value={minPrice}
+            minimumTrackTintColor={colors.softBlack}
+            maximumTrackTintColor={colors.border}
+            thumbTintColor={colors.softBlack}
+            // Only ever write the bound being dragged. Writing both would turn
+            // an untouched (null) maximum into a real 1,000,000 filter just
+            // because the minimum moved, quietly excluding nothing while
+            // showing up as an extra active filter.
+            onSlidingComplete={(v) => patch({ minPrice: Math.min(v, maxPrice) })}
+          />
+
+          <Text style={styles.sliderLabel}>Maximum</Text>
+          <Slider
+            minimumValue={PRICE_BOUNDS.min}
+            maximumValue={PRICE_BOUNDS.max}
+            step={PRICE_BOUNDS.step}
+            value={maxPrice}
+            minimumTrackTintColor={colors.softBlack}
+            maximumTrackTintColor={colors.border}
+            thumbTintColor={colors.softBlack}
+            onSlidingComplete={(v) => patch({ maxPrice: Math.max(v, minPrice) })}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>District</SectionTitle>
+          <View style={styles.chipWrap}>
+            {KIGALI_DISTRICTS.map((district) => (
+              <Chip
+                key={district}
+                label={district}
+                selected={draft.district === district}
+                onPress={() =>
+                  patch(
+                    draft.district === district
+                      ? { district: null, sector: null }
+                      : // Changing district invalidates any sector chosen under
+                        // the previous one.
+                        { district, sector: null },
+                  )
+                }
+              />
+            ))}
+          </View>
+        </View>
+
+        {sectors.length > 0 && (
+          <View style={styles.section}>
+            <SectionTitle>Sector</SectionTitle>
+            <View style={styles.chipWrap}>
+              {sectors.map((sector) => (
+                <Chip
+                  key={sector}
+                  label={sector}
+                  selected={draft.sector === sector}
+                  onPress={() =>
+                    patch({ sector: draft.sector === sector ? null : sector })
+                  }
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <SectionTitle>Property type</SectionTitle>
+          <View style={styles.chipWrap}>
+            {PROPERTY_TYPES.map((type) => (
+              <Chip
+                key={type}
+                label={PROPERTY_TYPE_LABELS[type]}
+                selected={draft.propertyType === type}
+                onPress={() =>
+                  patch({
+                    propertyType: draft.propertyType === type ? null : type,
+                  })
+                }
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>Bedrooms</SectionTitle>
+          <View style={styles.chipWrap}>
+            {BEDROOM_OPTIONS.map((n) => (
+              <Chip
+                key={n}
+                label={n === 0 ? 'Studio' : `${n}+`}
+                selected={draft.minBedrooms === n}
+                onPress={() =>
+                  patch({ minBedrooms: draft.minBedrooms === n ? null : n })
+                }
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>Furnishing</SectionTitle>
+          <View style={styles.chipWrap}>
+            <Chip
+              label="Furnished only"
+              selected={draft.furnishedOnly}
+              onPress={() => patch({ furnishedOnly: !draft.furnishedOnly })}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>Bathrooms</SectionTitle>
+          <View style={styles.chipWrap}>
+            {BATHROOM_OPTIONS.map((n) => (
+              <Chip
+                key={n}
+                label={`${n}+`}
+                selected={draft.minBathrooms === n}
+                onPress={() =>
+                  patch({ minBathrooms: draft.minBathrooms === n ? null : n })
+                }
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>Amenities</SectionTitle>
+          <View style={styles.chipWrap}>
+            {AMENITIES.map((a) => (
+              <Chip
+                key={a}
+                label={AMENITY_LABELS[a]}
+                selected={draft.amenities.includes(a)}
+                onPress={() => toggleAmenity(a)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>Longest lease you can commit to</SectionTitle>
+          <View style={styles.chipWrap}>
+            {STAY_OPTIONS.map((n) => (
+              <Chip
+                key={n}
+                label={n === 1 ? '1 month' : `${n} months`}
+                selected={draft.maxMinRentalMonths === n}
+                onPress={() =>
+                  patch({
+                    maxMinRentalMonths: draft.maxMinRentalMonths === n ? null : n,
+                  })
+                }
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle>Move in by</SectionTitle>
+          <View style={styles.chipWrap}>
+            {moveInOptions().map((d) => (
+              <Chip
+                key={d}
+                label={formatShortDate(d)}
+                selected={draft.availableBy === d}
+                onPress={() =>
+                  patch({ availableBy: draft.availableBy === d ? null : d })
+                }
+              />
+            ))}
+          </View>
+          <Text style={styles.sliderLabel}>
+            Listings without a stated date are always included.
+          </Text>
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Button
+          label="Clear all"
+          variant="ghost"
+          onPress={() => setDraft(EMPTY_FILTERS)}
+          style={styles.footerButton}
+        />
+        <Button label="Show results" onPress={apply} style={styles.footerButton} />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.white },
+  content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.xxl },
+  section: { gap: spacing.sm },
+  priceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  priceReadout: {
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.semibold,
+    color: colors.softBlack,
+  },
+  clearLink: {
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.semibold,
+    color: colors.muted,
+  },
+  sliderLabel: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xs,
+    color: colors.muted,
+  },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  footer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  footerButton: { flex: 1 },
+});

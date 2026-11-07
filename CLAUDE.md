@@ -89,9 +89,10 @@ The plan maps the Blueprint's phases onto what was already built:
   outside Rwanda needs authorization, and controllers must register. Supabase is
   in eu-central-1, and Gemini processes prompts outside Rwanda. Settle this
   before production.
-- **Phone OTP.** Pindo, a Rwandan SMS provider, can sit behind a Supabase Send
-  SMS auth hook (an Edge Function), with no screen changes. It needs pricing, a
-  sender ID and a decision.
+- **Phone OTP: decided 2026-10-30, use Pindo.** The plan is a Supabase Send SMS
+  auth hook (an Edge Function) that calls Pindo, with no screen changes. It is
+  not built yet. It still needs a Pindo account, an API token, a sender ID and
+  pricing.
 - **Sentry and PostHog** wait for beta. Each goes behind a `src/lib/` wrapper,
   and only after its data location has been checked.
 

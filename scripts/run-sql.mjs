@@ -11,9 +11,14 @@ import { spawnSync } from 'node:child_process';
 
 const file = process.argv[2];
 if (!file) {
-  console.error('usage: node scripts/run-sql.mjs <path-to-sql>');
+  console.error('usage: node scripts/run-sql.mjs <path-to-sql> [--yes]');
   process.exit(2);
 }
+
+// The CLI refuses to run SQL on a production-labelled project without consent,
+// and cannot prompt from a script. --yes is passed only by db:rls-check, which
+// always rolls back; db:seed writes, so it must keep asking.
+const consent = process.argv.includes('--yes') ? ' --yes' : '';
 
 // Invoked as a single shell command string rather than (command, args[]).
 // On Windows npx is a .cmd shim, which Node refuses to spawn without a shell
@@ -22,7 +27,7 @@ if (!file) {
 // an args array alongside shell:true is separately deprecated, so the command
 // is built as one pre-quoted string. The path is quoted because this project
 // lives under a directory with a space in its name.
-const command = `npx --yes supabase@latest db query --linked -f "${file}"`;
+const command = `npx --yes supabase@latest db query --linked${consent} -f "${file}"`;
 
 const result = spawnSync(command, { encoding: 'utf8', shell: true });
 

@@ -34,6 +34,7 @@ import {
   type PickedImage,
 } from '@/features/listings/create';
 import { listingKeys } from '@/features/listings/queries';
+import { useMyIdentity } from '@/features/verification/queries';
 import { ListingTermsFields, validateTerms } from '@/features/listings/terms-fields';
 import {
   PROPERTY_TYPES,
@@ -56,7 +57,7 @@ const STEP_TITLES: Record<Step, string> = {
   // optional, and a landlord should be able to skip it with one tap.
   terms: 'Rental terms',
   location: 'Set the location',
-  review: 'Review and publish',
+  review: 'Review and submit',
 };
 
 export default function PostListingScreen() {
@@ -72,6 +73,10 @@ function SignedInPostListing({ userId }: { userId: string }) {
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState<Step>('photos');
+  // Submitting is allowed either way (Blueprint §26: draft freely, verify
+  // before public); this only decides whether to warn that review will wait.
+  const identity = useMyIdentity(userId);
+  const identityPending = identity.isSuccess && !identity.data.badge;
   const [images, setImages] = useState<PickedImage[]>([]);
 
   const [title, setTitle] = useState('');
@@ -232,12 +237,12 @@ function SignedInPostListing({ userId }: { userId: string }) {
   }
 
   /**
-   * Publish.
+   * Submit for review.
    *
    * The row is created as a draft first so uploads have a listing id to file
-   * under; it only flips to active once every image has landed. A failure part
-   * way through therefore leaves a draft the landlord can finish, never a live
-   * listing with missing photos.
+   * under; it only moves to review once every image has landed. A failure part
+   * way through therefore leaves a draft the landlord can finish, never a
+   * listing in review with missing photos.
    */
   async function onPublish() {
     setSubmitting(true);
@@ -263,20 +268,26 @@ function SignedInPostListing({ userId }: { userId: string }) {
         setProgress(`Uploading photo ${done} of ${total}…`),
       );
 
-      setProgress('Publishing…');
+      setProgress('Submitting for review…');
       await publishListing(draft.id);
 
       await queryClient.invalidateQueries({
         queryKey: listingKeys.mine(userId),
       });
       await queryClient.invalidateQueries({ queryKey: ['listings', 'feed'] });
+      await queryClient.invalidateQueries({ queryKey: ['verification'] });
 
       resetForm();
-      Alert.alert('Listing published', 'Your rental is now live in the feed.');
+      Alert.alert(
+        'Submitted for review',
+        identityPending
+          ? 'Your listing goes live once Rwanda Rentals has checked your ID and the property. Verify your ID from your profile.'
+          : 'Your listing goes live once Rwanda Rentals has checked it. You can follow it on your profile.',
+      );
       router.push(`/listing/${draft.id}`);
     } catch (e) {
       Alert.alert(
-        'Could not publish',
+        'Could not submit',
         e instanceof Error ? e.message : 'Something went wrong. Please try again.',
       );
     } finally {
@@ -578,6 +589,24 @@ function SignedInPostListing({ userId }: { userId: string }) {
               </View>
             </View>
 
+            <Text style={styles.reviewMeta}>
+              Rwanda Rentals checks every listing before it goes live, so
+              tenants know it is real.
+            </Text>
+            {identityPending && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/verify-identity')}
+                style={styles.identityNote}
+              >
+                <Ionicons name="shield-outline" size={18} color={colors.charcoal} />
+                <Text style={styles.identityNoteText}>
+                  Your ID has not been checked yet, so this listing will wait for
+                  it. Verify your ID →
+                </Text>
+              </Pressable>
+            )}
+
             {!!progress && <Text style={styles.progressText}>{progress}</Text>}
           </View>
         )}
@@ -595,7 +624,7 @@ function SignedInPostListing({ userId }: { userId: string }) {
         )}
         {step === 'review' ? (
           <Button
-            label="Publish listing"
+            label="Submit for review"
             style={styles.flexTwo}
             onPress={() => void onPublish()}
             loading={submitting}
@@ -728,6 +757,20 @@ const styles = StyleSheet.create({
   reviewTitle: {
     fontFamily: fontFamily.regular,
     fontSize: fontSize.md,
+    color: colors.charcoal,
+  },
+  identityNote: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+    backgroundColor: colors.lightGray,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  identityNoteText: {
+    flex: 1,
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.sm,
     color: colors.charcoal,
   },
   reviewMeta: {

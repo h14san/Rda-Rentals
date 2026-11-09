@@ -78,8 +78,12 @@ The plan maps the Blueprint's phases onto what was already built:
 - **Phase 2 (done, live):** rental terms, the full status model with
   "availability confirmed", favorites, 2–4-way comparison, and a list/map
   toggle on the feed.
-- **Phase 3:** roles, in-app chat (which removes WhatsApp), push, reports,
-  verification, and the admin console.
+- **Phase 3a (done, live 2026-11-10):** staff roles,
+  landlord ID verification with in-app document upload, listing review, specific
+  badges, and staff review screens in the app (`/review`). Branch
+  `feat/phase-3a-verification`.
+- **Phase 3, rest:** reports, moderation actions (suspend/restore), in-app chat
+  (which removes WhatsApp), push, and the rest of the admin console.
 - **Later:** booking, AI matching and alerts, payments, digital rental, and
   agencies.
 
@@ -88,7 +92,16 @@ The plan maps the Blueprint's phases onto what was already built:
 - **Data residency.** Blueprint §50 cites the Rwanda DPP law: storing data
   outside Rwanda needs authorization, and controllers must register. Supabase is
   in eu-central-1, and Gemini processes prompts outside Rwanda. Settle this
-  before production.
+  before production. **Phase 3a now stores identity documents** in the
+  `verification-evidence` bucket in eu-central-1: no real landlord should upload
+  an ID until this is settled.
+- **Evidence retention.** How long ID photos are kept after a decision is
+  undecided. `decided_at` is recorded so a purge job can be added; it has to
+  delete through the Storage API, because deleting `storage.objects` rows in SQL
+  leaves the files behind.
+- **Re-review after edits.** An approved listing can be edited freely and keeps
+  its badges. Whether a material edit (rent, location, photos) should send it
+  back to review is undecided.
 - **Phone OTP: decided 2026-10-30, use Pindo.** The plan is a Supabase Send SMS
   auth hook (an Edge Function) that calls Pindo, with no screen changes. It is
   not built yet. It still needs a Pindo account, an API token, a sender ID and
@@ -105,7 +118,7 @@ npm run typecheck      # tsc --noEmit
 npx eslint .
 npm run db:push        # apply supabase/migrations
 npm run db:seed        # demo data — NON-PRODUCTION ONLY
-npm run db:rls-check   # asserts the RLS policies hold
+npm run db:rls-check   # asserts the RLS policies hold (passes --yes; always rolls back)
 
 npx supabase functions deploy chat           # the three AI functions;
 npx supabase functions deploy smart-search   # no Docker needed to deploy
@@ -154,6 +167,11 @@ key, so the map is blank there. Every other screen works in Expo Go — don't
 as JSON on stdout. Never call it directly from a check script; `db:seed` and
 `db:rls-check` go through `scripts/run-sql.mjs`, which greps the output and
 exits non-zero. A check that cannot fail is worse than no check.
+
+**The CLI asks for consent before any SQL on this project**, which it labels
+production, and cannot ask from a script. `run-sql.mjs` passes `--yes` only when
+given it; `db:rls-check` does, because it always rolls back. `db:seed` does not,
+because it writes, and re-running it duplicates every listing.
 
 **Spawning npx from Node on Windows needs `shell: true` with a single command
 string.** `npx.cmd` cannot be spawned without a shell (Node raises EINVAL since
@@ -247,9 +265,8 @@ that is a different screen that would be thrown away.
 
 **Listings are drafted before upload.** `create.ts` inserts the row as
 `status='draft'`, uploads images against its id, then moves it to
-`PUBLISH_TARGET` (`published` until Phase 3 verification, then
-`pending_review`). A mid-flow failure leaves a private draft, never a live
-listing with missing photos.
+`PUBLISH_TARGET` (`pending_review`). A mid-flow failure leaves a private draft,
+never a listing in review with missing photos.
 
 **The status rules live in a trigger, not the UI.** `listings_guard_status`
 decides which moves a landlord may make. Only `published` is public. Landlords
@@ -258,7 +275,46 @@ insert must start as `draft`. The trigger only restricts `current_user =
 'authenticated'` (PostgREST requests). The SQL editor, the service role and
 security-definer functions are staff and pass through.
 `LANDLORD_STATUS_ACTIONS` in `types.ts` offers only moves the trigger accepts.
-Change the two together.
+Change the two together. A draft can only go to `pending_review`; republishing
+a paused, unavailable or rented listing stays direct, because it was already
+approved, or was live before verification existed.
+
+**Roles are a table, never a column on `profiles`.** `user_roles` holds
+`admin`/`verifier` rows, readable only by their owner, because every signed-in
+user can read `profiles`. Renter and landlord are not roles. There are no write
+policies, so grant roles from the SQL editor until the admin console exists.
+`has_role()` is security definer so policies can call it without recursing,
+and `admin` satisfies every check.
+
+**Every staff action is a checked security-definer function**
+(`decide_verification`, `staff_listing_location`). Each one checks `has_role`
+itself and raises `42501` otherwise. Because they run as their owner, the
+status trigger lets their moves through. A new staff function that forgets the
+role check is open to every signed-in user. `isStaff` in the auth context only
+decides which screens are shown.
+
+**Entering `pending_review` opens the review case by trigger**
+(`listings_open_review_case`), so submitting stays one update. Approving a
+listing requires the owner's `identity_checked` badge (rule 9), at least one
+named check, and a reviewer who is not the owner. Refusing or requesting
+changes requires a note, because the landlord sees it.
+
+**Badges are written only by `decide_verification`.** Every badge
+(`profile_badges`, `listing_badges`) names what was checked and is readable by
+anyone. Cases, evidence and `verification_events` (the audit log) never ride
+along with a feed query. In the UI, badges are a green shield in the card body,
+never gold on the photo like Featured.
+
+**Staff reach the exact address only through `staff_listing_location`.** It
+works only while the listing has an open case, and logs a `viewed_location`
+event every time. The `listing_locations` policy itself stays owner-only.
+
+**ID documents are in a private bucket** (`verification-evidence`,
+`{uid}/{case_id}/{file}.jpg`, images only). Uploads are accepted only under one
+of the uploader's own open cases. There is no update or delete policy, so a
+document can't be swapped after a reviewer has seen it. Staff view documents
+through 5-minute signed URLs, with `cachePolicy="memory"` so they never land
+in the disk cache.
 
 **`availability_confirmed_at` is always the server's clock.** Any change to
 it, and every move to `published`, is overwritten with `now()` in the same
@@ -447,6 +503,8 @@ src/
     (tabs)/                 index (feed + map), chat (Ask), saved, post, profile
     (tabs)/saved.tsx        favorites, with select-to-compare
     compare.tsx             2–4 listings side by side
+    verify-identity.tsx     landlord ID upload (not (auth)/verify, the OTP step)
+    review/                 staff queue + case decision
     listing/[id].tsx        detail + map + WhatsApp CTA
     listing/edit/[id].tsx   edit fields + photos (flat form, not the wizard)
     filters.tsx             filter sheet (modal)
@@ -454,8 +512,9 @@ src/
     auth/context.tsx        session + profile, routing gate
     listings/               types, queries, create, filters-context,
                             smart-search, chat, auto-describe
+    verification/           badge labels, case queries, evidence upload
   lib/                      supabase, auth, contact, format, locations,
-                            edge-functions
+                            edge-functions, images (pick + compress)
   theme/                    colour, spacing, radius, shadow tokens
 supabase/
   functions/_shared/gemini.ts         key, CORS, provider errors (all three)
@@ -469,6 +528,8 @@ supabase/
   migrations/20261024130000_listing_terms_and_status.sql  terms, status model,
                                                   guard trigger, history
   migrations/20261024140000_favorites.sql        favorites + saved visibility
+  migrations/20261110120000_roles_and_verification.sql  roles, cases, badges,
+                                                  review gate, evidence bucket
   seed.sql                  15 demo Kigali listings (no photos — nothing in
                             the storage bucket to point at until a real upload)
   rls_check.sql             security assertions

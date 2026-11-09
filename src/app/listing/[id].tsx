@@ -7,6 +7,7 @@ import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { ImageCarousel } from '@/components/image-carousel';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, SectionTitle } from '@/components/ui';
+import { BadgeList } from '@/components/verification-badges';
 import { useAuth } from '@/features/auth/context';
 import { useFavoriteControl } from '@/features/listings/favorites';
 import { useListingDetail } from '@/features/listings/queries';
@@ -58,6 +59,9 @@ export default function ListingDetailScreen() {
       ? { latitude: listing.approx_latitude, longitude: listing.approx_longitude }
       : null;
   const contactPhone = listing.profiles?.whatsapp_phone ?? null;
+  const identityCheckedAt =
+    listing.profiles?.profile_badges?.find((b) => b.kind === 'identity_checked')
+      ?.checked_at ?? null;
 
   const contactContext = {
     listingTitle: listing.title,
@@ -136,6 +140,11 @@ export default function ListingDetailScreen() {
                 <Text style={styles.factText}>{fact}</Text>
               </View>
             ))}
+          </View>
+
+          <View style={styles.section}>
+            <SectionTitle>What Rwanda Rentals checked</SectionTitle>
+            <BadgeList badges={listing.listing_badges} identityCheckedAt={identityCheckedAt} />
           </View>
 
           <View style={styles.section}>

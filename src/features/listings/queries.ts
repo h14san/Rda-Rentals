@@ -28,6 +28,9 @@ export const SORT_LABELS: Record<SortOrder, string> = {
 
 const IMAGE_SELECT = 'listing_images (id, storage_path, position)';
 
+/** Public results of verification; readable by anyone, like the listing itself. */
+const BADGE_SELECT = 'listing_badges (kind, checked_at)';
+
 export const listingKeys = {
   all: ['listings'] as const,
   feed: (filters: Filters, sort: SortOrder) =>
@@ -74,7 +77,7 @@ export function useListingsFeed(
         .from('listings')
         // count:'exact' so the feed can show how many rentals matched, which is
         // the fastest way for a tenant to tell a filter was too narrow.
-        .select(`*, ${IMAGE_SELECT}`, { count: 'exact' })
+        .select(`*, ${IMAGE_SELECT}, ${BADGE_SELECT}`, { count: 'exact' })
         .eq('status', 'published');
 
       if (filters.minPrice !== null) query = query.gte('price_rwf', filters.minPrice);
@@ -141,7 +144,9 @@ export function useListingDetail(id: string) {
         // null; one request either way, rather than a second round trip for
         // the owner on a slow connection.
         .select(
-          `*, ${IMAGE_SELECT}, profiles (id, full_name, whatsapp_phone), listing_locations (address, latitude, longitude)`,
+          // The profiles embed is hinted by column so it stays unambiguous as
+          // more tables gain foreign keys to both listings and profiles.
+          `*, ${IMAGE_SELECT}, ${BADGE_SELECT}, profiles!owner_id (id, full_name, whatsapp_phone, profile_badges (kind, checked_at)), listing_locations (address, latitude, longitude)`,
         )
         .eq('id', id)
         .single();
@@ -164,7 +169,7 @@ export function useListingsByIds(ids: string[]) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('listings')
-        .select(`*, ${IMAGE_SELECT}`)
+        .select(`*, ${IMAGE_SELECT}, ${BADGE_SELECT}`)
         .in('id', ids);
       if (error) throw error;
       const rows = (data as unknown as ListingWithImages[]).map(sortImages);
@@ -210,6 +215,9 @@ export function useSetListingStatus(userId: string) {
       void qc.invalidateQueries({ queryKey: listingKeys.mine(userId) });
       void qc.invalidateQueries({ queryKey: listingKeys.detail(row.id) });
       void qc.invalidateQueries({ queryKey: ['listings', 'feed'] });
+      // Entering review opens a case by trigger. A literal key, because
+      // verification/queries imports this file.
+      void qc.invalidateQueries({ queryKey: ['verification'] });
     },
   });
 }

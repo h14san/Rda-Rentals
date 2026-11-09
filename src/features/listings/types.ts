@@ -50,19 +50,20 @@ export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
 };
 
 /**
- * Where a draft goes when the landlord presses Publish.
+ * Where a draft goes when the landlord submits it.
  *
- * 'published' until landlord verification exists (Phase 3). The trigger is
- * what actually enforces this; flipping it here without the trigger change
- * would leave the button asking for a move the database refuses.
+ * Review, never straight to live: rule 9 says the landlord is verified before
+ * anything is public. The listings_guard_status trigger is what enforces it,
+ * and entering pending_review opens the review case by trigger too, so this
+ * one update is the whole submission.
  */
-export const PUBLISH_TARGET: ListingStatus = 'published';
+export const PUBLISH_TARGET: ListingStatus = 'pending_review';
 
 /** The status changes a landlord is offered, per current status. */
 export const LANDLORD_STATUS_ACTIONS: Partial<
   Record<ListingStatus, { to: ListingStatus; label: string }[]>
 > = {
-  draft: [{ to: PUBLISH_TARGET, label: 'Publish' }],
+  draft: [{ to: PUBLISH_TARGET, label: 'Submit for review' }],
   published: [
     { to: 'rented', label: 'Mark rented' },
     { to: 'paused', label: 'Pause' },
@@ -140,12 +141,69 @@ export type ListingLocationRow = {
 /** A listing joined with its images, as the feed and detail screens consume it. */
 export type ListingWithImages = ListingRow & {
   listing_images: Pick<ListingImageRow, 'id' | 'storage_path' | 'position'>[];
+  /** Embedded by the feed and detail selects; absent where not selected. */
+  listing_badges?: Pick<ListingBadgeRow, 'kind' | 'checked_at'>[];
 };
 
-/** Detail screen additionally needs the landlord's contact number. */
+/** Detail screen additionally needs the landlord's contact number and badges. */
 export type ListingDetail = ListingWithImages & {
-  profiles: Pick<ProfileRow, 'id' | 'full_name' | 'whatsapp_phone'> | null;
+  profiles:
+    | (Pick<ProfileRow, 'id' | 'full_name' | 'whatsapp_phone'> & {
+        profile_badges: Pick<ProfileBadgeRow, 'kind' | 'checked_at'>[];
+      })
+    | null;
   listing_locations: Pick<ListingLocationRow, 'address' | 'latitude' | 'longitude'> | null;
+};
+
+/* Verification. Labels and screens live in src/features/verification. */
+
+export type StaffRole = 'admin' | 'verifier';
+export type CaseSubject = 'landlord' | 'listing';
+export type CaseStatus = 'submitted' | 'changes_requested' | 'approved' | 'rejected';
+export type CaseDecision = Exclude<CaseStatus, 'submitted'>;
+export type EvidenceKind =
+  | 'id_document'
+  | 'ownership_document'
+  | 'authorization_letter'
+  | 'other';
+export type ProfileBadgeKind = 'identity_checked';
+export type ListingBadgeKind =
+  | 'authorization_checked'
+  | 'existence_checked'
+  | 'information_checked';
+
+export type VerificationCaseRow = {
+  id: string;
+  subject_type: CaseSubject;
+  profile_id: string;
+  listing_id: string | null;
+  status: CaseStatus;
+  submitted_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+};
+
+export type VerificationEvidenceRow = {
+  id: string;
+  case_id: string;
+  kind: EvidenceKind;
+  storage_path: string;
+  uploaded_at: string;
+};
+
+export type ProfileBadgeRow = {
+  profile_id: string;
+  kind: ProfileBadgeKind;
+  checked_at: string;
+  case_id: string | null;
+};
+
+export type ListingBadgeRow = {
+  listing_id: string;
+  kind: ListingBadgeKind;
+  checked_at: string;
+  case_id: string | null;
 };
 
 export type Database = {
@@ -235,9 +293,70 @@ export type Database = {
         Update: Partial<ListingImageRow>;
         Relationships: [];
       };
+      // Everything below is written only by database functions, except
+      // evidence rows, which the case's owner adds while the case is open.
+      user_roles: {
+        Row: { user_id: string; role: StaffRole; granted_by: string | null; granted_at: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      verification_cases: {
+        Row: VerificationCaseRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      verification_evidence: {
+        Row: VerificationEvidenceRow;
+        Insert: Pick<VerificationEvidenceRow, 'case_id' | 'kind' | 'storage_path'>;
+        Update: never;
+        Relationships: [];
+      };
+      verification_events: {
+        Row: {
+          id: number;
+          case_id: string;
+          actor: string | null;
+          action: string;
+          note: string | null;
+          at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      profile_badges: {
+        Row: ProfileBadgeRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      listing_badges: {
+        Row: ListingBadgeRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      request_identity_verification: { Args: Record<string, never>; Returns: string };
+      resubmit_listing_case: { Args: { p_listing_id: string }; Returns: undefined };
+      decide_verification: {
+        Args: {
+          p_case_id: string;
+          p_decision: CaseDecision;
+          p_note?: string | null;
+          p_checks?: ListingBadgeKind[];
+        };
+        Returns: undefined;
+      };
+      staff_listing_location: {
+        Args: { p_listing_id: string };
+        Returns: { address: string | null; latitude: number | null; longitude: number | null }[];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
@@ -247,8 +366,9 @@ export type Database = {
  * Feed filters.
  *
  * This shape is deliberately the single description of "what can be searched".
- * Phase 3's natural-language parser targets this object rather than building
- * its own query, so anything the AI can express is already expressible here.
+ * The natural-language search and the chatbot target this object rather than
+ * building their own query, so anything the AI can express is already
+ * expressible here.
  */
 export const filtersSchema = z.object({
   minPrice: z.number().int().positive().nullable().default(null),

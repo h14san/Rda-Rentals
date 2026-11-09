@@ -1,6 +1,4 @@
 import { decode } from 'base64-arraybuffer';
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import * as ImagePicker from 'expo-image-picker';
 
 import {
   PUBLISH_TARGET,
@@ -8,7 +6,11 @@ import {
   type ListingRow,
   type PropertyType,
 } from '@/features/listings/types';
+import { compressToJpeg, type PickedImage } from '@/lib/images';
 import { supabase } from '@/lib/supabase';
+
+// Re-exported so the post and edit screens keep one import site for photos.
+export { captureImage, pickImages, type PickedImage } from '@/lib/images';
 
 export const MAX_IMAGES = 8;
 
@@ -33,81 +35,6 @@ const JPEG_QUALITY = 0.7;
  */
 const ANALYSIS_MAX_EDGE = 1024;
 const ANALYSIS_QUALITY = 0.6;
-
-export interface PickedImage {
-  uri: string;
-  width: number;
-  height: number;
-}
-
-/** Opens the system picker. Returns [] if the user cancels or denies access. */
-export async function pickImages(remainingSlots: number): Promise<PickedImage[]> {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!permission.granted) return [];
-
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ['images'],
-    allowsMultipleSelection: true,
-    selectionLimit: remainingSlots,
-    quality: 1, // Compression happens in compressToJpeg, after resizing.
-    exif: false,
-  });
-
-  if (result.canceled) return [];
-  return result.assets.map((a) => ({
-    uri: a.uri,
-    width: a.width,
-    height: a.height,
-  }));
-}
-
-/** Opens the camera for a single shot. */
-export async function captureImage(): Promise<PickedImage | null> {
-  const permission = await ImagePicker.requestCameraPermissionsAsync();
-  if (!permission.granted) return null;
-
-  const result = await ImagePicker.launchCameraAsync({
-    quality: 1,
-    exif: false,
-  });
-  if (result.canceled || !result.assets[0]) return null;
-
-  const a = result.assets[0];
-  return { uri: a.uri, width: a.width, height: a.height };
-}
-
-/**
- * Resize + re-encode to JPEG, returning base64.
- *
- * base64 rather than a Blob because RN's fetch is unreliable at turning a
- * file:// URI into a Blob; reading it out of the manipulator directly avoids a
- * round trip through the filesystem.
- */
-async function compressToJpeg(
-  image: PickedImage,
-  maxEdge = MAX_EDGE,
-  quality = JPEG_QUALITY,
-): Promise<string> {
-  const context = ImageManipulator.manipulate(image.uri);
-
-  // Only ever scale down, and constrain the longer edge so portrait and
-  // landscape shots both end up under the same pixel budget.
-  const longestEdge = Math.max(image.width, image.height);
-  if (longestEdge > maxEdge) {
-    const isLandscape = image.width >= image.height;
-    context.resize(isLandscape ? { width: maxEdge } : { height: maxEdge });
-  }
-
-  const rendered = await context.renderAsync();
-  const saved = await rendered.saveAsync({
-    compress: quality,
-    format: SaveFormat.JPEG,
-    base64: true,
-  });
-
-  if (!saved.base64) throw new Error('Image compression returned no data.');
-  return saved.base64;
-}
 
 /**
  * base64 JPEG for the auto-describe function, at the smaller analysis budget.
@@ -265,7 +192,7 @@ export async function uploadListingImages(
   startPosition = 0,
 ): Promise<void> {
   for (let i = 0; i < images.length; i++) {
-    const base64 = await compressToJpeg(images[i]);
+    const base64 = await compressToJpeg(images[i], MAX_EDGE, JPEG_QUALITY);
     const path = storagePathFor(userId, listingId);
 
     const { error: uploadError } = await supabase.storage

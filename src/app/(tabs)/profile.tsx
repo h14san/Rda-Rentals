@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Button, SectionTitle, TextField } from '@/components/ui';
+import { BadgePill } from '@/components/verification-badges';
 import { useAuth } from '@/features/auth/context';
 import {
   useConfirmAvailability,
@@ -17,6 +18,12 @@ import {
   LISTING_STATUS_LABELS,
   type ListingWithImages,
 } from '@/features/listings/types';
+import {
+  useMyIdentity,
+  useMyListingCases,
+  useResubmitListing,
+} from '@/features/verification/queries';
+import { CASE_STATUS_LABELS, PROFILE_BADGE_LABELS } from '@/features/verification/types';
 import { formatRwandanPhone, normalizeRwandanPhone, signOut } from '@/lib/auth';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { imageUrl, supabase } from '@/lib/supabase';
@@ -32,7 +39,11 @@ export default function ProfileScreen() {
 
 function SignedInProfile({ userId }: { userId: string }) {
   const router = useRouter();
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, isStaff } = useAuth();
+  const identity = useMyIdentity(userId);
+  const listingCases = useMyListingCases(userId);
+  const resubmit = useResubmitListing(userId);
+  const identityCase = identity.data?.latestCase ?? null;
 
   const { data: listings, isPending, isError, error, refetch } = useMyListings(userId);
   const setStatus = useSetListingStatus(userId);
@@ -130,6 +141,28 @@ function SignedInProfile({ userId }: { userId: string }) {
                 ? formatRwandanPhone(profile.whatsapp_phone)
                 : 'No contact number'}
             </Text>
+            {identity.data?.badge ? (
+              <BadgePill label={PROFILE_BADGE_LABELS.identity_checked.label} />
+            ) : (
+              identity.isSuccess && (
+                <View style={styles.identityRow}>
+                  <Text style={styles.listingMeta}>
+                    {identityCase?.status === 'submitted'
+                      ? 'ID sent · waiting for review'
+                      : identityCase
+                        ? `ID ${CASE_STATUS_LABELS[identityCase.status].toLowerCase()}`
+                        : 'Verify your ID so your listings can go live.'}
+                  </Text>
+                  {identityCase?.status !== 'submitted' && (
+                    <Button
+                      label="Verify your ID"
+                      variant="secondary"
+                      onPress={() => router.push('/verify-identity')}
+                    />
+                  )}
+                </View>
+              )
+            )}
             <Button
               label="Edit profile"
               variant="secondary"
@@ -138,6 +171,14 @@ function SignedInProfile({ userId }: { userId: string }) {
           </>
         )}
       </View>
+
+      {isStaff && (
+        <Button
+          label="Review queue"
+          variant="secondary"
+          onPress={() => router.push('/review')}
+        />
+      )}
 
       <View style={styles.section}>
         <SectionTitle>Your listings</SectionTitle>
@@ -158,6 +199,12 @@ function SignedInProfile({ userId }: { userId: string }) {
             const cover = listing.listing_images?.[0];
             const actions = LANDLORD_STATUS_ACTIONS[listing.status] ?? [];
             const isLive = listing.status === 'published';
+            // Only meaningful while the listing is in review or was refused;
+            // an old approved case on a live listing says nothing new.
+            const review =
+              listing.status === 'pending_review' || listing.status === 'rejected'
+                ? listingCases.data?.get(listing.id)
+                : undefined;
 
             return (
               <View key={listing.id} style={styles.listingRow}>
@@ -196,6 +243,12 @@ function SignedInProfile({ userId }: { userId: string }) {
                         {LISTING_STATUS_LABELS[listing.status]}
                       </Text>
                     </View>
+                    {review && review.status !== 'approved' && (
+                      <Text style={styles.listingMeta}>
+                        {CASE_STATUS_LABELS[review.status]}
+                        {review.decision_note ? `: ${review.decision_note}` : ''}
+                      </Text>
+                    )}
                     {isLive && !!listing.availability_confirmed_at && (
                       <Text style={styles.listingMeta}>
                         Confirmed available {timeAgo(listing.availability_confirmed_at)}
@@ -238,6 +291,18 @@ function SignedInProfile({ userId }: { userId: string }) {
                 {/* Its own row: re-confirming is the routine action on a live
                     listing, and the one the feed's "recently confirmed" sort
                     rewards, so it should not be squeezed between the others. */}
+                {review?.status === 'changes_requested' && (
+                  <Button
+                    label="Send back for review"
+                    loading={resubmit.isPending && resubmit.variables === listing.id}
+                    onPress={() =>
+                      resubmit.mutate(listing.id, {
+                        onError: (e) => Alert.alert('Could not resubmit', e.message),
+                      })
+                    }
+                  />
+                )}
+
                 {isLive && (
                   <Button
                     label="Still available"
@@ -296,6 +361,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   editForm: { gap: spacing.md },
+  identityRow: { gap: spacing.sm },
   name: {
     fontSize: fontSize.lg,
     fontFamily: fontFamily.bold,

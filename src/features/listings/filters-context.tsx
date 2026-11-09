@@ -7,7 +7,7 @@ import { EMPTY_FILTERS, type Filters } from '@/features/listings/types';
  * Feed filters live above both the feed and the filters modal, which are
  * separate routes and so cannot share local state.
  *
- * Phase 3's natural-language search sets this same object — "a cheap studio
+ * Natural-language search sets this same object — "a cheap studio
  * near Kimironko under 150,000" becomes a Filters value — so the AI path and
  * the manual path stay one code path.
  */
@@ -16,7 +16,7 @@ interface FiltersState {
   setFilters: (next: Filters) => void;
   resetFilters: () => void;
   // Sort lives alongside filters rather than inside them: Filters is the shape
-  // Phase 3's natural-language parser targets, and it should describe what to
+  // the natural-language parser targets, and it should describe what to
   // match, not how to order the result.
   sort: SortOrder;
   setSort: (next: SortOrder) => void;

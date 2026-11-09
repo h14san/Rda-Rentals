@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { CompactBadges } from '@/components/verification-badges';
 import { listingFacts, type ListingWithImages } from '@/features/listings/types';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { imageUrl } from '@/lib/supabase';
@@ -84,6 +85,7 @@ export function ListingCard({
         <Text style={styles.meta} numberOfLines={1}>
           {[formatLocation(listing.sector, listing.district), ...facts].join(' · ')}
         </Text>
+        <CompactBadges badges={listing.listing_badges} />
         {!!listing.availability_confirmed_at && (
           <Text style={styles.confirmed} numberOfLines={1}>
             Availability confirmed {timeAgo(listing.availability_confirmed_at)}

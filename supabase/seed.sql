@@ -221,4 +221,48 @@ join public.listings l on l.owner_id = s.owner_id and l.title = s.title
 where s.address is not null or s.latitude is not null
 on conflict (listing_id) do nothing;
 
+-- ---------------------------------------------------------------------------
+-- verification
+-- ---------------------------------------------------------------------------
+-- A demo reviewer, and Aline's identity already checked, so the review queue
+-- can be exercised both ways: her new listings are approvable at once, while
+-- Eric's wait until his identity is checked first. The seeded listings stay
+-- published without listing badges, like real listings that were live before
+-- verification existed.
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, created_at, updated_at,
+  raw_app_meta_data, raw_user_meta_data
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  'aaaaaaaa-0000-4000-8000-000000000003',
+  'authenticated', 'authenticated', 'demo.reviewer@example.com',
+  crypt('demo-password-3', gen_salt('bf')),
+  now(), now(), now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{"full_name":"Demo Reviewer"}'::jsonb
+)
+on conflict (id) do nothing;
+
+insert into public.user_roles (user_id, role)
+values ('aaaaaaaa-0000-4000-8000-000000000003', 'verifier')
+on conflict do nothing;
+
+with c as (
+  insert into public.verification_cases
+    (subject_type, profile_id, status, decided_by, decided_at)
+  select 'landlord', 'aaaaaaaa-0000-4000-8000-000000000001', 'approved',
+         'aaaaaaaa-0000-4000-8000-000000000003', now()
+  where not exists (
+    select 1 from public.profile_badges
+    where profile_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+  )
+  returning id, profile_id
+)
+insert into public.profile_badges (profile_id, kind, case_id)
+select profile_id, 'identity_checked', id from c
+on conflict do nothing;
+
 commit;

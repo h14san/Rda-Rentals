@@ -17,6 +17,12 @@ do $check$
 declare
   user_a uuid := 'aaaaaaaa-0000-4000-8000-000000000001';
   user_b uuid := 'aaaaaaaa-0000-4000-8000-000000000002';
+  -- Verification staff. Created below and rolled back with everything else,
+  -- so the check does not depend on the seed having a staff account.
+  user_c uuid := 'aaaaaaaa-0000-4000-8000-0000000000c3';
+  a_case uuid;
+  b_case uuid;
+  b_listing uuid;
   a_active_listing uuid;
   a_draft_listing uuid;
   visible int;
@@ -56,6 +62,27 @@ begin
   ) then
     raise exception 'FAIL: approximate point missing or identical to the exact pin.';
   end if;
+
+  -- Verification fixtures, as the table owner: a staff account, and an open
+  -- identity case for A with one evidence row and its storage object. B starts
+  -- with no identity badge, whatever the seed did.
+  insert into auth.users (instance_id, id, aud, role, email, created_at, updated_at)
+  values ('00000000-0000-0000-0000-000000000000', user_c,
+          'authenticated', 'authenticated', 'rls.check.staff@example.com', now(), now())
+  on conflict (id) do nothing;
+  insert into public.user_roles (user_id, role) values (user_c, 'verifier')
+  on conflict do nothing;
+
+  delete from public.profile_badges where profile_id = user_b;
+  delete from public.verification_cases where profile_id in (user_a, user_b)
+    and status in ('submitted', 'changes_requested');
+
+  insert into public.verification_cases (subject_type, profile_id)
+  values ('landlord', user_a) returning id into a_case;
+  insert into public.verification_evidence (case_id, kind, storage_path)
+  values (a_case, 'id_document', user_a || '/' || a_case || '/rls-check.jpg');
+  insert into storage.objects (bucket_id, name, owner)
+  values ('verification-evidence', user_a || '/' || a_case || '/rls-check.jpg', user_a);
 
   -- Become user B.
   set local role authenticated;
@@ -141,10 +168,30 @@ begin
     raise exception 'FAIL: user B cannot update its own listing.';
   end if;
 
-  -- 7b. A landlord cannot skip moderation. Publishing a draft is allowed
-  --     until verification exists; suspending or approving is staff-only.
-  update public.listings set status = 'published'
-  where owner_id = user_b and title = 'B own listing';
+  -- 7b. A landlord cannot skip moderation (rule 9). A draft goes to review,
+  --     never straight to published; suspending or approving is staff-only.
+  begin
+    update public.listings set status = 'published'
+    where owner_id = user_b and title = 'B own listing';
+    raise exception 'FAIL: user B published a draft without review.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  update public.listings set status = 'pending_review'
+  where owner_id = user_b and title = 'B own listing'
+  returning id into b_listing;
+
+  if b_listing is null then
+    raise exception 'FAIL: user B cannot submit its own draft for review.';
+  end if;
+
+  select count(*) into visible
+  from public.verification_cases
+  where listing_id = b_listing and subject_type = 'listing' and status = 'submitted';
+  if visible <> 1 then
+    raise exception 'FAIL: submitting for review opened % cases, expected 1.', visible;
+  end if;
 
   begin
     update public.listings set status = 'suspended'
@@ -232,6 +279,183 @@ begin
     raise exception 'FAIL: a favorited listing vanished once it was rented.';
   end if;
 
+  -- 10. Verification, as B: another landlord's case, documents and roles are
+  --     invisible; badges, roles and decisions cannot be forged.
+  select count(*) into visible from public.verification_cases where profile_id = user_a;
+  if visible <> 0 then
+    raise exception 'FAIL: user B can read user A''s verification case.';
+  end if;
+
+  select count(*) into visible from public.verification_evidence where case_id = a_case;
+  if visible <> 0 then
+    raise exception 'FAIL: user B can read user A''s evidence rows.';
+  end if;
+
+  select count(*) into visible from storage.objects
+  where bucket_id = 'verification-evidence' and name like user_a || '/%';
+  if visible <> 0 then
+    raise exception 'FAIL: user B can read user A''s identity documents.';
+  end if;
+
+  select count(*) into visible from public.user_roles where user_id = user_c;
+  if visible <> 0 then
+    raise exception 'FAIL: user B can see who the staff are.';
+  end if;
+
+  select count(*) into visible from public.verification_cases where listing_id = b_listing;
+  if visible <> 1 then
+    raise exception 'FAIL: user B cannot read its own listing''s case.';
+  end if;
+
+  begin
+    insert into public.profile_badges (profile_id, kind) values (user_b, 'identity_checked');
+    raise exception 'FAIL: user B gave itself an identity badge.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.listing_badges (listing_id, kind) values (b_listing, 'existence_checked');
+    raise exception 'FAIL: user B gave its listing a badge.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.user_roles (user_id, role) values (user_b, 'admin');
+    raise exception 'FAIL: user B made itself an admin.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.verification_evidence (case_id, kind, storage_path)
+    values (a_case, 'other', user_b || '/' || a_case || '/planted.jpg');
+    raise exception 'FAIL: user B added evidence to user A''s case.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.decide_verification(a_case, 'approved');
+    raise exception 'FAIL: user B decided a verification case.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform * from public.staff_listing_location(b_listing);
+    raise exception 'FAIL: user B called the staff location function.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  b_case := public.request_identity_verification();
+  if b_case is null then
+    raise exception 'FAIL: user B cannot open an identity case.';
+  end if;
+
+  -- 11. Verification, as C (staff).
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    true
+  );
+
+  select count(*) into visible from public.listings where id = b_listing;
+  if visible <> 1 then
+    raise exception 'FAIL: staff cannot see a listing waiting for review.';
+  end if;
+
+  select count(*) into visible from public.verification_evidence where case_id = a_case;
+  if visible <> 1 then
+    raise exception 'FAIL: staff cannot see submitted evidence.';
+  end if;
+
+  select count(*) into visible from storage.objects
+  where bucket_id = 'verification-evidence' and name like user_a || '/%';
+  if visible <> 1 then
+    raise exception 'FAIL: staff cannot read submitted documents.';
+  end if;
+
+  -- Staff still cannot read exact locations directly; only via the function,
+  -- which logs the look.
+  select count(*) into visible from public.listing_locations where listing_id = b_listing;
+  if visible <> 0 then
+    raise exception 'FAIL: staff read listing_locations directly.';
+  end if;
+
+  perform * from public.staff_listing_location(b_listing);
+  select count(*) into visible from public.verification_events e
+  join public.verification_cases c on c.id = e.case_id
+  where c.listing_id = b_listing and e.action = 'viewed_location';
+  if visible <> 1 then
+    raise exception 'FAIL: a staff look at an exact location was not logged.';
+  end if;
+
+  -- Rule 9: the listing cannot be approved before its landlord is checked.
+  begin
+    perform public.decide_verification(
+      (select id from public.verification_cases where listing_id = b_listing),
+      'approved', null, array['existence_checked']);
+    raise exception 'FAIL: a listing was approved before its landlord''s identity.';
+  exception
+    when raise_exception then
+      if sqlerrm not like '%identity before approving%' then raise; end if;
+  end;
+
+  begin
+    perform public.decide_verification(b_case, 'rejected', '');
+    raise exception 'FAIL: a case was refused without a note.';
+  exception
+    when invalid_parameter_value then null;
+  end;
+
+  perform public.decide_verification(b_case, 'approved');
+  if not exists (
+    select 1 from public.profile_badges where profile_id = user_b and kind = 'identity_checked'
+  ) then
+    raise exception 'FAIL: approving identity did not record the badge.';
+  end if;
+
+  perform public.decide_verification(
+    (select id from public.verification_cases where listing_id = b_listing),
+    'approved', null, array['existence_checked', 'authorization_checked']);
+
+  if not exists (
+    select 1 from public.listings where id = b_listing and status = 'published'
+  ) then
+    raise exception 'FAIL: an approved listing was not published.';
+  end if;
+
+  select count(*) into visible from public.listing_badges where listing_id = b_listing;
+  if visible <> 2 then
+    raise exception 'FAIL: approving recorded % listing badges, expected 2.', visible;
+  end if;
+
+  begin
+    perform * from public.staff_listing_location(b_listing);
+    raise exception 'FAIL: staff read a location with no open review.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.decide_verification(b_case, 'rejected', 'second thoughts');
+    raise exception 'FAIL: a decided case was decided again.';
+  exception
+    when raise_exception then
+      if sqlerrm not like '%already been decided%' then raise; end if;
+  end;
+
+  -- Staff cannot approve themselves.
+  begin
+    perform public.decide_verification(public.request_identity_verification(), 'approved');
+    raise exception 'FAIL: a reviewer approved their own identity.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
   -- 8. Anonymous users see published listings only.
   set local role anon;
   perform set_config('request.jwt.claims', null, true);
@@ -246,6 +470,37 @@ begin
   if visible <> 0 then
     raise exception 'FAIL: anonymous user can read exact locations.';
   end if;
+
+  -- 12. Anonymous users see badges, but no cases, documents or staff functions.
+  select count(*) into visible from public.listing_badges where listing_id = b_listing;
+  if visible <> 2 then
+    raise exception 'FAIL: anonymous user cannot see listing badges.';
+  end if;
+
+  begin
+    select count(*) into visible from public.verification_cases;
+    if visible <> 0 then
+      raise exception 'FAIL: anonymous user can read verification cases.';
+    end if;
+  exception
+    when insufficient_privilege then null;  -- no grant at all is also a pass
+  end;
+
+  begin
+    select count(*) into visible from public.verification_evidence;
+    if visible <> 0 then
+      raise exception 'FAIL: anonymous user can read evidence rows.';
+    end if;
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.request_identity_verification();
+    raise exception 'FAIL: anonymous user opened a verification case.';
+  exception
+    when insufficient_privilege then null;
+  end;
 
   raise notice 'All RLS checks passed.';
 end;

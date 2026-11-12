@@ -352,7 +352,7 @@ make.
 
 | Item | Blocks | Status |
 |---|---|---|
-| FCM `google-services.json` + EAS project, APNs key | Push delivery (M3) | Not started |
+| FCM `google-services.json` + EAS project, APNs key | Push delivery (M3) | EAS CLI signed in as `finnadosome` (2026-11-12). No `eas.json` and no FCM file yet |
 | Pindo account, API token, sender ID | Phone OTP | Decided, not started |
 | Data residency (Rwanda DPP law, §50) | Any real user data, especially IDs | Legal question |
 | Evidence retention period | Purge job for ID photos | Undecided |

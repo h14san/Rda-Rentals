@@ -84,8 +84,21 @@ The plan maps the Blueprint's phases onto what was already built:
   `feat/phase-3a-verification`.
 - **Phase 3, rest:** reports, moderation actions (suspend/restore), in-app chat
   (which removes WhatsApp), push, and the rest of the admin console.
-- **Later:** booking, AI matching and alerts, payments, digital rental, and
-  agencies.
+- **Phase 4:** booking (Instant Book + Request to Book).
+- **Later:** AI matching and alerts, payments, digital rental, and agencies.
+
+**What to work on next is in `docs/WORKPLAN.md`.** It has milestones M0–M7
+covering the rest of Phase 3 and then Phase 4, each with a spec, a definition
+of done, and the working agreement. It also records what the owner
+authorized: live `db:push` and deploys, commits, pushes and merges to `main`
+are allowed; seeding the live project, `config push`, payments and real ID
+uploads are not. Stop after Phase 4 for review.
+
+Decisions taken 2026-11-12 (details in the work plan):
+- The admin console is a staff-only area **inside the app**, not a separate
+  web app.
+- Contact details in chat are **masked server-side** (`•••`) until a booking
+  is confirmed. The original text is readable by staff only.
 
 ### Open non-code decisions
 

@@ -25,7 +25,6 @@ export const colors = {
   muted: '#6B7280',
   danger: '#DC2626',
   success: '#059669',
-  whatsapp: '#25D366',
 } as const;
 
 /**

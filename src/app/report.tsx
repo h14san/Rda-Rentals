@@ -18,10 +18,13 @@ const TITLES: Record<ReportTarget, string> = {
   listing: 'Report this listing',
   user: 'Report this account',
   message: 'Report this message',
+  conversation: 'Report this conversation',
 };
 
 function isTarget(value: string | undefined): value is ReportTarget {
-  return value === 'listing' || value === 'user' || value === 'message';
+  return (
+    value === 'listing' || value === 'user' || value === 'message' || value === 'conversation'
+  );
 }
 
 /**

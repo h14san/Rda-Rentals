@@ -28,8 +28,8 @@ const queryClient = new QueryClient({
 /**
  * Routes the user to the right place for their auth state.
  *
- * Three states matter: signed out, signed in but with an incomplete profile
- * (no name or contact number — a listing would be uncontactable), and ready.
+ * Three states matter: signed out, signed in but with no name yet (a
+ * conversation with a nameless stranger is not one anyone answers), and ready.
  */
 function AuthGate() {
   const { session, profile, initializing } = useAuth();
@@ -52,8 +52,7 @@ function AuthGate() {
 
     const inAuthGroup = segments[0] === '(auth)';
     const onProfileSetup = segments[1] === 'profile-setup';
-    const profileIncomplete =
-      !!profile && (!profile.full_name || !profile.whatsapp_phone);
+    const profileIncomplete = !!profile && !profile.full_name;
 
     if (!session && !inAuthGroup) {
       router.replace('/sign-in');
@@ -92,6 +91,11 @@ function AuthGate() {
       <Stack.Screen name="review/[caseId]" options={{ title: 'Review' }} />
       <Stack.Screen name="staff/reports/index" options={{ title: 'Reports' }} />
       <Stack.Screen name="staff/reports/[id]" options={{ title: 'Report' }} />
+      <Stack.Screen
+        name="staff/conversation/[reportId]"
+        options={{ title: 'Reported conversation' }}
+      />
+      <Stack.Screen name="conversation/[id]" options={{ title: '' }} />
       <Stack.Screen name="user/[id]" options={{ title: '' }} />
       <Stack.Screen name="my-reports" options={{ title: 'Your reports' }} />
       <Stack.Screen name="report" options={{ presentation: 'modal', title: 'Report' }} />

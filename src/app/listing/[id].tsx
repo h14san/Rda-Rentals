@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { ImageCarousel } from '@/components/image-carousel';
@@ -16,9 +16,9 @@ import {
   listingFacts,
   listingTermRows,
 } from '@/features/listings/types';
+import { useStartConversation } from '@/features/messaging/queries';
 import { useMyListingSuspensions } from '@/features/moderation/queries';
 import { AMENITY_LABELS, knownAmenities } from '@/lib/amenities';
-import { openPhoneCall, openWhatsApp } from '@/lib/contact';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { APPROX_RADIUS_M, openInMaps } from '@/lib/maps';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
@@ -45,6 +45,7 @@ export default function ListingDetailScreen() {
   // but the owner this map is empty.
   const suspensions = useMyListingSuspensions(session?.user.id ?? '');
   const favorites = useFavoriteControl(session?.user.id ?? null);
+  const startConversation = useStartConversation();
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const { data: listing, isPending, isError, error, refetch } = useListingDetail(id);
 
@@ -63,16 +64,9 @@ export default function ListingDetailScreen() {
     listing.approx_latitude !== null && listing.approx_longitude !== null
       ? { latitude: listing.approx_latitude, longitude: listing.approx_longitude }
       : null;
-  const contactPhone = listing.profiles?.whatsapp_phone ?? null;
   const identityCheckedAt =
     listing.profiles?.profile_badges?.find((b) => b.kind === 'identity_checked')
       ?.checked_at ?? null;
-
-  const contactContext = {
-    listingTitle: listing.title,
-    priceRwf: listing.price_rwf,
-    location,
-  };
 
   const facts = listingFacts(listing);
   const suspension =
@@ -287,8 +281,8 @@ export default function ListingDetailScreen() {
                 </MapView>
               </View>
               <Text style={styles.mapCaption}>
-                The property is somewhere in this circle. Ask the landlord for the
-                exact address.
+                The property is somewhere in this circle. The exact address is
+                shared once a booking is confirmed.
               </Text>
             </View>
           )}
@@ -311,30 +305,25 @@ export default function ListingDetailScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.cta}>
-        {contactPhone ? (
-          <>
-            <Button
-              label="WhatsApp"
-              variant="whatsapp"
-              style={styles.ctaPrimary}
-              icon={<Ionicons name="logo-whatsapp" size={20} color={colors.white} />}
-              onPress={() => void openWhatsApp(contactPhone, contactContext)}
-            />
-            <Button
-              label="Call"
-              variant="secondary"
-              style={styles.ctaSecondary}
-              icon={<Ionicons name="call-outline" size={18} color={colors.charcoal} />}
-              onPress={() => void openPhoneCall(contactPhone)}
-            />
-          </>
-        ) : (
-          <Text style={styles.noContact}>
-            This landlord has not added a contact number yet.
-          </Text>
-        )}
-      </View>
+      {/* The owner has nobody to message. For everyone else this is the only
+          way to reach the landlord: there is no number to show (rule 1). */}
+      {!isOwner && (
+        <View style={styles.cta}>
+          <Button
+            label="Message landlord"
+            style={styles.ctaPrimary}
+            icon={<Ionicons name="chatbubble-outline" size={18} color={colors.white} />}
+            loading={startConversation.isPending}
+            onPress={() =>
+              startConversation.mutate(listing.id, {
+                onSuccess: (conversationId) =>
+                  router.push(`/conversation/${conversationId}`),
+                onError: (e) => Alert.alert('Could not open the conversation', e.message),
+              })
+            }
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -465,14 +454,5 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.white,
   },
-  ctaPrimary: { flex: 2 },
-  ctaSecondary: { flex: 1 },
-  noContact: {
-    flex: 1,
-    textAlign: 'center',
-    color: colors.muted,
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.sm,
-    paddingVertical: spacing.md,
-  },
+  ctaPrimary: { flex: 1 },
 });

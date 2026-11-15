@@ -133,7 +133,7 @@ or read others' reports.
 
 ---
 
-## M2: In-app chat (Phase 3c), the biggest milestone
+## M2: In-app chat (Phase 3c), the biggest milestone — DONE 2026-11-16
 
 Blueprint §18, §19. Features #26, #28, #29, #30. Product rules 1, 2, 5.
 

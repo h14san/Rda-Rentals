@@ -52,6 +52,7 @@ export default function ReportDetailScreen() {
   const busy =
     triage.isPending || resolve.isPending || moderateListing.isPending || restrictAccount.isPending;
   const listingSuspended = r.listing?.status === 'suspended';
+  const isChat = r.target_type === 'message' || r.target_type === 'conversation';
 
   /** Every action here is read by someone, so none goes out without a note. */
   function withNote(run: (trimmed: string) => void) {
@@ -117,7 +118,13 @@ export default function ReportDetailScreen() {
           <View style={styles.box}>
             <Text style={styles.bodyStrong}>{r.user.full_name ?? 'Unnamed account'}</Text>
             <Text style={styles.meta}>
-              {r.target_type === 'listing' ? 'Owner of the listing' : 'Reported account'}
+              {r.target_type === 'listing'
+                ? 'Owner of the listing'
+                : r.target_type === 'message'
+                  ? 'Sent the reported message'
+                  : r.target_type === 'conversation'
+                    ? 'The other person in the conversation'
+                    : 'Reported account'}
               {r.accountRestricted ? ' · account suspended' : ''}
             </Text>
             <Button
@@ -132,6 +139,22 @@ export default function ReportDetailScreen() {
           )
         )}
       </View>
+
+      {isChat && (
+        <View style={styles.section}>
+          {open ? (
+            <Button
+              label="Read the conversation (logged)"
+              variant="secondary"
+              onPress={() => router.push(`/staff/conversation/${r.id}`)}
+            />
+          ) : (
+            <Text style={styles.meta}>
+              The conversation is closed to staff now that this report is closed.
+            </Text>
+          )}
+        </View>
+      )}
 
       {open && (
         <View style={styles.section}>

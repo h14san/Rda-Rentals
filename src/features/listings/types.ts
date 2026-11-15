@@ -1,6 +1,13 @@
 import { z } from 'zod';
 
 import type {
+  ConversationParticipantRow,
+  ConversationRow,
+  MessageRow,
+  StaffTranscript,
+  UserBlockRow,
+} from '@/features/messaging/types';
+import type {
   AccountRestrictionRow,
   ListingSuspensionRow,
   ModerationAction,
@@ -87,7 +94,6 @@ export const LANDLORD_STATUS_ACTIONS: Partial<
 export type ProfileRow = {
   id: string;
   full_name: string | null;
-  whatsapp_phone: string | null;
   avatar_url: string | null;
   created_at: string;
   updated_at: string;
@@ -155,10 +161,10 @@ export type ListingWithImages = ListingRow & {
   listing_badges?: Pick<ListingBadgeRow, 'kind' | 'checked_at'>[];
 };
 
-/** Detail screen additionally needs the landlord's contact number and badges. */
+/** Detail screen additionally needs the landlord's name and badges. Never a contact number. */
 export type ListingDetail = ListingWithImages & {
   profiles:
-    | (Pick<ProfileRow, 'id' | 'full_name' | 'whatsapp_phone'> & {
+    | (Pick<ProfileRow, 'id' | 'full_name'> & {
         profile_badges: Pick<ProfileBadgeRow, 'kind' | 'checked_at'>[];
       })
     | null;
@@ -380,6 +386,34 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // Conversations are created by start_conversation(). A participant
+      // inserts only their own text; the server may mask it on the way in.
+      conversations: {
+        Row: ConversationRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      messages: {
+        Row: MessageRow;
+        Insert: { conversation_id: string; sender_id: string; body: string };
+        Update: never;
+        Relationships: [];
+      };
+      conversation_participants: {
+        Row: ConversationParticipantRow;
+        Insert: never;
+        Update: Partial<
+          Pick<ConversationParticipantRow, 'last_read_at' | 'archived' | 'muted'>
+        >;
+        Relationships: [];
+      };
+      user_blocks: {
+        Row: UserBlockRow;
+        Insert: Pick<UserBlockRow, 'blocker_id' | 'blocked_id'>;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -398,6 +432,8 @@ export type Database = {
         Args: { p_listing_id: string };
         Returns: { address: string | null; latitude: number | null; longitude: number | null }[];
       };
+      start_conversation: { Args: { p_listing_id: string }; Returns: string };
+      staff_report_conversation: { Args: { p_report_id: string }; Returns: StaffTranscript };
       triage_report: {
         Args: { p_report_id: string; p_severity: ReportSeverity };
         Returns: undefined;

@@ -22,7 +22,7 @@ interface AuthState {
   isStaff: boolean;
   /** True until the persisted session has been read from secure storage. */
   initializing: boolean;
-  /** A profile is "complete" once it has a name and a contact number. */
+  /** A profile is "complete" once it has a name. Nothing else is collected. */
   needsProfileSetup: boolean;
   refreshProfile: () => Promise<void>;
 }
@@ -100,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Only assert setup is needed once the profile row has actually loaded,
       // otherwise the first render after sign-in bounces to the setup screen.
       needsProfileSetup:
-        !!session && !!profile && (!profile.full_name || !profile.whatsapp_phone),
+        !!session && !!profile && !profile.full_name,
       refreshProfile,
     };
   }, [session, profile, roles, initializing, userId]);

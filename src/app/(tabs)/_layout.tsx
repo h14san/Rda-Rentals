@@ -1,9 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
+import { useAuth } from '@/features/auth/context';
+import { useInboxRealtime, useUnreadCount } from '@/features/messaging/queries';
 import { colors } from '@/theme';
 
 export default function TabsLayout() {
+  const { session } = useAuth();
+  const userId = session?.user.id ?? null;
+  // Mounted here, above every tab, so the badge is live wherever the user is.
+  useInboxRealtime(userId);
+  const unread = useUnreadCount(userId);
+
   return (
     <Tabs
       screenOptions={{
@@ -52,10 +60,26 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
+          tabBarBadge: unread > 0 ? unread : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.softBlack, color: colors.white },
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbubbles-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="post"
         options={{
           title: 'Post',
           headerTitle: 'Post a rental',
+          // Five tabs is the limit on a small phone, and Messages needed one.
+          // Posting is something a landlord does a few times, messaging is
+          // daily, so Post is reached from the profile instead. The route
+          // itself is unchanged.
+          href: null,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="add-circle-outline" color={color} size={size} />
           ),

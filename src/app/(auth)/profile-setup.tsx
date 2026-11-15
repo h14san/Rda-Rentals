@@ -11,46 +11,38 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
-import { normalizeRwandanPhone } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { colors, fontFamily, fontSize, spacing } from '@/theme';
 
 /**
  * One-time completion step.
  *
- * A WhatsApp number is mandatory rather than optional: it is the only channel a
- * tenant has to reach a landlord, so a profile without one produces listings
- * nobody can respond to.
+ * Only a name. This used to demand a WhatsApp number, because that was the one
+ * way a tenant could reach a landlord. Chat is that way now, so the number is
+ * no longer necessary, and what is not necessary is not collected (rule 10).
  */
 export default function ProfileSetupScreen() {
   const { session, profile, refreshProfile } = useAuth();
 
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
-  const [whatsapp, setWhatsapp] = useState(
-    profile?.whatsapp_phone ?? session?.user.phone ?? '',
-  );
-  const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
+  const [nameError, setNameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   async function onSave() {
-    const nextErrors: { name?: string; phone?: string } = {};
-    if (fullName.trim().length < 2) nextErrors.name = 'Enter your name.';
-
-    const normalized = normalizeRwandanPhone(whatsapp);
-    if (!normalized) {
-      nextErrors.phone = 'Enter a Rwandan mobile number, for example 0788 123 456.';
+    if (fullName.trim().length < 2) {
+      setNameError('Enter your name.');
+      return;
     }
-
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0 || !session) return;
+    setNameError(null);
+    if (!session) return;
 
     setSaving(true);
     setSubmitError(null);
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ full_name: fullName.trim(), whatsapp_phone: normalized })
+        .update({ full_name: fullName.trim() })
         .eq('id', session.user.id);
 
       if (error) throw error;
@@ -76,7 +68,8 @@ export default function ProfileSetupScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Almost there</Text>
             <Text style={styles.subtitle}>
-              Tenants use your WhatsApp number to ask about your listings.
+              Landlords and tenants see this name when you message them. Your
+              phone number and email stay private.
             </Text>
           </View>
 
@@ -84,24 +77,16 @@ export default function ProfileSetupScreen() {
             label="Full name"
             value={fullName}
             onChangeText={setFullName}
-            error={errors.name}
+            error={nameError}
             placeholder="Your name"
             autoCapitalize="words"
-          />
-
-          <TextField
-            label="WhatsApp number"
-            value={whatsapp}
-            onChangeText={setWhatsapp}
-            error={errors.phone}
-            hint="This is where enquiries about your listings arrive."
-            placeholder="0788 123 456"
-            keyboardType="phone-pad"
+            returnKeyType="done"
+            onSubmitEditing={() => void onSave()}
           />
 
           {!!submitError && <Text style={styles.error}>{submitError}</Text>}
 
-          <Button label="Continue" onPress={onSave} loading={saving} />
+          <Button label="Continue" onPress={() => void onSave()} loading={saving} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

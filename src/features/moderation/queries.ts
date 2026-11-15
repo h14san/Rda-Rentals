@@ -182,6 +182,18 @@ export function useReportDetail(reportId: string, enabled: boolean) {
       let listing: ReportDetail['listing'] = null;
       let user: ReportDetail['user'] = null;
 
+      // Staff cannot read conversations, so for a message or conversation
+      // report the subject recorded on the report is the only way to a name.
+      if (report.subject_user_id) {
+        const res = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('id', report.subject_user_id)
+          .maybeSingle();
+        if (res.error) throw res.error;
+        user = res.data;
+      }
+
       if (report.target_type === 'listing') {
         const res = await supabase
           .from('listings')
@@ -192,15 +204,7 @@ export function useReportDetail(reportId: string, enabled: boolean) {
           .maybeSingle();
         if (res.error) throw res.error;
         listing = res.data as unknown as ReportDetail['listing'];
-        user = listing?.owner ?? null;
-      } else if (report.target_type === 'user') {
-        const res = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .eq('id', report.target_id)
-          .maybeSingle();
-        if (res.error) throw res.error;
-        user = res.data;
+        user = listing?.owner ?? user;
       }
 
       const [restriction, others] = await Promise.all([

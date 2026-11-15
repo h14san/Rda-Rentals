@@ -137,6 +137,7 @@ export function routeForNotification(
     const conversation = id('conversation_id');
     if (conversation) return `/conversation/${conversation}`;
   }
+  if (kind.startsWith('booking_')) return '/bookings';
   if (kind === 'verification_decided') return '/verify-identity';
   if (kind === 'report_resolved') return '/my-reports';
   if (kind === 'account_suspended' || kind === 'account_restored') return '/profile';

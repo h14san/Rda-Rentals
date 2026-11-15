@@ -1,0 +1,185 @@
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+import { ErrorState, LoadingState } from '@/components/states';
+import { Button, Chip, SectionTitle, TextField } from '@/components/ui';
+import { useAuth } from '@/features/auth/context';
+import { useRequestBooking } from '@/features/bookings/queries';
+import { DURATION_OPTIONS, wouldBookInstantly } from '@/features/bookings/types';
+import { useListingDetail } from '@/features/listings/queries';
+import { moveInOptions } from '@/features/listings/terms-fields';
+import { formatShortDate } from '@/features/listings/types';
+import { formatPrice } from '@/lib/format';
+import { colors, radius, spacing, type } from '@/theme';
+
+/**
+ * Book a listing: a move-in date, a length of stay, and an optional note.
+ *
+ * No application form (§23). Whether this books at once or asks the landlord
+ * is decided by the server from the listing's settings; the screen works out
+ * the same answer first so the button says what it will really do.
+ */
+export default function BookScreen() {
+  const { listingId } = useLocalSearchParams<{ listingId: string }>();
+  const { profile } = useAuth();
+  const router = useRouter();
+  const listing = useListingDetail(listingId);
+  const request = useRequestBooking();
+
+  const [moveIn, setMoveIn] = useState<string | null>(null);
+  const [months, setMonths] = useState<number | null>(null);
+  const [message, setMessage] = useState('');
+
+  if (listing.isPending) return <LoadingState label="Loading…" />;
+  if (listing.isError)
+    return <ErrorState error={listing.error} onRetry={() => void listing.refetch()} />;
+
+  const l = listing.data;
+
+  // The 1st of the next three months, like the landlord's own form, plus the
+  // listing's stated date when that is later than all of them.
+  const dates = moveInOptions();
+  if (l.available_from && !dates.includes(l.available_from) && l.available_from > dates[2]) {
+    dates.push(l.available_from);
+  }
+  const durations = [...new Set([...DURATION_OPTIONS, l.min_rental_months ?? 12])].sort(
+    (a, b) => a - b,
+  );
+
+  const ready = moveIn !== null && months !== null;
+  const instant = ready && wouldBookInstantly(l, moveIn, months, !!profile?.full_name);
+  // Instant only, and these dates do not qualify: the server would refuse.
+  const blocked = ready && !instant && !l.request_to_book_enabled;
+
+  function onSubmit() {
+    if (!ready) return;
+    request.mutate(
+      { listingId: l.id, moveIn, months, message },
+      {
+        onSuccess: () => {
+          Alert.alert(
+            instant ? 'Booked' : 'Request sent',
+            instant
+              ? 'The place is reserved for you. The exact address is now on the listing page.'
+              : 'The landlord has 72 hours to answer. You will be notified, and you can keep talking in the chat.',
+          );
+          router.replace('/bookings');
+        },
+        onError: (e) => Alert.alert('Could not book', e.message),
+      },
+    );
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <Stack.Screen options={{ title: l.instant_book_enabled ? 'Book' : 'Request to book' }} />
+
+      <View style={styles.summary}>
+        <Text style={styles.bodyStrong} numberOfLines={2}>
+          {l.title}
+        </Text>
+        <Text style={styles.meta}>
+          {formatPrice(l.price_rwf)} / month
+          {l.deposit_rwf !== null ? ` · deposit ${formatPrice(l.deposit_rwf)}` : ''}
+        </Text>
+        <Text style={styles.meta}>
+          {l.available_from ? `Available from ${formatShortDate(l.available_from)}` : 'Available now'}
+          {l.min_rental_months ? ` · minimum stay ${l.min_rental_months} months` : ''}
+        </Text>
+      </View>
+
+      <View style={styles.section}>
+        <SectionTitle>Move-in date</SectionTitle>
+        <View style={styles.chips}>
+          {dates.map((d) => (
+            <Chip
+              key={d}
+              label={formatShortDate(d)}
+              selected={moveIn === d}
+              onPress={() => setMoveIn(d)}
+            />
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <SectionTitle>How long</SectionTitle>
+        <View style={styles.chips}>
+          {durations.map((m) => (
+            <Chip
+              key={m}
+              label={`${m} month${m === 1 ? '' : 's'}`}
+              selected={months === m}
+              onPress={() => setMonths(m)}
+            />
+          ))}
+        </View>
+      </View>
+
+      <TextField
+        label="Note to the landlord (optional)"
+        value={message}
+        onChangeText={setMessage}
+        multiline
+        maxLength={500}
+        style={styles.note}
+        hint="Sent as a chat message. Phone numbers and emails are hidden until the booking is confirmed."
+      />
+
+      {ready && (
+        <View style={styles.box}>
+          <Text style={styles.bodyStrong}>
+            {blocked
+              ? 'These dates cannot be booked'
+              : instant
+                ? 'This books at once'
+                : 'This sends a request'}
+          </Text>
+          <Text style={styles.meta}>
+            {blocked
+              ? 'This landlord only takes instant bookings, and they need a move-in date and length of stay that meet the terms above.'
+              : instant
+                ? 'The landlord allows Instant Book and your dates meet their terms. The place is reserved for you and you see the exact address straight away.'
+                : l.instant_book_enabled
+                  ? 'Your dates do not meet the terms for Instant Book, so the landlord will be asked. They have 72 hours to answer; if they accept, you confirm, and then you see the exact address.'
+                  : 'The landlord has 72 hours to answer. If they accept, you confirm, and then you see the exact address.'}
+          </Text>
+          <Text style={styles.caption}>
+            No payment is taken in the app. Never pay before you have seen the place.
+          </Text>
+        </View>
+      )}
+
+      <Button
+        label={instant ? 'Book now' : 'Request to book'}
+        disabled={!ready || blocked}
+        loading={request.isPending}
+        onPress={onSubmit}
+      />
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { padding: spacing.md, gap: spacing.lg, paddingBottom: spacing.xxl },
+  section: { gap: spacing.xs },
+  summary: {
+    gap: 2,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  note: { minHeight: 80, textAlignVertical: 'top', paddingTop: spacing.sm },
+  box: {
+    gap: spacing.xs,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.lightGray,
+  },
+  bodyStrong: type.bodyStrong,
+  meta: type.meta,
+  caption: type.caption,
+});

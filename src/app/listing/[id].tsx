@@ -16,6 +16,8 @@ import {
   listingFacts,
   listingTermRows,
 } from '@/features/listings/types';
+import { useBookingForPair } from '@/features/bookings/queries';
+import { isActiveBooking } from '@/features/bookings/types';
 import { useStartConversation } from '@/features/messaging/queries';
 import { useMyListingSuspensions } from '@/features/moderation/queries';
 import { AMENITY_LABELS, knownAmenities } from '@/lib/amenities';
@@ -46,6 +48,9 @@ export default function ListingDetailScreen() {
   const suspensions = useMyListingSuspensions(session?.user.id ?? '');
   const favorites = useFavoriteControl(session?.user.id ?? null);
   const startConversation = useStartConversation();
+  // The viewer's own booking on this listing, if any. For the owner this finds
+  // nothing: an owner cannot be the renter of their own listing.
+  const myBooking = useBookingForPair(id, session?.user.id ?? null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const { data: listing, isPending, isError, error, refetch } = useListingDetail(id);
 
@@ -54,8 +59,11 @@ export default function ListingDetailScreen() {
 
   const location = formatLocation(listing.sector, listing.district);
   const isOwner = session?.user.id === listing.owner_id;
-  // Only ever non-null for the owner; RLS hides the row from everyone else.
+  // Non-null only for the owner and for the renter of a confirmed booking
+  // (rules 3 and 4); RLS hides the row from everyone else.
   const exact = listing.listing_locations;
+  const booking = myBooking.data ?? null;
+  const hasLiveBooking = !!booking && isActiveBooking(booking.status);
   const exactPin =
     exact?.latitude != null && exact.longitude != null
       ? { latitude: exact.latitude, longitude: exact.longitude }
@@ -116,7 +124,8 @@ export default function ListingDetailScreen() {
             <Text style={styles.location}>{location}</Text>
             {!!exact?.address && (
               <Text style={styles.address}>
-                {exact.address} · only you can see this
+                {exact.address} ·{' '}
+                {isOwner ? 'only you can see this' : 'shared with you for your booking'}
               </Text>
             )}
             <Text style={styles.posted}>
@@ -217,7 +226,7 @@ export default function ListingDetailScreen() {
             </View>
           )}
 
-          {exactPin && isOwner && Platform.OS !== 'web' && (
+          {exactPin && Platform.OS !== 'web' && (
             <View style={styles.section}>
               <SectionTitle>Location</SectionTitle>
               {/*
@@ -252,12 +261,14 @@ export default function ListingDetailScreen() {
                 </View>
               </Pressable>
               <Text style={styles.mapCaption}>
-                Tenants see an approximate area, not this pin.
+                {isOwner
+                  ? 'Tenants see an approximate area, not this pin, until a booking is confirmed.'
+                  : 'The exact location, shared with you because your booking is confirmed.'}
               </Text>
             </View>
           )}
 
-          {!isOwner && approxCenter && Platform.OS !== 'web' && (
+          {!isOwner && !exactPin && approxCenter && Platform.OS !== 'web' && (
             <View style={styles.section}>
               <SectionTitle>Approximate area</SectionTitle>
               {/*
@@ -310,9 +321,10 @@ export default function ListingDetailScreen() {
       {!isOwner && (
         <View style={styles.cta}>
           <Button
-            label="Message landlord"
+            label="Message"
+            variant="secondary"
             style={styles.ctaPrimary}
-            icon={<Ionicons name="chatbubble-outline" size={18} color={colors.white} />}
+            icon={<Ionicons name="chatbubble-outline" size={18} color={colors.charcoal} />}
             loading={startConversation.isPending}
             onPress={() =>
               startConversation.mutate(listing.id, {
@@ -322,6 +334,22 @@ export default function ListingDetailScreen() {
               })
             }
           />
+          {hasLiveBooking ? (
+            <Button
+              label="Your booking"
+              style={styles.ctaPrimary}
+              onPress={() => router.push('/bookings')}
+            />
+          ) : (
+            // Only a live listing can be booked; the server refuses the rest.
+            listing.status === 'published' && (
+              <Button
+                label={listing.instant_book_enabled ? 'Book' : 'Request to book'}
+                style={styles.ctaPrimary}
+                onPress={() => router.push(`/book/${listing.id}`)}
+              />
+            )
+          )}
         </View>
       )}
     </View>

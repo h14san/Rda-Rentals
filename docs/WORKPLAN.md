@@ -288,7 +288,7 @@ to favoriters through `price_at_save`. Record the decision.
 
 ---
 
-## M7: Booking (Phase 4)
+## M7: Booking (Phase 4) — DONE 2026-11-20. Stopped here for review.
 
 Blueprint §20–§23, §21 states, §22 settings. Features #31–#36. Rules 3, 4, 6,
 7, 10, 14. No payments: rule 14 says design for them, so the state machine

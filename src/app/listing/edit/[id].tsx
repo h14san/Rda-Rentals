@@ -29,7 +29,8 @@ import {
   type ListingTerms,
   type PickedImage,
 } from '@/features/listings/create';
-import { BOOKING_MODE_COPY } from '@/features/bookings/types';
+import { BookingModeFields } from '@/components/booking-mode-fields';
+import { useAutoDescribe } from '@/features/listings/auto-describe';
 import { useListingDetail, useUpdateListing } from '@/features/listings/queries';
 import { ListingTermsFields, validateTerms } from '@/features/listings/terms-fields';
 import {
@@ -39,7 +40,7 @@ import {
 } from '@/features/listings/types';
 import { formatPrice } from '@/lib/format';
 import { KIGALI_DISTRICTS, sectorsFor } from '@/lib/locations';
-import { imageUrl } from '@/lib/supabase';
+import { imageUrl, supabase } from '@/lib/supabase';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
 
 /**
@@ -95,6 +96,10 @@ function SignedInEditListing({ userId }: { userId: string }) {
   >([]);
   const [newImages, setNewImages] = useState<PickedImage[]>([]);
   const [photoProgress, setPhotoProgress] = useState<string | null>(null);
+  // The photo the landlord moved to the front, if they did. Staged like every
+  // other photo change, and written on Save.
+  const [coverId, setCoverId] = useState<string | null>(null);
+  const autoDescribe = useAutoDescribe();
 
   if (isPending) return <LoadingState label="Loading listing…" />;
   if (isError) return <ErrorState error={error} onRetry={() => void refetch()} />;
@@ -174,6 +179,20 @@ function SignedInEditListing({ userId }: { userId: string }) {
           removedImages.map((i) => i.storage_path),
         );
         setRemovedImages([]);
+      }
+
+      // The cover is whichever photo has the lowest position, so making one
+      // the cover is giving it a position below all the others: one update,
+      // no renumbering, and no collision with the unique (listing, position)
+      // constraint. Positions may go negative; only their order means anything.
+      if (coverId && keptImages[0]?.id === coverId) {
+        const lowest = Math.min(...listing!.listing_images.map((i) => i.position));
+        const { error: coverError } = await supabase
+          .from('listing_images')
+          .update({ position: lowest - 1 })
+          .eq('id', coverId);
+        if (coverError) throw coverError;
+        setCoverId(null);
       }
 
       if (newImages.length > 0) {
@@ -271,10 +290,22 @@ function SignedInEditListing({ userId }: { userId: string }) {
                 >
                   <Ionicons name="close" size={14} color={colors.white} />
                 </Pressable>
-                {index === 0 && (
+                {index === 0 ? (
                   <View style={styles.coverBadge}>
                     <Text style={styles.coverText}>Cover</Text>
                   </View>
+                ) : (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Make photo ${index + 1} the cover`}
+                    style={[styles.coverBadge, styles.makeCover]}
+                    onPress={() => {
+                      setKeptImages((c) => [img, ...c.filter((k) => k.id !== img.id)]);
+                      setCoverId(img.id);
+                    }}
+                  >
+                    <Text style={[styles.coverText, styles.makeCoverText]}>Make cover</Text>
+                  </Pressable>
                 )}
               </View>
             ))}
@@ -383,29 +414,14 @@ function SignedInEditListing({ userId }: { userId: string }) {
 
         <ListingTermsFields terms={terms} onChange={setTerms} errors={errors} />
 
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>How people book</Text>
-          <Text style={styles.help}>Choose one or both. At least one has to stay on.</Text>
-          {(
-            [
-              ['request', requestToBook, setRequestToBook, instantBook],
-              ['instant', instantBook, setInstantBook, requestToBook],
-            ] as const
-          ).map(([mode, on, set, otherOn]) => (
-            <View key={mode} style={styles.bookingMode}>
-              <View style={styles.chipWrap}>
-                <Chip
-                  label={BOOKING_MODE_COPY[mode].label + (on ? ': on' : ': off')}
-                  selected={on}
-                  // Turning the last one off would leave no way to book, which
-                  // the database refuses; do not offer it.
-                  onPress={() => (on && !otherOn ? undefined : set(!on))}
-                />
-              </View>
-              <Text style={styles.help}>{BOOKING_MODE_COPY[mode].detail}</Text>
-            </View>
-          ))}
-        </View>
+        <BookingModeFields
+          instantBook={instantBook}
+          requestToBook={requestToBook}
+          onChange={(next) => {
+            setInstantBook(next.instantBook);
+            setRequestToBook(next.requestToBook);
+          }}
+        />
 
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>District</Text>
@@ -461,6 +477,48 @@ function SignedInEditListing({ userId }: { userId: string }) {
           multiline
           numberOfLines={5}
           style={styles.textArea}
+          // The photos are already uploaded, so they are read back from their
+          // public URLs and compressed on the phone exactly like fresh ones.
+          // No server change, and no URL the function has to trust.
+          accessory={
+            keptImages.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Write the description from my photos"
+                disabled={autoDescribe.isPending}
+                onPress={() =>
+                  autoDescribe.mutate(
+                    {
+                      images: keptImages.map((i) => ({
+                        uri: imageUrl(i.storage_path),
+                        // Unknown until decoded; the compressor only needs
+                        // which edge is longer, and resizes by width.
+                        width: 1600,
+                        height: 1200,
+                      })),
+                      facts: { title, propertyType, bedrooms, furnished, district, sector },
+                    },
+                    {
+                      onSuccess: (result) =>
+                        result.unusable
+                          ? Alert.alert(
+                              'Nothing to describe',
+                              'The photos did not show enough. Write a few lines yourself.',
+                            )
+                          : setDescription(result.description),
+                      onError: (e) => Alert.alert('Could not write it', e.message),
+                    },
+                  )
+                }
+                style={[styles.aiAction, autoDescribe.isPending && { opacity: 0.6 }]}
+              >
+                <Ionicons name="sparkles-outline" size={14} color={colors.softBlack} />
+                <Text style={styles.aiActionLabel}>
+                  {autoDescribe.isPending ? 'Reading photos…' : 'Write it for me'}
+                </Text>
+              </Pressable>
+            ) : undefined
+          }
         />
 
         {!!photoProgress && <Text style={styles.note}>{photoProgress}</Text>}
@@ -489,7 +547,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.white },
   content: { padding: spacing.md, paddingBottom: spacing.xl, gap: spacing.md },
   field: { gap: spacing.sm },
-  bookingMode: { gap: spacing.xs, marginTop: spacing.xs },
   fieldLabel: {
     fontSize: fontSize.sm,
     fontFamily: fontFamily.semibold,
@@ -524,6 +581,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  makeCover: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.softBlack },
+  makeCoverText: { color: colors.softBlack },
+  aiAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  aiActionLabel: { fontFamily: fontFamily.semibold, fontSize: fontSize.sm, color: colors.softBlack },
   coverBadge: {
     position: 'absolute',
     bottom: 4,

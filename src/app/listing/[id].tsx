@@ -6,6 +6,7 @@ import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { AskListing } from '@/components/ask-listing';
 import { ImageCarousel } from '@/components/image-carousel';
+import { ListingReviews } from '@/components/listing-reviews';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, SectionTitle } from '@/components/ui';
 import { BadgeList } from '@/components/verification-badges';
@@ -266,6 +267,8 @@ export default function ListingDetailScreen() {
               )}
             </View>
           )}
+
+          <ListingReviews listingId={listing.id} />
 
           {!!listing.profiles && (
             <View style={styles.section}>

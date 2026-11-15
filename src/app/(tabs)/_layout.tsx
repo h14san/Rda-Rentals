@@ -10,10 +10,12 @@ import {
   useUnreadNotificationCount,
 } from '@/features/notifications/queries';
 import { usePush } from '@/features/notifications/use-push';
+import { useT } from '@/lib/i18n';
 import { colors, spacing } from '@/theme';
 
 export default function TabsLayout() {
   const { session, mode } = useAuth();
+  const t = useT();
   const userId = session?.user.id ?? null;
   // Which tabs show follows what the account said it is here for. Hidden tabs
   // are still routes: a guest can reach /post from their profile. At most five
@@ -49,7 +51,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           ...hidden(mode !== 'host'),
-          title: 'Explore',
+          title: t('Explore'),
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="search-outline" color={color} size={size} />
@@ -57,28 +59,11 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="chat"
-        options={{
-          title: 'Ask',
-          headerTitle: 'Ask about rentals',
-          // Off the tab bar: it did the same job as the search bar on Explore.
-          // Asking now lives on each listing ("Ask about this place"), which
-          // is a question the search bar cannot answer. The screen is kept, so
-          // bringing the tab back is deleting this line.
-          href: null,
-          // Same sparkles mark as the feed's smart search bar and the
-          // "Write it for me" action: one icon means "a model did this".
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="sparkles-outline" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="saved"
         options={{
           ...hidden(rents(mode)),
-          title: 'Saved',
-          headerTitle: 'Saved rentals',
+          title: t('Saved'),
+          headerTitle: t('Saved rentals'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="heart-outline" color={color} size={size} />
           ),
@@ -88,8 +73,8 @@ export default function TabsLayout() {
         name="listings"
         options={{
           ...hidden(mode === 'host'),
-          title: 'Listings',
-          headerTitle: 'Your listings',
+          title: t('Listings'),
+          headerTitle: t('Your listings'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" color={color} size={size} />
           ),
@@ -99,8 +84,8 @@ export default function TabsLayout() {
         name="post"
         options={{
           ...hidden(lists(mode)),
-          title: 'Post',
-          headerTitle: 'Post a rental',
+          title: t('Post'),
+          headerTitle: t('Post a rental'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="add-circle-outline" color={color} size={size} />
           ),
@@ -109,7 +94,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="messages"
         options={{
-          title: 'Messages',
+          title: t('Messages'),
           tabBarBadge: unread > 0 ? unread : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.softBlack, color: colors.white },
           tabBarIcon: ({ color, size }) => (
@@ -120,8 +105,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          headerTitle: 'Your profile',
+          title: t('Profile'),
+          headerTitle: t('Your profile'),
           headerRight: () => (
             <Pressable
               accessibilityRole="button"

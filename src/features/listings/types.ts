@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { BookingRow } from '@/features/bookings/types';
+import type { ReviewRow, SavedSearchRow } from '@/features/listings/extras';
 import type {
   ConversationParticipantRow,
   ConversationRow,
@@ -159,6 +160,8 @@ export type ListingRow = {
    * "republish" will send it to review instead.
    */
   review_reason: ReviewReason | null;
+  /** When the "still available?" warning went out. Set only by the database. */
+  stale_reminded_at: string | null;
   /** Rule 7: the landlord chooses. The database requires at least one. */
   instant_book_enabled: boolean;
   request_to_book_enabled: boolean;
@@ -282,6 +285,7 @@ export type Database = {
           | 'approx_latitude'
           | 'approx_longitude'
           | 'review_reason'
+          | 'stale_reminded_at'
           | 'availability_confirmed_at'
           | 'bathrooms'
           | 'size_sqm'
@@ -310,7 +314,12 @@ export type Database = {
         Update: Partial<
           Omit<
             ListingRow,
-            'id' | 'owner_id' | 'approx_latitude' | 'approx_longitude' | 'review_reason'
+            | 'id'
+            | 'owner_id'
+            | 'approx_latitude'
+            | 'approx_longitude'
+            | 'review_reason'
+            | 'stale_reminded_at'
           >
         >;
         Relationships: [];
@@ -460,6 +469,19 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      saved_searches: {
+        Row: SavedSearchRow;
+        Insert: { user_id: string; name: string; filters: Filters };
+        Update: never;
+        Relationships: [];
+      };
+      // Written only by submit_review(), from a completed booking.
+      reviews: {
+        Row: ReviewRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       // Changed only through the booking functions; there is no write policy.
       bookings: {
         Row: BookingRow;
@@ -505,6 +527,11 @@ export type Database = {
         Args: { p_listing_id: string };
         Returns: { address: string | null; latitude: number | null; longitude: number | null }[];
       };
+      submit_review: {
+        Args: { p_booking_id: string; p_rating: number; p_body?: string | null };
+        Returns: string;
+      };
+      account_deletion_blocker: { Args: Record<string, never>; Returns: string | null };
       request_booking: {
         Args: {
           p_listing_id: string;

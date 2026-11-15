@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useT } from '@/lib/i18n';
 import { colors, radius, spacing, type } from '@/theme';
 
 export type SheetAction = {
@@ -30,6 +31,7 @@ export function ActionSheet({
   title?: string;
 }) {
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -37,7 +39,7 @@ export function ActionSheet({
         {/* Swallows taps so pressing between rows does not close the sheet. */}
         <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + spacing.sm }]}>
           <View style={styles.handle} />
-          {!!title && <Text style={styles.title}>{title}</Text>}
+          {!!title && <Text style={styles.title}>{t(title)}</Text>}
           {actions.map((action) => (
             <Pressable
               key={action.label}
@@ -56,7 +58,7 @@ export function ActionSheet({
                   action.destructive && styles.destructive,
                 ]}
               >
-                {action.label}
+                {t(action.label)}
               </Text>
               {action.selected && (
                 <Ionicons name="checkmark" size={20} color={colors.softBlack} />
@@ -68,7 +70,7 @@ export function ActionSheet({
             onPress={onClose}
             style={({ pressed }) => [styles.row, styles.last, pressed && { opacity: 0.6 }]}
           >
-            <Text style={[styles.label, styles.cancel]}>Cancel</Text>
+            <Text style={[styles.label, styles.cancel]}>{t('Cancel')}</Text>
           </Pressable>
         </Pressable>
       </Pressable>

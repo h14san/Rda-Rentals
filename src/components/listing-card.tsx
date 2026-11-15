@@ -62,12 +62,6 @@ export function ListingCard({
           </View>
         )}
 
-        {listing.is_featured && (
-          <View style={[styles.featuredBadge, compact && styles.overlayCompact]}>
-            <Text style={styles.featuredText}>Featured</Text>
-          </View>
-        )}
-
         {favorite && (
           <Pressable
             accessibilityRole="button"
@@ -161,22 +155,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lightGray,
   },
   imageFallback: { alignItems: 'center', justifyContent: 'center' },
-
-  featuredBadge: {
-    position: 'absolute',
-    top: spacing.sm + 4,
-    left: spacing.sm + 4,
-    backgroundColor: colors.gold,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  overlayCompact: { top: spacing.sm, left: spacing.sm },
-  featuredText: {
-    ...type.caption,
-    fontFamily: fontFamily.bold,
-    color: colors.softBlack,
-  },
 
   heart: {
     position: 'absolute',

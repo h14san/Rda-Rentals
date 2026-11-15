@@ -9,7 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LoadingState } from '@/components/states';
 import { AuthProvider, useAuth } from '@/features/auth/context';
 import { FiltersProvider } from '@/features/listings/filters-context';
-import { useT } from '@/lib/i18n';
+import { setActiveLanguage, useLanguage, useT } from '@/lib/i18n';
 import { colors, fontAssets, type } from '@/theme';
 
 void SplashScreen.preventAutoHideAsync();
@@ -42,6 +42,11 @@ function AuthGate() {
   const router = useRouter();
   const splashHidden = useRef(false);
   const t = useT();
+  // Alerts are raised outside render and read the language from here.
+  const language = useLanguage();
+  useEffect(() => {
+    setActiveLanguage(language);
+  }, [language]);
 
   // A signed-in user whose profile row has not arrived yet is in neither state,
   // so hold rather than bounce them through the wrong screen.

@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
+import { Alert } from '@/lib/alert';
 
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, SectionTitle } from '@/components/ui';
@@ -17,6 +19,7 @@ import {
 import { captureImage, pickImages, type PickedImage } from '@/lib/images';
 import { timeAgo } from '@/lib/format';
 import { colors, radius, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 /**
  * Landlord identity verification (rule 9, Features #20).
@@ -59,7 +62,7 @@ function SignedInVerify({ userId }: { userId: string }) {
     submit.mutate(
       {
         images,
-        onProgress: (done, total) => setProgress(`Uploading photo ${done} of ${total}…`),
+        onProgress: (done, total) => setProgress(translate('Uploading photo {done} of {total}…', { done, total })),
       },
       {
         onSuccess: () => {

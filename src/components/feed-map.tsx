@@ -1,4 +1,5 @@
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { Button } from '@/components/ui';
@@ -7,6 +8,7 @@ import { formatPriceCompact } from '@/lib/format';
 import { KIGALI_CENTER } from '@/lib/locations';
 import { APPROX_RADIUS_M } from '@/lib/maps';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 /**
  * The feed as a map (Features #12).
@@ -87,7 +89,7 @@ export function FeedMap({
       <View style={styles.footer}>
         <Text style={styles.footerText}>
           Showing {placed.length} of {total}
-          {unplaced > 0 ? ` · ${unplaced} without a location` : ''} · areas are
+          {unplaced > 0 ? translate(' · {n} without a location', { n: unplaced }) : ''} · areas are
           approximate
         </Text>
         {hasMore && (

@@ -1,6 +1,8 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
+import { Alert } from '@/lib/alert';
 
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Chip, SectionTitle, TextField } from '@/components/ui';
@@ -12,6 +14,7 @@ import { moveInOptions } from '@/features/listings/terms-fields';
 import { formatShortDate } from '@/features/listings/types';
 import { formatPrice } from '@/lib/format';
 import { colors, radius, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 /**
  * Book a listing: a move-in date, a length of stay, and an optional note.
@@ -113,11 +116,11 @@ export default function BookScreen() {
         </Text>
         <Text style={styles.meta}>
           {formatPrice(l.price_rwf)} / month
-          {l.deposit_rwf !== null ? ` · deposit ${formatPrice(l.deposit_rwf)}` : ''}
+          {l.deposit_rwf !== null ? translate(' · deposit {price}', { price: formatPrice(l.deposit_rwf) }) : ''}
         </Text>
         <Text style={styles.meta}>
-          {l.available_from ? `Available from ${formatShortDate(l.available_from)}` : 'Available now'}
-          {l.min_rental_months ? ` · minimum stay ${l.min_rental_months} months` : ''}
+          {l.available_from ? translate('Available from {date}', { date: formatShortDate(l.available_from) }) : 'Available now'}
+          {l.min_rental_months ? translate(' · minimum stay {n} months', { n: l.min_rental_months }) : ''}
         </Text>
       </View>
 

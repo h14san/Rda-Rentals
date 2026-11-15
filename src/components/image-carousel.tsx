@@ -5,10 +5,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
 } from 'react-native';
+import { Text } from '@/components/text';
 
 import { PhotoGallery } from '@/components/photo-gallery';
 import { imageUrl } from '@/lib/supabase';

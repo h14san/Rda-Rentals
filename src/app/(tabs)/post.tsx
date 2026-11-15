@@ -5,15 +5,15 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/components/text';
+import { Alert } from '@/lib/alert';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { BookingModeFields } from '@/components/booking-mode-fields';
@@ -48,6 +48,7 @@ import {
 import { formatPrice } from '@/lib/format';
 import { KIGALI_CENTER, KIGALI_DISTRICTS, sectorsFor } from '@/lib/locations';
 import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 type Step = 'photos' | 'details' | 'terms' | 'location' | 'review';
 
@@ -288,7 +289,7 @@ function SignedInPostListing({ userId }: { userId: string }) {
       });
 
       await uploadListingImages(userId, draft.id, images, (done, total) =>
-        setProgress(`Uploading photo ${done} of ${total}…`),
+        setProgress(translate('Uploading photo {done} of {total}…', { done, total })),
       );
 
       setProgress('Submitting for review…');
@@ -473,7 +474,7 @@ function SignedInPostListing({ userId }: { userId: string }) {
                 describedFromPhotos
                   ? 'Written from your photos — read it over and fix anything that is not right.'
                   : images.length < DESCRIBE_IDEAL_IMAGES
-                    ? `Add ${DESCRIBE_IDEAL_IMAGES} or more photos for a fuller description.`
+                    ? translate('Add {n} or more photos for a fuller description.', { n: DESCRIBE_IDEAL_IMAGES })
                     : undefined
               }
               placeholder="Water and electricity included, secure compound, 10 minutes from the bus stop…"

@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
+import { Alert } from '@/lib/alert';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { AskListing } from '@/components/ask-listing';
@@ -27,6 +29,7 @@ import { AMENITY_LABELS, knownAmenities } from '@/lib/amenities';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { APPROX_RADIUS_M, openInMaps } from '@/lib/maps';
 import { colors, fontFamily, fontSize, radius, shadow, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 /** Collapsed height for a long description, in lines. */
 const DESCRIPTION_LINES = 6;
@@ -98,7 +101,7 @@ export default function ListingDetailScreen() {
       ? [
           {
             icon: 'bed-outline' as const,
-            label: `${listing.bedrooms} bed${listing.bedrooms === 1 ? '' : 's'}`,
+            label: translate(listing.bedrooms === 1 ? '{n} bed' : '{n} beds', { n: listing.bedrooms }),
           },
         ]
       : []),
@@ -106,7 +109,7 @@ export default function ListingDetailScreen() {
       ? [
           {
             icon: 'water-outline' as const,
-            label: `${listing.bathrooms} bath${listing.bathrooms === 1 ? '' : 's'}`,
+            label: translate(listing.bathrooms === 1 ? '{n} bath' : '{n} baths', { n: listing.bathrooms }),
           },
         ]
       : []),
@@ -161,9 +164,9 @@ export default function ListingDetailScreen() {
               </Text>
             )}
             <Text style={styles.posted}>
-              Posted {timeAgo(listing.created_at)}
+              {translate('Posted {ago}', { ago: timeAgo(listing.created_at) })}
               {listing.status === 'published' && !!listing.availability_confirmed_at
-                ? ` · Availability confirmed ${timeAgo(listing.availability_confirmed_at)}`
+                ? translate(' · Availability confirmed {ago}', { ago: timeAgo(listing.availability_confirmed_at) })
                 : ''}
             </Text>
           </View>
@@ -191,7 +194,7 @@ export default function ListingDetailScreen() {
           {listing.status !== 'published' && (
             <View style={styles.statusBanner}>
               <Text style={styles.statusText}>
-                This listing is {LISTING_STATUS_LABELS[listing.status].toLowerCase()}.
+                {translate('This listing is: {status}.', { status: translate(LISTING_STATUS_LABELS[listing.status]) })}
               </Text>
               {!!suspension && (
                 <Text style={styles.statusNote}>

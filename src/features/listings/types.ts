@@ -25,6 +25,7 @@ import type {
   ReportTarget,
 } from '@/features/moderation/types';
 import { AMENITIES, AMENITY_LABELS } from '@/lib/amenities';
+import { activeLanguage } from '@/lib/i18n-state';
 import { formatPrice } from '@/lib/format';
 
 /**
@@ -677,13 +678,14 @@ export function activeFilterCount(f: Filters): number {
  */
 export function filterSummary(f: Filters): string[] {
   const chips: string[] = [];
+  const fr = activeLanguage() === 'fr';
 
   if (f.minPrice !== null && f.maxPrice !== null) {
     chips.push(`${formatPrice(f.minPrice)} – ${formatPrice(f.maxPrice)}`);
   } else if (f.maxPrice !== null) {
-    chips.push(`Under ${formatPrice(f.maxPrice)}`);
+    chips.push(`${fr ? 'Moins de' : 'Under'} ${formatPrice(f.maxPrice)}`);
   } else if (f.minPrice !== null) {
-    chips.push(`From ${formatPrice(f.minPrice)}`);
+    chips.push(`${fr ? 'À partir de' : 'From'} ${formatPrice(f.minPrice)}`);
   }
 
   if (f.sector) chips.push(f.sector);
@@ -692,13 +694,15 @@ export function filterSummary(f: Filters): string[] {
   if (f.propertyType) chips.push(PROPERTY_TYPE_LABELS[f.propertyType]);
 
   if (f.minBedrooms !== null) {
-    chips.push(f.minBedrooms === 0 ? 'Studio' : `${f.minBedrooms}+ bedrooms`);
+    chips.push(f.minBedrooms === 0 ? 'Studio' : `${f.minBedrooms}+ ${fr ? 'chambres' : 'bedrooms'}`);
   }
 
   if (f.furnishedOnly) chips.push('Furnished');
 
   if (f.minBathrooms !== null) {
-    chips.push(`${f.minBathrooms}+ bathroom${f.minBathrooms === 1 ? '' : 's'}`);
+    chips.push((fr
+        ? `${f.minBathrooms}+ salle${f.minBathrooms === 1 ? '' : 's'} de bain`
+        : `${f.minBathrooms}+ bathroom${f.minBathrooms === 1 ? '' : 's'}`));
   }
 
   for (const a of f.amenities) chips.push(AMENITY_LABELS[a]);
@@ -707,11 +711,13 @@ export function filterSummary(f: Filters): string[] {
     chips.push(
       f.maxMinRentalMonths === 1
         ? 'Monthly lease'
-        : `Lease ${f.maxMinRentalMonths} months or less`,
+        : (fr
+          ? `Bail de ${f.maxMinRentalMonths} mois ou moins`
+          : `Lease ${f.maxMinRentalMonths} months or less`),
     );
   }
 
-  if (f.availableBy !== null) chips.push(`Move in by ${formatShortDate(f.availableBy)}`);
+  if (f.availableBy !== null) chips.push(`${fr ? 'Emménagement avant le' : 'Move in by'} ${formatShortDate(f.availableBy)}`);
 
   return chips;
 }
@@ -731,28 +737,49 @@ export function listingFacts(listing: {
   furnished: boolean;
   bathrooms?: number | null;
 }): string[] {
+  const french = activeLanguage() === 'fr';
+  const s = (n: number) => (n === 1 ? '' : 's');
   const bedrooms =
     listing.bedrooms === null
       ? null
       : listing.bedrooms === 0
         ? 'Studio'
-        : `${listing.bedrooms} bedroom${listing.bedrooms === 1 ? '' : 's'}`;
+        : french
+          ? `${listing.bedrooms} chambre${s(listing.bedrooms)}`
+          : `${listing.bedrooms} bedroom${s(listing.bedrooms)}`;
   const bathrooms =
     listing.bathrooms == null
       ? null
-      : `${listing.bathrooms} bathroom${listing.bathrooms === 1 ? '' : 's'}`;
+      : french
+        ? `${listing.bathrooms} salle${s(listing.bathrooms)} de bain`
+        : `${listing.bathrooms} bathroom${s(listing.bathrooms)}`;
+  const typeLabel = PROPERTY_TYPE_LABELS[listing.property_type];
 
   return [
     ...new Set(
       [
-        PROPERTY_TYPE_LABELS[listing.property_type],
+        french ? (FRENCH_TYPES[typeLabel] ?? typeLabel) : typeLabel,
         bedrooms,
         bathrooms,
-        listing.furnished ? 'Furnished' : 'Unfurnished',
+        listing.furnished
+          ? french
+            ? 'Meublé'
+            : 'Furnished'
+          : french
+            ? 'Non meublé'
+            : 'Unfurnished',
       ].filter((f): f is string => f !== null),
     ),
   ];
 }
+
+/** The four property types, for text assembled outside a component. */
+const FRENCH_TYPES: Record<string, string> = {
+  Studio: 'Studio',
+  Apartment: 'Appartement',
+  Shared: 'Colocation',
+  House: 'Maison',
+};
 
 /**
  * The rental terms as label/value rows for the detail page and comparison.
@@ -765,7 +792,8 @@ export function listingTermRows(listing: {
   min_rental_months: number | null;
   available_from: string | null;
 }): { label: string; value: string }[] {
-  const notStated = 'Not stated';
+  const french = activeLanguage() === 'fr';
+  const notStated = french ? 'Non précisé' : 'Not stated';
   return [
     {
       label: 'Deposit',
@@ -776,11 +804,16 @@ export function listingTermRows(listing: {
       value:
         listing.min_rental_months === null
           ? notStated
-          : `${listing.min_rental_months} month${listing.min_rental_months === 1 ? '' : 's'}`,
+          : `${listing.min_rental_months} ${french ? 'mois' : `month${listing.min_rental_months === 1 ? '' : 's'}`}`,
     },
     {
       label: 'Available from',
-      value: listing.available_from === null ? 'Now' : formatShortDate(listing.available_from),
+      value:
+        listing.available_from === null
+          ? french
+            ? 'Maintenant'
+            : 'Now'
+          : formatShortDate(listing.available_from),
     },
     {
       label: 'Size',
@@ -794,7 +827,7 @@ export function formatShortDate(isoDate: string): string {
   const [y, m, d] = isoDate.split('-').map(Number);
   // Built from parts in UTC and formatted in UTC: `new Date('2026-11-01')` is
   // midnight UTC, which a phone west of Greenwich would render as 31 October.
-  return new Intl.DateTimeFormat('en-GB', {
+  return new Intl.DateTimeFormat(activeLanguage() === 'fr' ? 'fr-FR' : 'en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',

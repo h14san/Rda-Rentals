@@ -2,16 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+import { Text } from '@/components/text';
+import { Alert } from '@/lib/alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/action-sheet';
@@ -42,6 +42,7 @@ import {
 import { useClearMessageNotification } from '@/features/notifications/queries';
 import { registerForPush } from '@/lib/push';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -127,7 +128,7 @@ function Conversation({ id, userId }: { id: string; userId: string }) {
 
   function confirmBlock() {
     Alert.alert(
-      `Block ${other?.full_name ?? 'this person'}?`,
+      translate('Block {name}?', { name: other?.full_name ?? translate('this person') }),
       'Neither of you will be able to send messages to the other. They are not told.',
       [
         { text: 'Cancel', style: 'cancel' },

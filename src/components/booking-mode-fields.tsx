@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { Chip } from '@/components/ui';
 import { BOOKING_MODE_COPY } from '@/features/bookings/types';

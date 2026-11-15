@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { COMPARE_MAX } from '@/features/listings/favorites';
@@ -16,6 +17,7 @@ import { AMENITIES, AMENITY_LABELS, knownAmenities } from '@/lib/amenities';
 import { formatPriceCompact, timeAgo } from '@/lib/format';
 import { imageUrl } from '@/lib/supabase';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 type Row = {
   label: string;
@@ -101,7 +103,7 @@ export default function CompareScreen() {
       cell: (l) =>
         l.status === 'published'
           ? l.availability_confirmed_at
-            ? `Confirmed ${timeAgo(l.availability_confirmed_at)}`
+            ? translate('Confirmed {ago}', { ago: timeAgo(l.availability_confirmed_at) })
             : 'Live'
           : LISTING_STATUS_LABELS[l.status],
     },

@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Button } from '@/components/ui';
@@ -18,6 +19,7 @@ import {
 import { formatLocation, formatPrice } from '@/lib/format';
 import { imageUrl } from '@/lib/supabase';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 export default function SavedScreen() {
   const { session } = useAuth();
@@ -70,8 +72,8 @@ function SignedInSaved({ userId }: { userId: string }) {
       <View style={styles.headerRow}>
         <Text style={styles.count}>
           {selecting
-            ? `Choose ${COMPARE_MIN} to ${COMPARE_MAX} · ${selected.length} chosen`
-            : `${data.length} saved`}
+            ? translate('Choose {min} to {max} · {n} chosen', { min: COMPARE_MIN, max: COMPARE_MAX, n: selected.length })
+            : translate('{n} saved', { n: data.length })}
         </Text>
         {/* A filled pill, not a text link: comparing is the reason to save
             more than one place, and nobody found it as a link. */}
@@ -117,8 +119,8 @@ function SignedInSaved({ userId }: { userId: string }) {
           <Button
             label={
               selected.length < COMPARE_MIN
-                ? `Select at least ${COMPARE_MIN}`
-                : `Compare ${selected.length}`
+                ? translate('Select at least {n}', { n: COMPARE_MIN })
+                : translate('Compare {n}', { n: selected.length })
             }
             disabled={selected.length < COMPARE_MIN}
             onPress={() => {
@@ -193,7 +195,7 @@ function SavedRow({
             <Text style={[styles.badgeText, stillLive && styles.badgeTextNeutral]}>
               {change}
               {change.startsWith('Price') && saved.price_at_save !== null
-                ? ` (was ${formatPrice(saved.price_at_save)})`
+                ? translate(' (was {price})', { price: formatPrice(saved.price_at_save) })
                 : ''}
             </Text>
           </View>

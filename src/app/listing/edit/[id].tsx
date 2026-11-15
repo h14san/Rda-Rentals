@@ -1,15 +1,15 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/components/text';
+import { Alert } from '@/lib/alert';
 
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,6 +42,7 @@ import { formatPrice } from '@/lib/format';
 import { KIGALI_DISTRICTS, sectorsFor } from '@/lib/locations';
 import { imageUrl, supabase } from '@/lib/supabase';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 /**
  * Edit an existing listing.
@@ -215,7 +216,7 @@ function SignedInEditListing({ userId }: { userId: string }) {
           userId,
           listingId,
           newImages,
-          (done, total) => setPhotoProgress(`Uploading photo ${done} of ${total}…`),
+          (done, total) => setPhotoProgress(translate('Uploading photo {done} of {total}…', { done, total })),
           start,
         );
         setNewImages([]);

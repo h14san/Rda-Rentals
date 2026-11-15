@@ -1,5 +1,7 @@
 import { useRouter } from 'expo-router';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
+import { Alert } from '@/lib/alert';
 
 import { Button } from '@/components/ui';
 import {
@@ -16,6 +18,7 @@ import {
 } from '@/features/listings/extras';
 import { formatShortDate } from '@/features/listings/types';
 import { colors, radius, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 /**
  * One booking, with the actions its viewer may take.
@@ -89,8 +92,8 @@ export function BookingCard({
           </Text>
           <Text style={styles.meta}>
             {isRenter
-              ? `Landlord: ${b.landlord?.full_name ?? 'unknown'}`
-              : `Renter: ${b.renter?.full_name ?? 'unknown'}`}
+              ? translate('Landlord: {name}', { name: b.landlord?.full_name ?? translate('unknown') })
+              : translate('Renter: {name}', { name: b.renter?.full_name ?? translate('unknown') })}
           </Text>
         </>
       )}
@@ -156,7 +159,7 @@ export function BookingCard({
       {isLandlord && isActiveBooking(b.status) && standing.isSuccess && (
         <Text style={styles.meta}>
           {standingSummary
-            ? `Other landlords rated this renter ${standingSummary.average} of 5 (${standingSummary.count}).`
+            ? translate('Other landlords rated this renter {avg} of 5 ({n}).', { avg: standingSummary.average, n: standingSummary.count })
             : 'No landlord has reviewed this renter yet.'}
         </Text>
       )}

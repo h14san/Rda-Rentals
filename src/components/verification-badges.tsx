@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import type { ListingBadgeKind } from '@/features/listings/types';
 import {
@@ -10,6 +11,7 @@ import {
 } from '@/features/verification/types';
 import { timeAgo } from '@/lib/format';
 import { colors, fontFamily, radius, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 /**
  * Verification badges.
@@ -38,7 +40,7 @@ export function CompactBadges({ badges }: { badges: Badge[] | undefined }) {
       <Ionicons name="shield-checkmark" size={14} color={colors.success} />
       <Text style={styles.compactText} numberOfLines={1}>
         {LISTING_BADGE_LABELS[list[0].kind].label}
-        {more > 0 ? ` · ${more} more check${more === 1 ? '' : 's'}` : ''}
+        {more > 0 ? translate(more === 1 ? ' · {n} more check' : ' · {n} more checks', { n: more }) : ''}
       </Text>
     </View>
   );

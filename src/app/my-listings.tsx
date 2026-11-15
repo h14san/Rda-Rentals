@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
+import { Alert } from '@/lib/alert';
 
 import { ActionSheet, type SheetAction } from '@/components/action-sheet';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
@@ -29,6 +31,7 @@ import { CASE_STATUS_LABELS } from '@/features/verification/types';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { imageUrl } from '@/lib/supabase';
 import { colors, fontFamily, radius, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 /** How a landlord thinks about their listings: is it up, is it waiting, or is it down. */
 type Group = 'all' | 'live' | 'waiting' | 'off';
@@ -142,11 +145,11 @@ function MyListings({ userId }: { userId: string }) {
     }
     if (l.status === 'suspended') {
       const note = suspensions.data?.get(l.id)?.note;
-      return note ? `Suspended by Rwanda Rentals: ${note}` : null;
+      return note ? translate('Suspended by Rwanda Rentals: {note}', { note }) : null;
     }
     if (l.review_reason && l.status !== 'published') return REVIEW_REASON_LABELS[l.review_reason];
     if (l.status === 'published' && l.availability_confirmed_at) {
-      return `Confirmed available ${timeAgo(l.availability_confirmed_at)}`;
+      return translate('Confirmed available {ago}', { ago: timeAgo(l.availability_confirmed_at) });
     }
     if (l.status === 'pending_review') return 'Waiting for our team to review it.';
     if (l.status === 'booking_pending') return 'A request was accepted and is waiting to be confirmed.';
@@ -201,7 +204,7 @@ function MyListings({ userId }: { userId: string }) {
         onPress: () =>
           Alert.alert(
             'Delete listing',
-            `"${l.title}" and its photos will be removed permanently.`,
+            translate('"{title}" and its photos will be removed permanently.', { title: l.title }),
             [
               { text: 'Cancel', style: 'cancel' },
               {
@@ -286,7 +289,7 @@ function MyListings({ userId }: { userId: string }) {
               {(['all', 'live', 'waiting', 'off'] as const).map((g) => (
                 <Chip
                   key={g}
-                  label={`${GROUP_LABELS[g]} ${count(g)}`}
+                  label={`${translate(GROUP_LABELS[g])} ${count(g)}`}
                   selected={group === g}
                   onPress={() => setGroup(g)}
                 />

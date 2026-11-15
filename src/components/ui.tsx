@@ -3,12 +3,12 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
+import { Text } from '@/components/text';
 
 import { useT } from '@/lib/i18n';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';

@@ -1,5 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { ListingCard } from '@/components/listing-card';
 import { ErrorState, LoadingState } from '@/components/states';

@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { Text } from '@/components/text';
 
+import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { colors, radius, spacing, type } from '@/theme';
@@ -24,6 +25,19 @@ export function LoadingState({ label = 'Loading…' }: { label?: string }) {
   );
 }
 
+/** A soft round mark above the words, so an empty screen reads as a state, not a blank. */
+function Mark({ icon, tone }: { icon: keyof typeof Ionicons.glyphMap; tone?: 'danger' }) {
+  return (
+    <View style={[styles.mark, tone === 'danger' && styles.markDanger]}>
+      <Ionicons
+        name={icon}
+        size={26}
+        color={tone === 'danger' ? colors.danger : colors.charcoal}
+      />
+    </View>
+  );
+}
+
 export function EmptyState({
   title,
   message,
@@ -38,10 +52,11 @@ export function EmptyState({
   const t = useT();
   return (
     <View style={styles.center}>
+      <Mark icon="file-tray-outline" />
       <Text style={styles.title}>{t(title)}</Text>
       <Text style={styles.muted}>{t(message)}</Text>
       {actionLabel && onAction && (
-        <Button label={actionLabel} onPress={onAction} variant="secondary" />
+        <Button label={actionLabel} onPress={onAction} variant="secondary" style={styles.action} />
       )}
     </View>
   );
@@ -60,9 +75,12 @@ export function ErrorState({
 
   return (
     <View style={styles.center}>
+      <Mark icon="cloud-offline-outline" tone="danger" />
       <Text style={styles.title}>{t('Could not load')}</Text>
       <Text style={styles.muted}>{message}</Text>
-      {onRetry && <Button label="Try again" onPress={onRetry} variant="secondary" />}
+      {onRetry && (
+        <Button label="Try again" onPress={onRetry} variant="secondary" style={styles.action} />
+      )}
     </View>
   );
 }
@@ -88,12 +106,23 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.sm,
   },
-  title: type.h2,
+  mark: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.lightGray,
+    marginBottom: spacing.sm,
+  },
+  markDanger: { backgroundColor: colors.dangerTint },
+  title: { ...type.h2, textAlign: 'center' },
   muted: {
     ...type.meta,
     textAlign: 'center',
-    marginBottom: spacing.sm,
+    maxWidth: 320,
   },
+  action: { marginTop: spacing.md, alignSelf: 'stretch' },
 
   skeletonCard: { marginBottom: spacing.xl, gap: spacing.sm },
   skeletonImage: {

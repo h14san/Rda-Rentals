@@ -191,6 +191,7 @@ function SignedInProfile({ userId }: { userId: string }) {
         )}
       </MenuSection>
 
+      <MenuSection>
       <MenuRow
         icon="log-out-outline"
         label="Sign out"
@@ -211,12 +212,13 @@ function SignedInProfile({ userId }: { userId: string }) {
           ])
         }
       />
+      </MenuSection>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.xxl },
+  content: { padding: spacing.md, gap: spacing.lg, paddingBottom: spacing.xxl },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

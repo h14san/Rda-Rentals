@@ -86,7 +86,11 @@ function AuthGate() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.white },
         headerTintColor: colors.softBlack,
-        headerTitleStyle: type.h2,
+        // A compact centred title and a bare back arrow: the content is the
+        // screen, and the bar should take as little of it as it can.
+        headerTitleStyle: { ...type.bodyStrong, fontSize: 17 },
+        headerTitleAlign: 'center',
+        headerBackButtonDisplayMode: 'minimal',
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.white },
       }}

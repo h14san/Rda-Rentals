@@ -888,6 +888,27 @@ the 1st-of-the-month chips.
 
 ## UI direction (owner feedback, 2026-11-21): take cues from Airbnb
 
+**The look, as of 2026-11-26 (owner: "modern, clean, simple"), lives in the
+tokens and five shared components**, so a new screen gets it by using them:
+
+- **Fill, not outline.** Secondary buttons, chips, inputs and icon tiles are a
+  tint of `colors.lightGray` with no border. Borders are hairlines between
+  things, never boxes around them. One solid (`softBlack`) button per screen.
+- **Inputs are filled and borderless at rest**, with a dark outline only while
+  focused. Danger is a red tint (`dangerTint`) with red text, not a red slab.
+- **Large radii** (`sm 10 / md 14 / lg 18`) and a wide, faint shadow.
+- **Tab screens have a large left-aligned title; pushed screens a small
+  centred one** with a bare back arrow. The active tab's icon is filled.
+- **Menus are cards of rows** with the icon in a small tile (`menu-row.tsx`).
+- **Empty and error states carry a round mark** above the words.
+- Still monochrome on purpose. Gold stays reserved for the price rule, green
+  for verification. Do not add a brand colour to buttons without the owner.
+
+Screens that style themselves locally (bordered cards in `my-listings`,
+`booking-card`, `saved`, the staff console) only inherited the new tokens;
+they have not each been redrawn.
+
+
 - **Explore** is one raised search pill, a round filter button with a count,
   the active filters as chips with a Clear chip, and a results row. No title
   and no neighbourhood shortcuts: the owner asked for the sector chips to go.

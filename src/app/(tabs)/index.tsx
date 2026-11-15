@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -45,7 +45,18 @@ const LAYOUTS: { key: Layout; icon: keyof typeof Ionicons.glyphMap; label: strin
   { key: 'map', icon: 'map-outline', label: 'Map' },
 ];
 
-export default function FeedScreen() {
+/**
+ * This is the tab group's first route, so it is where the app opens. A host
+ * opens on their listings instead: that is the screen they came for, and
+ * Explore is not on their tab bar. Someone who wants both chooses "Both".
+ */
+export default function ExploreTab() {
+  const { mode } = useAuth();
+  if (mode === 'host') return <Redirect href="/listings" />;
+  return <FeedScreen />;
+}
+
+function FeedScreen() {
   const router = useRouter();
   const {
     filters,

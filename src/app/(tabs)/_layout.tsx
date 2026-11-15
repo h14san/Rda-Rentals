@@ -19,7 +19,7 @@ export default function TabsLayout() {
   // are still routes: a guest can reach /post from their profile. At most five
   // show at once, which is the limit on a small phone.
   //   guest: Explore, Saved, Messages, Profile
-  //   host:  Explore, Listings, Post, Messages, Profile
+  //   host:  Listings, Post, Messages, Profile (opens on Listings)
   //   both:  Explore, Saved, Post, Messages, Profile (listings via the profile)
   const hidden = (show: boolean) => (show ? {} : { href: null });
   // Mounted here, above every tab, so the badge is live wherever the user is.
@@ -48,6 +48,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          ...hidden(mode !== 'host'),
           title: 'Explore',
           headerShown: false,
           tabBarIcon: ({ color, size }) => (

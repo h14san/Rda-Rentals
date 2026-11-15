@@ -12,8 +12,7 @@
       "supportsTablet": false,
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Rwanda Rentals needs access to your photos so you can add pictures to a rental listing.",
-        "NSCameraUsageDescription": "Rwanda Rentals needs camera access so you can photograph a rental you are listing.",
-        "NSLocationWhenInUseUsageDescription": "Rwanda Rentals uses your location to centre the map when you set a rental pin."
+        "NSCameraUsageDescription": "Rwanda Rentals needs camera access so you can photograph a rental you are listing."
       }
     },
     "android": {
@@ -41,7 +40,13 @@
         }
       ],
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Rwanda Rentals uses your location to show rentals near you on the map. It is not saved."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

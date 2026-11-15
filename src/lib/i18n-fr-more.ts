@@ -448,6 +448,8 @@ export const FR_MORE: Record<string, string> = {
     'Les messages que vous envoyez, les locations que vous enregistrez et les signalements que vous faites.',
   'A push token for your phone, if you turn notifications on.':
     'Un jeton push pour votre téléphone, si vous activez les notifications.',
+  'Not your location. If you let the map use it, it stays on your phone and is not saved. To find places, the app sends the area shown on the map, rounded to about a kilometre.':
+    'Pas votre position. Si vous laissez la carte l’utiliser, elle reste sur votre téléphone et n’est pas enregistrée. Pour trouver des logements, l’application envoie la zone affichée sur la carte, arrondie à environ un kilomètre.',
   'Who can see what': 'Qui peut voir quoi',
   'Other users see your name, your live listings, and which checks you passed. They never see your phone number or email.':
     'Les autres utilisateurs voient votre nom, vos annonces en ligne et les vérifications que vous avez passées. Ils ne voient jamais votre numéro de téléphone ni votre e-mail.',
@@ -659,6 +661,26 @@ export const FR_MORE: Record<string, string> = {
   'Other landlords rated this renter {avg} of 5 ({n}).':
     'D’autres propriétaires ont noté ce locataire {avg} sur 5 ({n}).',
   ' · {n} without a location': ' · {n} sans emplacement',
+  // Map: near me
+  'Show places near me': 'Afficher les logements près de moi',
+  'Search this area': 'Rechercher dans cette zone',
+  'Looking in this area…': 'Recherche dans cette zone…',
+  '{shown} of {total} places in this area': '{shown} sur {total} logements dans cette zone',
+  'areas are approximate': 'zones approximatives',
+  'No places here match. Zoom out or move the map, then search this area.':
+    'Aucun logement ne correspond ici. Dézoomez ou déplacez la carte, puis recherchez dans cette zone.',
+  'Could not load this area. Check your connection.':
+    'Impossible de charger cette zone. Vérifiez votre connexion.',
+  'You seem to be outside Rwanda, so the map shows Kigali.':
+    'Vous semblez être hors du Rwanda, la carte affiche donc Kigali.',
+  'Location is off for this app': 'La localisation est désactivée pour cette application',
+  'Allow location for Rwanda Rentals in your phone settings to see places near you.':
+    'Autorisez la localisation pour Rwanda Rentals dans les réglages du téléphone pour voir les logements près de vous.',
+  'Not now': 'Pas maintenant',
+  'Open settings': 'Ouvrir les réglages',
+  'Could not find you': 'Position introuvable',
+  'Check that location is switched on, then try again.':
+    'Vérifiez que la localisation est activée, puis réessayez.',
   'Show all {n} reviews': 'Afficher les {n} avis',
   ' · {n} more check': ' · {n} autre vérification',
   ' · {n} more checks': ' · {n} autres vérifications',

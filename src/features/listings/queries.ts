@@ -31,10 +31,23 @@ const IMAGE_SELECT = 'listing_images (id, storage_path, position)';
 /** Public results of verification; readable by anyone, like the listing itself. */
 const BADGE_SELECT = 'listing_badges (kind, checked_at)';
 
+/**
+ * The part of the map being searched, in the approximate coordinates every
+ * listing carries. It sits beside `Filters`, like sort, because it describes
+ * where the renter is looking, not what they want: the AI parsers never
+ * produce one, and a saved search never stores one.
+ */
+export type MapBounds = {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+};
+
 export const listingKeys = {
   all: ['listings'] as const,
-  feed: (filters: Filters, sort: SortOrder) =>
-    ['listings', 'feed', filters, sort] as const,
+  feed: (filters: Filters, sort: SortOrder, bounds: MapBounds | null = null) =>
+    ['listings', 'feed', filters, sort, bounds] as const,
   detail: (id: string) => ['listings', 'detail', id] as const,
   mine: (userId: string) => ['listings', 'mine', userId] as const,
 };
@@ -60,9 +73,13 @@ export function useListingsFeed(
   // unfiltered feed in the meantime would spend a request on rows it will not
   // show.
   enabled = true,
+  // Only the map passes this. It is applied to the approximate point, so a
+  // listing near the edge of the area can fall either side of it, which is the
+  // same uncertainty the 500 m circle already shows.
+  bounds: MapBounds | null = null,
 ) {
   return useInfiniteQuery({
-    queryKey: listingKeys.feed(filters, sort),
+    queryKey: listingKeys.feed(filters, sort, bounds),
     enabled,
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
@@ -103,6 +120,12 @@ export function useListingsFeed(
         query = query.or(
           `available_from.is.null,available_from.lte.${filters.availableBy}`,
         );
+      if (bounds)
+        query = query
+          .gte('approx_latitude', bounds.south)
+          .lte('approx_latitude', bounds.north)
+          .gte('approx_longitude', bounds.west)
+          .lte('approx_longitude', bounds.east);
 
       // Featured listings float to the top only under the default ordering.
       // Letting paid placement override an explicit "price: low to high" would

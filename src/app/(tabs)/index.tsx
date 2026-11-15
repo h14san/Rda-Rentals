@@ -297,11 +297,8 @@ function FeedScreen() {
         />
       ) : layout === 'map' ? (
         <FeedMap
-          listings={listings}
-          total={total}
-          hasMore={!!hasNextPage}
-          loadingMore={isFetchingNextPage}
-          onLoadMore={() => void fetchNextPage()}
+          filters={filters}
+          sort={sort}
           onOpen={(id) => router.push(`/listing/${id}`)}
         />
       ) : (

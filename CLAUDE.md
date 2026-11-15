@@ -539,8 +539,14 @@ policy from becoming a back door, a favorite can only be *created* on a
 `published` listing. `price_at_save` is captured by trigger, so the "price
 dropped" badge can't be faked from the client.
 
-**The feed map shows only loaded pages** and draws every listing at its
-approximate point with a 500 m circle. The tap target is the price bubble,
+**The feed map searches the area on screen** (`MapBounds`, beside `Filters`
+like sort, passed to the same `useListingsFeed`). Opening it asks for
+when-in-use location (`src/lib/my-location.ts`, on `onMapReady`, never at
+launch) and centres on the renter only inside Rwanda. Moving the map offers
+"Search this area" instead of refetching per pan. The position never leaves
+the phone; the bounds are rounded outward to 0.01°, and the privacy help says
+so. `expo-location` is native: a new dev build is needed. It draws every
+listing at its approximate point with a 500 m circle. The tap target is the price bubble,
 because circles aren't tappable on iOS. Both maps import `APPROX_RADIUS_M`
 from `src/lib/maps.ts`.
 

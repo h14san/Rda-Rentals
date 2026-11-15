@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -8,8 +8,8 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
-import { Text } from '@/components/text';
 
+import { Text } from '@/components/text';
 import { useT } from '@/lib/i18n';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
 
@@ -29,14 +29,17 @@ interface ButtonProps {
   icon?: ReactNode;
 }
 
-const BUTTON_COLORS: Record<
-  ButtonVariant,
-  { bg: string; fg: string; border?: string }
-> = {
+/**
+ * Filled shapes, no outlines. One solid primary per screen; everything else is
+ * a quiet tinted fill, so the eye lands on the action that matters. Danger is
+ * a red tint rather than a red slab: it should read as "careful", not shout
+ * from every listing card.
+ */
+const BUTTON_COLORS: Record<ButtonVariant, { bg: string; fg: string }> = {
   primary: { bg: colors.softBlack, fg: colors.white },
-  secondary: { bg: colors.white, fg: colors.charcoal, border: colors.border },
+  secondary: { bg: colors.lightGray, fg: colors.softBlack },
   ghost: { bg: 'transparent', fg: colors.charcoal },
-  danger: { bg: colors.white, fg: colors.danger, border: colors.danger },
+  danger: { bg: colors.dangerTint, fg: colors.danger },
 };
 
 export function Button({
@@ -62,9 +65,10 @@ export function Button({
         styles.button,
         {
           backgroundColor: palette.bg,
-          borderColor: palette.border ?? 'transparent',
-          borderWidth: palette.border ? 1 : 0,
-          opacity: inactive ? 0.5 : pressed ? 0.85 : 1,
+          opacity: inactive ? 0.45 : 1,
+          // A slight press-in instead of a fade: the button feels physical
+          // without an animation library on the path of every tap.
+          transform: [{ scale: pressed && !inactive ? 0.98 : 1 }],
         },
         style,
       ]}
@@ -137,9 +141,15 @@ export function TextField({
   style,
   accessory,
   placeholder,
+  onFocus,
+  onBlur,
   ...rest
 }: TextFieldProps) {
   const t = useT();
+  // A filled field with no outline at rest, and a dark outline only while it
+  // has focus: the one field being typed in is the one that stands out.
+  const [focused, setFocused] = useState(false);
+
   return (
     <View style={styles.fieldWrap}>
       <View style={styles.fieldLabelRow}>
@@ -149,7 +159,20 @@ export function TextField({
       <TextInput
         placeholderTextColor={colors.muted}
         placeholder={placeholder ? t(placeholder) : undefined}
-        style={[styles.input, !!error && styles.inputError, style]}
+        onFocus={(e) => {
+          setFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          onBlur?.(e);
+        }}
+        style={[
+          styles.input,
+          focused && styles.inputFocused,
+          !!error && styles.inputError,
+          style,
+        ]}
         {...rest}
       />
       {!!error && <Text style={styles.fieldError}>{error}</Text>}
@@ -173,52 +196,49 @@ export function SectionTitle({ children }: { children: ReactNode }) {
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 52,
-    borderRadius: radius.md,
+    minHeight: 54,
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
   buttonInner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   buttonLabel: {
-    ...type.label,
+    fontFamily: fontFamily.semibold,
     fontSize: fontSize.md,
+    letterSpacing: -0.1,
   },
 
   chip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 9,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.white,
+    backgroundColor: colors.lightGray,
   },
-  chipSelected: {
-    backgroundColor: colors.softBlack,
-    borderColor: colors.softBlack,
-  },
-  chipLabel: type.label,
+  chipSelected: { backgroundColor: colors.softBlack },
+  chipLabel: { ...type.label, color: colors.charcoal },
   chipLabelSelected: { color: colors.white },
 
-  fieldWrap: { gap: spacing.xs },
+  fieldWrap: { gap: spacing.sm },
   fieldLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  fieldLabel: type.label,
+  fieldLabel: { ...type.label, color: colors.softBlack },
   input: {
-    minHeight: 52,
-    borderWidth: 1,
-    borderColor: colors.border,
+    minHeight: 54,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     fontFamily: fontFamily.regular,
     fontSize: fontSize.md,
     color: colors.softBlack,
-    backgroundColor: colors.white,
+    backgroundColor: colors.lightGray,
   },
+  inputFocused: { borderColor: colors.softBlack, backgroundColor: colors.white },
   inputError: { borderColor: colors.danger },
   fieldError: {
     ...type.caption,
@@ -228,6 +248,6 @@ const styles = StyleSheet.create({
 
   sectionTitle: {
     ...type.h2,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
 });

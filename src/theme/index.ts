@@ -11,19 +11,26 @@ import { Platform, type TextStyle } from 'react-native';
 export const colors = {
   /** Page and card background. */
   white: '#FFFFFF',
-  /** Surface behind cards, input fills, skeletons. */
-  lightGray: '#F3F4F6',
+  /**
+   * The one surface tint: input fills, chips, secondary buttons, icon tiles,
+   * skeletons. A hair cooler and lighter than before, so a filled control sits
+   * on the page instead of looking like a grey box on it.
+   */
+  lightGray: '#F4F5F7',
   /** Body copy and icons. */
-  charcoal: '#1F2937',
-  /** Headings and price emphasis. */
-  softBlack: '#111827',
+  charcoal: '#2A2F38',
+  /** Headings, price emphasis, and the single solid button colour. */
+  softBlack: '#0E1116',
   /** Accent. Spent deliberately — see the note below. */
   gold: '#E9B44C',
 
   /** Derived, not in the source doc but needed for real UI. */
-  border: '#E5E7EB',
-  muted: '#6B7280',
-  danger: '#DC2626',
+  /** Hairlines only. Shapes are separated by fill and space, not by boxes. */
+  border: '#E9EAEE',
+  muted: '#6F7682',
+  danger: '#D92D20',
+  /** Behind danger text: a destructive button or a failed state. */
+  dangerTint: '#FEECEB',
   success: '#059669',
 } as const;
 
@@ -48,11 +55,17 @@ export const spacing = {
   xxl: 48,
 } as const;
 
+/**
+ * Generous corners throughout. Small radii on large shapes are what make a
+ * screen read as a form; these make it read as cards and controls.
+ */
 export const radius = {
-  sm: 8,
-  md: 12,
-  /** Airbnb-style image corners. */
-  lg: 16,
+  /** Icon tiles, thumbnails in dense rows. */
+  sm: 10,
+  /** Inputs, grid photos, inner cards. */
+  md: 14,
+  /** Buttons, cards, large photos. */
+  lg: 18,
   pill: 999,
 } as const;
 
@@ -100,15 +113,15 @@ export const type = {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.xl,
     lineHeight: 32,
-    letterSpacing: -0.6,
+    letterSpacing: -0.7,
     color: colors.softBlack,
   },
   /** Section headings. */
   h2: {
     fontFamily: fontFamily.semibold,
-    fontSize: fontSize.lg,
-    lineHeight: 26,
-    letterSpacing: -0.3,
+    fontSize: 19,
+    lineHeight: 25,
+    letterSpacing: -0.35,
     color: colors.softBlack,
   },
   /** The hero number on a listing detail page. */
@@ -133,12 +146,14 @@ export const type = {
     fontFamily: fontFamily.regular,
     fontSize: fontSize.md,
     lineHeight: 24,
+    letterSpacing: -0.1,
     color: colors.charcoal,
   },
   bodyStrong: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.md,
     lineHeight: 24,
+    letterSpacing: -0.15,
     color: colors.softBlack,
   },
   /** Buttons, chips, field labels. */
@@ -168,12 +183,14 @@ export const type = {
 
 /** Soft shadow. Cross-platform: iOS uses shadow*, Android uses elevation. */
 export const shadow = Platform.select({
+  // Wide and faint: a card lifts off the page without a visible edge. A tight
+  // dark shadow is the single thing that most dates a screen.
   ios: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowColor: '#0E1116',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 18,
   },
-  android: { elevation: 3 },
+  android: { elevation: 2 },
   default: {},
 }) as object;

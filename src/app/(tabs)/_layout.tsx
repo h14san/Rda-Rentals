@@ -11,7 +11,7 @@ import {
 } from '@/features/notifications/queries';
 import { usePush } from '@/features/notifications/use-push';
 import { useT } from '@/lib/i18n';
-import { colors, spacing } from '@/theme';
+import { colors, fontFamily, spacing, type } from '@/theme';
 
 export default function TabsLayout() {
   const { session, mode } = useAuth();
@@ -40,9 +40,16 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: colors.white,
           borderTopColor: colors.border,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          elevation: 0,
         },
+        tabBarLabelStyle: { fontFamily: fontFamily.medium, fontSize: 11, letterSpacing: 0.1 },
+        tabBarItemStyle: { paddingTop: 4 },
         headerStyle: { backgroundColor: colors.white },
-        headerTitleStyle: { color: colors.softBlack },
+        headerTitleStyle: { ...type.h1, fontSize: 24 },
+        // Tab screens are destinations, not steps: a large left-aligned title,
+        // where pushed screens get a small centred one.
+        headerTitleAlign: 'left',
         headerShadowVisible: false,
         sceneStyle: { backgroundColor: colors.white },
       }}
@@ -53,8 +60,8 @@ export default function TabsLayout() {
           ...hidden(mode !== 'host'),
           title: t('Explore'),
           headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search-outline" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'search' : 'search-outline'} color={color} size={24} />
           ),
         }}
       />
@@ -64,8 +71,8 @@ export default function TabsLayout() {
           ...hidden(rents(mode)),
           title: t('Saved'),
           headerTitle: t('Saved rentals'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="heart-outline" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'heart' : 'heart-outline'} color={color} size={24} />
           ),
         }}
       />
@@ -75,8 +82,8 @@ export default function TabsLayout() {
           ...hidden(mode === 'host'),
           title: t('Listings'),
           headerTitle: t('Your listings'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} color={color} size={24} />
           ),
         }}
       />
@@ -86,8 +93,8 @@ export default function TabsLayout() {
           ...hidden(lists(mode)),
           title: t('Post'),
           headerTitle: t('Post a rental'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle-outline" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} color={color} size={24} />
           ),
         }}
       />
@@ -97,8 +104,8 @@ export default function TabsLayout() {
           title: t('Messages'),
           tabBarBadge: unread > 0 ? unread : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.softBlack, color: colors.white },
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubbles-outline" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} color={color} size={24} />
           ),
         }}
       />
@@ -131,8 +138,8 @@ export default function TabsLayout() {
             height: 10,
             borderRadius: 5,
           },
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} color={color} size={24} />
           ),
         }}
       />

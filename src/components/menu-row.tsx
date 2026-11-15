@@ -1,26 +1,30 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+
 import { Text } from '@/components/text';
-
 import { useT } from '@/lib/i18n';
-import { colors, spacing, type } from '@/theme';
+import { colors, radius, spacing, type } from '@/theme';
 
-/** A titled group of MenuRows, with hairlines between the rows only. */
+/**
+ * A titled group of MenuRows on one soft card. Grouping by card, rather than
+ * by a long ruled list, is what lets the profile read as three short lists.
+ */
 export function MenuSection({ title, children }: { title?: string; children: ReactNode }) {
   const t = useT();
   return (
     <View style={styles.section}>
       {!!title && <Text style={styles.sectionTitle}>{t(title)}</Text>}
-      <View>{children}</View>
+      <View style={styles.card}>{children}</View>
     </View>
   );
 }
 
 /**
- * One line of a settings-style menu: icon, label, an optional quiet detail on
- * the right, and a chevron. The profile tab is built from these, so that it is
- * a list of places to go rather than a page of everything at once.
+ * One line of a settings-style menu: an icon in a small tile, a label, an
+ * optional quiet detail on the right, and a chevron. The profile tab is built
+ * from these, so that it is a list of places to go rather than a page of
+ * everything at once.
  */
 export function MenuRow({
   icon,
@@ -45,9 +49,11 @@ export function MenuRow({
       accessibilityRole="button"
       accessibilityLabel={detail ? `${label}, ${detail}` : label}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
     >
-      <Ionicons name={icon} size={22} color={tint} />
+      <View style={[styles.iconTile, destructive && styles.iconTileDanger]}>
+        <Ionicons name={icon} size={19} color={tint} />
+      </View>
       <Text style={[styles.label, destructive && { color: colors.danger }]} numberOfLines={1}>
         {t(label)}
       </Text>
@@ -57,22 +63,38 @@ export function MenuRow({
           {detail}
         </Text>
       )}
-      {!destructive && <Ionicons name="chevron-forward" size={18} color={colors.muted} />}
+      {!destructive && <Ionicons name="chevron-forward" size={16} color={colors.muted} />}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  section: { gap: spacing.xs },
-  sectionTitle: { ...type.h2, marginBottom: spacing.xs },
+  section: { gap: spacing.sm },
+  sectionTitle: { ...type.caption, textTransform: 'uppercase', letterSpacing: 0.8, marginLeft: spacing.xs },
+  card: {
+    borderRadius: radius.lg,
+    backgroundColor: colors.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
   row: {
-    minHeight: 56,
+    minHeight: 58,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.md,
   },
+  rowPressed: { backgroundColor: colors.lightGray },
+  iconTile: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.lightGray,
+  },
+  iconTileDanger: { backgroundColor: colors.dangerTint },
   label: { ...type.body, flex: 1, color: colors.softBlack },
   detail: { ...type.meta, maxWidth: '45%' },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.softBlack },

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button, TextField } from '@/components/ui';
-import { useSubmitReview } from '@/features/listings/extras';
+import { useSubmitReview, useSubmitTenantReview } from '@/features/listings/extras';
 import { colors, spacing, type } from '@/theme';
 
 const WORDS = ['', 'Poor', 'Below average', 'Fine', 'Good', 'Excellent'];
@@ -15,9 +15,15 @@ const WORDS = ['', 'Poor', 'Below average', 'Fine', 'Good', 'Excellent'];
  * place you did not rent.
  */
 export default function RateScreen() {
-  const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
+  // ?about=renter is the landlord reviewing the person who rented. The two
+  // directions share a form and nothing else: different functions, different
+  // tables, and only the tenant's review of the place is public.
+  const { bookingId, about } = useLocalSearchParams<{ bookingId: string; about?: string }>();
   const router = useRouter();
-  const submit = useSubmitReview();
+  const aboutRenter = about === 'renter';
+  const submitPlace = useSubmitReview();
+  const submitRenter = useSubmitTenantReview();
+  const submit = aboutRenter ? submitRenter : submitPlace;
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState('');
 
@@ -26,7 +32,12 @@ export default function RateScreen() {
       { bookingId, rating, body },
       {
         onSuccess: () => {
-          Alert.alert('Thank you', 'Your review is now on the listing.');
+          Alert.alert(
+            'Thank you',
+            aboutRenter
+              ? 'Other landlords will see it when this person asks to book with them.'
+              : 'Your review is now on the listing.',
+          );
           router.back();
         },
         onError: (e) => Alert.alert('Could not post your review', e.message),
@@ -36,7 +47,7 @@ export default function RateScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Text style={styles.h2}>How was it?</Text>
+      <Text style={styles.h2}>{aboutRenter ? 'How was this renter?' : 'How was it?'}</Text>
       <View style={styles.stars} accessibilityRole="adjustable" accessibilityLabel="Rating">
         {[1, 2, 3, 4, 5].map((n) => (
           <Pressable
@@ -57,17 +68,23 @@ export default function RateScreen() {
       <Text style={styles.word}>{WORDS[rating]}</Text>
 
       <TextField
-        label="Tell others about it (optional)"
+        label={aboutRenter ? 'Anything to add (optional)' : 'Tell others about it (optional)'}
         value={body}
         onChangeText={setBody}
         multiline
         maxLength={1000}
         style={styles.body}
-        hint="Was it as described? How was the landlord? Phone numbers and emails are removed."
+        hint={
+          aboutRenter
+            ? 'Did they pay on time and look after the place? Phone numbers and emails are removed.'
+            : 'Was it as described? How was the landlord? Phone numbers and emails are removed.'
+        }
       />
 
       <Text style={styles.caption}>
-        Reviews are public and show your name. You can write one review per rental.
+        {aboutRenter
+          ? 'Not public. The renter can read it, and so can a landlord they ask to book with. One review per rental.'
+          : 'Reviews are public and show your name. You can write one review per rental.'}
       </Text>
 
       <Button

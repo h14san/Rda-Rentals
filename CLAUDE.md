@@ -225,10 +225,9 @@ overturn any of them:
   undecided. `decided_at` is recorded so a purge job can be added; it has to
   delete through the Storage API, because deleting `storage.objects` rows in SQL
   leaves the files behind.
-- **Phone OTP: decided 2026-10-30, use Pindo.** The plan is a Supabase Send SMS
-  auth hook (an Edge Function) that calls Pindo, with no screen changes. It is
-  not built yet. It still needs a Pindo account, an API token, a sender ID and
-  pricing.
+- **Phone OTP: decided 2026-10-30, use Pindo.** The hook function (`send-sms`)
+  is built and deployed. It still needs a Pindo account, an API token and a
+  registered sender ID, then the steps in `docs/WORKPLAN.md`.
 - **Sentry and PostHog** wait for beta. Each goes behind a `src/lib/` wrapper,
   and only after its data location has been checked.
 
@@ -491,9 +490,9 @@ available" therefore sends any value; it is the change that counts.
 the owner. There are deliberately no write policies. `changed_by` is filled
 only when the owner made the change. The owner reads this table and anyone
 signed in reads `profiles`, so a staff id there was a name; staff actions are
-attributed in the staff-only logs instead. (`verification_cases.decided_by`
-still has this leak to the case's owner. Fixing it needs a column-level
-revoke, which breaks `select *`.)
+attributed in the staff-only logs instead. `verification_cases.decided_by` had
+the same leak and is now always null: a trigger clears it on every write, so
+no future writer can reintroduce it. Who decided is in `verification_events`.
 
 **A report never reaches the reported party.** `reports` has a select policy
 for the reporter and for staff, and none for the target, so they learn neither
@@ -610,8 +609,9 @@ the mask matters: USSD codes first (they contain a phone number), then email,
 then `+`-prefixed numbers, then local Rwandan forms. The Rwandan pattern is
 exactly nine national digits starting 72/73/78/79 with no digit touching
 either end. That is what lets "250,000 RWF", "780000" and "2026-11-15"
-through. Add a fixture before touching either regex. Known gap: a bare
-nine-digit run like "780000 800" is masked.
+through. A number written without its 0 or 250 prefix is masked only when it
+is unbroken or grouped in threes, which is what stopped "780000 800" (a rent
+and a fee) being eaten. Add a fixture before touching either regex.
 
 **Masking stops at a confirmed booking, for new messages only.**
 `contact_masking_active(conversation)` is false while a `confirmed` or
@@ -802,35 +802,65 @@ available again after being rented, never on pause/unpause. Ten per user.
 `completed` booking, once (rule 13). There is no insert policy. The body is
 passed through `mask_contact_details`. They are public. The listing page
 shows nothing at all until there is one. Landlord-reviews-tenant, replies and
-staff removal of a review are not built.
+staff removal exist as of 2026-11-24: see below.
+
+**A landlord answers a review once** (`reply_to_review`), publicly, masked
+like the review. **Staff remove a review** (`remove_review`): it is hidden by
+the select policy, not deleted, and logged. **A landlord reviews the renter**
+of a completed booking (`tenant_reviews`, `submit_tenant_review`). That one
+is not public: the renter, its author, staff, and a landlord with a live
+booking from that renter can read it. The booking card shows a landlord the
+renter's average while they decide. The `/rate/[bookingId]` screen serves
+both directions (`?about=renter`).
 
 **A live listing unconfirmed for 30 days is paused**, with a warning at 23
 (`expire_stale_listings()`, daily by `pg_cron`). Listings live before the
 rule get their 30 days from 2026-11-23, a constant in the function, so the
 demo data was not mass-paused on the first night.
 
-**Staff need a second factor, and `has_role()` enforces it.** Once a staff
-member has a verified TOTP factor, their role counts only in an `aal2`
-session. Every staff policy and function goes through `has_role`, so this is
-real, not a screen. `/staff` redirects to `/staff/unlock`, which enrols on
-the first visit and asks for the code after. An account with no factor yet is
-deliberately not locked out, or the first admin (inserted from the SQL
-editor) could never enrol. That window is the gap: staff are only as
-protected as their having opened the console once.
+**Staff need a second factor, and `has_role()` enforces it, always.** A role
+counts only in an `aal2` session. Every staff policy and function goes through
+`has_role`, so this is real, not a screen. `/staff` redirects to
+`/staff/unlock`, which enrols an authenticator app on the first visit and asks
+for its code after. Nobody is locked out by this, including the first admin
+inserted from the SQL editor: enrolling needs no role, because the unlock
+screen is offered to anyone who can read their own `user_roles` row, and that
+policy does not use `has_role`. (An earlier version exempted accounts with no
+factor on the opposite, wrong, reasoning. It left every staff account that had
+not opened the console on one emailed code.) In `rls_check.sql` staff sessions
+carry `'aal', 'aal2'` in their claims for this reason.
 
 **French is a dictionary keyed by the English string** (`src/lib/i18n-fr.ts`,
 `useT()`). A missing line shows English instead of a key. The shared
 components (Button, Chip, TextField, SectionTitle, the menu rows, the states,
 the action sheet) and the tab and stack titles translate what they are given,
-which covers most screens without edits. **Not translated:** text built from
-numbers or names, the help pages, the staff console, and everything composed
-in the database (notifications, system messages). The language is in the
+which covers most screens without edits. `t('{n} rentals', { n })` handles text with a number in it; the template is
+the key. Notification **titles** are a fixed set and translate in the list;
+their bodies, push banners and chat system messages are composed in the
+database and stay English. **Not translated:** most text built from numbers
+or names, the help pages, and the staff console. The language is in the
 user's auth metadata, like the account mode, and defaults to the phone's.
 
-**The cover photo is the lowest `position`.** "Make cover" gives that photo
-a position below all the others: one update, no renumbering, no collision.
-Positions can be negative. It is staged until Save like other photo changes,
-and is not a material edit (no re-review).
+**Photos reorder with arrows on the edit screen**, staged until Save like
+every photo change. Saving writes the kept photos to fresh positions below
+every existing one, in the new order. Renumbering in place would collide with
+the unique `(listing_id, position)` constraint partway through. Positions can
+be negative; only their order means anything. Reordering is not a material
+edit (no re-review).
+
+**The gallery zooms by pinch and springs back on release**
+(`zoomable-image.tsx`). It does not stay zoomed, because that needs panning,
+and panning inside a sideways-swiping list makes every drag ambiguous. The
+viewer is wrapped in its own `GestureHandlerRootView`: a Modal is a separate
+native window on Android and gestures do not reach it otherwise.
+
+**Phone sign-in is built and switched off.** `send-sms` is Supabase Auth's
+Send SMS hook, delivering through Pindo. It runs without a JWT and verifies
+the Standard Webhooks signature instead. It is deployed and refuses everything
+until three secrets exist. Turning it on is the owner's steps in
+`docs/WORKPLAN.md`; nothing in the app changes except
+`EXPO_PUBLIC_AUTH_CHANNEL=phone`. Written from both providers' docs and never
+run against either.
 
 **"Write it for me" on the edit screen reads the listing's own public photo
 URLs on the phone** and sends them like fresh photos. No server change. Not
@@ -1079,6 +1109,8 @@ supabase/
   functions/auto-describe/            photos -> description
   functions/ask-listing/              one listing + a question -> answer, known
   functions/delete-account/           deletes the caller's files, then the user
+  functions/send-sms/                 Auth's Send SMS hook -> Pindo (inactive
+                                      until its secrets are set)
   functions/send-push/                notification id -> Expo Push (no JWT; see
                                       its header for why that is safe)
   migrations/20260910120000_init.sql  schema, indexes, RLS, storage policies
@@ -1103,6 +1135,9 @@ supabase/
                                       location release, masking end, expiry cron
   migrations/20261123120000_launch_gaps.sql  saved searches + alerts, reviews,
                                       stale expiry, staff aal2, deletion check
+  migrations/20261124120000_follow_ups.sql  strict staff aal2, reviewer hidden,
+                                      masking fix, review replies/removal,
+                                      tenant reviews
   seed.sql                  15 demo Kigali listings (no photos — nothing in
                             the storage bucket to point at until a real upload)
   rls_check.sql             security assertions

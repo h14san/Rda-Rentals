@@ -83,6 +83,21 @@ export type ReviewRow = {
   author_id: string | null;
   rating: number;
   body: string | null;
+  /** The landlord's one public answer, if they gave it. */
+  reply: string | null;
+  replied_at: string | null;
+  /** Set when staff removed it. Only staff ever receive such a row. */
+  removed_at: string | null;
+  created_at: string;
+};
+
+export type TenantReviewRow = {
+  id: string;
+  booking_id: string;
+  renter_id: string;
+  author_id: string | null;
+  rating: number;
+  body: string | null;
   created_at: string;
 };
 
@@ -143,8 +158,73 @@ export function useSubmitReview() {
   });
 }
 
+export function useReplyToReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { reviewId: string; body: string }) => {
+      const { error } = await supabase.rpc('reply_to_review', {
+        p_review_id: input.reviewId,
+        p_body: input.body,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['reviews'] }),
+  });
+}
+
+/** Staff only; the function checks. The note goes to the audit log. */
+export function useRemoveReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { reviewId: string; note: string }) => {
+      const { error } = await supabase.rpc('remove_review', {
+        p_review_id: input.reviewId,
+        p_note: input.note,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['reviews'] }),
+  });
+}
+
+/**
+ * What landlords have said about a renter. RLS returns rows only to the
+ * renter, the authors, staff, and a landlord with a live booking from that
+ * renter, so for anyone else this is simply empty.
+ */
+export function useTenantReviews(renterId: string | null) {
+  return useQuery({
+    queryKey: ['reviews', 'tenant', renterId] as const,
+    enabled: !!renterId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tenant_reviews')
+        .select('*')
+        .eq('renter_id', renterId!)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as TenantReviewRow[];
+    },
+  });
+}
+
+export function useSubmitTenantReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { bookingId: string; rating: number; body: string }) => {
+      const { error } = await supabase.rpc('submit_tenant_review', {
+        p_booking_id: input.bookingId,
+        p_rating: input.rating,
+        p_body: input.body.trim() || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['reviews'] }),
+  });
+}
+
 /** "4.5" and a count, or null when there is nothing to average. */
-export function reviewSummary(reviews: ReviewRow[]): { average: string; count: number } | null {
+export function reviewSummary(reviews: { rating: number }[]): { average: string; count: number } | null {
   if (reviews.length === 0) return null;
   const mean = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
   return { average: mean.toFixed(1), count: reviews.length };

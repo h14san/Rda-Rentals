@@ -234,4 +234,45 @@ export const FR: Record<string, string> = {
   'Address or landmark': 'Adresse ou point de repère',
   'Make cover': 'Photo principale',
   Cover: 'Principale',
+
+  // Counts
+  'No rentals': 'Aucune location',
+  '1 rental': '1 location',
+  '{n} rentals': '{n} locations',
+  'Save search': 'Enregistrer la recherche',
+  'Mark all as read': 'Tout marquer comme lu',
+
+  // Notification titles (composed in the database, in English; a fixed set)
+  'Your ID was checked': 'Votre identité a été vérifiée',
+  'Your ID was not accepted': 'Votre pièce d’identité n’a pas été acceptée',
+  'We need another photo of your ID': 'Il nous faut une autre photo de votre pièce d’identité',
+  'Your listing is live': 'Votre annonce est en ligne',
+  'Your listing was not approved': 'Votre annonce n’a pas été approuvée',
+  'Your listing needs changes': 'Votre annonce doit être modifiée',
+  'Your report was reviewed': 'Votre signalement a été examiné',
+  'A listing of yours was suspended': 'Une de vos annonces a été suspendue',
+  'Your listing was restored': 'Votre annonce a été rétablie',
+  'Your account was suspended': 'Votre compte a été suspendu',
+  'Your account was restored': 'Votre compte a été rétabli',
+  'Price dropped on a saved rental': 'Baisse de prix sur une location enregistrée',
+  'A saved rental is no longer available': 'Une location enregistrée n’est plus disponible',
+  'Your booking request was declined': 'Votre demande de réservation a été refusée',
+  'Your booking request was accepted. Confirm it to book.':
+    'Votre demande a été acceptée. Confirmez-la pour réserver.',
+  'A booking was confirmed': 'Une réservation a été confirmée',
+  'Your booking was cancelled': 'Votre réservation a été annulée',
+  'A booking was cancelled': 'Une réservation a été annulée',
+  'Your booking request expired': 'Votre demande de réservation a expiré',
+  'A booking request expired': 'Une demande de réservation a expiré',
+  'The place was booked by someone else': 'Le logement a été réservé par quelqu’un d’autre',
+  'Your listing was paused': 'Votre annonce a été mise en pause',
+  'Is your place still available?': 'Votre logement est-il toujours disponible ?',
+  'You have a new review': 'Vous avez un nouvel avis',
+  'The landlord replied to your review': 'Le propriétaire a répondu à votre avis',
+
+  // Reviews
+  'Review this renter': 'Évaluer ce locataire',
+  'Post reply': 'Publier la réponse',
+  'Your reply': 'Votre réponse',
+  'Another date': 'Autre date',
 };

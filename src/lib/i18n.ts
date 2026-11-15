@@ -51,13 +51,27 @@ export async function setLanguage(language: Language): Promise<void> {
   if (error) throw error;
 }
 
-export type Translate = (text: string) => string;
+export type Translate = (text: string, values?: Record<string, string | number>) => string;
 
-/** `const t = useT()` then `t('Save')`. Unknown text comes back unchanged. */
+/**
+ * `const t = useT()` then `t('Save')`, or `t('{n} saved', { n: 3 })` for
+ * text with a number or a name in it. The template is the dictionary key, so
+ * the French line carries the same `{n}`. Unknown text comes back unchanged.
+ */
 export function useT(): Translate {
   const { session } = useAuth();
   const language = languageOf(session);
-  return useCallback((text: string) => (language === 'fr' ? (FR[text] ?? text) : text), [language]);
+  return useCallback(
+    (text: string, values?: Record<string, string | number>) => {
+      const template = language === 'fr' ? (FR[text] ?? text) : text;
+      return values
+        ? template.replace(/\{(\w+)\}/g, (whole, key) =>
+            key in values ? String(values[key]) : whole,
+          )
+        : template;
+    },
+    [language],
+  );
 }
 
 export function useLanguage(): Language {

@@ -96,9 +96,16 @@ function SignedInEditListing({ userId }: { userId: string }) {
   >([]);
   const [newImages, setNewImages] = useState<PickedImage[]>([]);
   const [photoProgress, setPhotoProgress] = useState<string | null>(null);
-  // The photo the landlord moved to the front, if they did. Staged like every
-  // other photo change, and written on Save.
-  const [coverId, setCoverId] = useState<string | null>(null);
+  /** Swaps a kept photo with its neighbour. Staged, like every photo change. */
+  function movePhoto(index: number, by: -1 | 1) {
+    setKeptImages((current) => {
+      const target = index + by;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
   const autoDescribe = useAutoDescribe();
 
   if (isPending) return <LoadingState label="Loading listing…" />;
@@ -181,18 +188,25 @@ function SignedInEditListing({ userId }: { userId: string }) {
         setRemovedImages([]);
       }
 
-      // The cover is whichever photo has the lowest position, so making one
-      // the cover is giving it a position below all the others: one update,
-      // no renumbering, and no collision with the unique (listing, position)
-      // constraint. Positions may go negative; only their order means anything.
-      if (coverId && keptImages[0]?.id === coverId) {
-        const lowest = Math.min(...listing!.listing_images.map((i) => i.position));
-        const { error: coverError } = await supabase
-          .from('listing_images')
-          .update({ position: lowest - 1 })
-          .eq('id', coverId);
-        if (coverError) throw coverError;
-        setCoverId(null);
+      // Photos are ordered by `position`, which is unique per listing, so
+      // renumbering in place would collide partway through. Instead the whole
+      // kept set is written to fresh positions below every existing one, in
+      // the order the landlord left them. Positions may go negative; only
+      // their order means anything. Skipped when nothing moved.
+      const before = listing!.listing_images
+        .filter((i) => keptImages.some((k) => k.id === i.id))
+        .map((i) => i.id);
+      if (before.join() !== keptImages.map((k) => k.id).join()) {
+        setPhotoProgress('Saving photo order…');
+        const base =
+          Math.min(...listing!.listing_images.map((i) => i.position)) - keptImages.length;
+        for (let i = 0; i < keptImages.length; i++) {
+          const { error: orderError } = await supabase
+            .from('listing_images')
+            .update({ position: base + i })
+            .eq('id', keptImages[i].id);
+          if (orderError) throw orderError;
+        }
       }
 
       if (newImages.length > 0) {
@@ -266,7 +280,8 @@ function SignedInEditListing({ userId }: { userId: string }) {
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Photos</Text>
           <Text style={styles.help}>
-            The first photo is what tenants see in the feed.
+            The first photo is what tenants see in the feed. Use the arrows to
+            change the order.
             {reviewWarning ? ' Adding or removing a photo sends the listing back for review.' : ''}
           </Text>
 
@@ -290,23 +305,37 @@ function SignedInEditListing({ userId }: { userId: string }) {
                 >
                   <Ionicons name="close" size={14} color={colors.white} />
                 </Pressable>
-                {index === 0 ? (
+                {index === 0 && (
                   <View style={styles.coverBadge}>
                     <Text style={styles.coverText}>Cover</Text>
                   </View>
-                ) : (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Make photo ${index + 1} the cover`}
-                    style={[styles.coverBadge, styles.makeCover]}
-                    onPress={() => {
-                      setKeptImages((c) => [img, ...c.filter((k) => k.id !== img.id)]);
-                      setCoverId(img.id);
-                    }}
-                  >
-                    <Text style={[styles.coverText, styles.makeCoverText]}>Make cover</Text>
-                  </Pressable>
                 )}
+                {/* Earlier and later, so any order is reachable. The first
+                    photo is the cover, so "earlier" is also how one becomes it. */}
+                <View style={styles.moveRow}>
+                  {index > 0 && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Move photo ${index + 1} earlier`}
+                      hitSlop={6}
+                      style={styles.moveButton}
+                      onPress={() => movePhoto(index, -1)}
+                    >
+                      <Ionicons name="chevron-back" size={14} color={colors.softBlack} />
+                    </Pressable>
+                  )}
+                  {index < keptImages.length - 1 && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Move photo ${index + 1} later`}
+                      hitSlop={6}
+                      style={styles.moveButton}
+                      onPress={() => movePhoto(index, 1)}
+                    >
+                      <Ionicons name="chevron-forward" size={14} color={colors.softBlack} />
+                    </Pressable>
+                  )}
+                </View>
               </View>
             ))}
 
@@ -581,8 +610,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  makeCover: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.softBlack },
-  makeCoverText: { color: colors.softBlack },
+  moveRow: { position: 'absolute', bottom: 4, right: 4, flexDirection: 'row', gap: 4 },
+  moveButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.softBlack,
+  },
   aiAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   aiActionLabel: { fontFamily: fontFamily.semibold, fontSize: fontSize.sm, color: colors.softBlack },
   coverBadge: {

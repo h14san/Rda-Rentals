@@ -438,3 +438,8 @@ enabled = true
 # The three AI functions have no block and keep the default (JWT required).
 [functions.send-push]
 verify_jwt = false
+
+# send-sms is called by Supabase Auth (the Send SMS hook), which signs the
+# request instead of sending a user JWT. The function verifies that signature.
+[functions.send-sms]
+verify_jwt = false

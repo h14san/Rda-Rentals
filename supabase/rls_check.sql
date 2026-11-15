@@ -31,6 +31,8 @@ declare
     '250788123456',
     '250 788 123 456',
     'my number is 788123456',
+    'or 788 123 456 after six',
+    '788-123-456',
     '+254 712 345 678',
     'write to me.name+rent@example.co.rw',
     'dial *182*1*1*0788123456*5000# now',
@@ -50,7 +52,9 @@ declare
     'KG 123 St, near the market',
     'Call me after 7',
     'Is 7 pm ok? I finish at 6:30',
-    'the room is 3 * 4 metres'
+    'the room is 3 * 4 metres',
+    'Rent is 780000 800 for security',
+    '780 000 or 800 000'
   ];
   must_flag text[] := array[
     'see https://example.com/house',
@@ -123,6 +127,7 @@ declare
   user_d uuid := 'aaaaaaaa-0000-4000-8000-0000000000d4';
   booking uuid;
   completed_booking uuid;
+  the_review uuid;
   a_active_listing uuid;
   a_draft_listing uuid;
   visible int;
@@ -473,7 +478,7 @@ begin
   -- 11. Verification, as C (staff).
   perform set_config(
     'request.jwt.claims',
-    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
     true
   );
 
@@ -702,7 +707,7 @@ begin
   --     As C (staff): triage, then suspend through the report.
   perform set_config(
     'request.jwt.claims',
-    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
     true
   );
 
@@ -794,7 +799,7 @@ begin
   --     As C: restore returns it to what it was (rented), never to published.
   perform set_config(
     'request.jwt.claims',
-    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
     true
   );
 
@@ -868,7 +873,7 @@ begin
 
   perform set_config(
     'request.jwt.claims',
-    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
     true
   );
 
@@ -1047,7 +1052,7 @@ begin
   --     As C: a stranger, even one with a staff role, reads and writes nothing.
   perform set_config(
     'request.jwt.claims',
-    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
     true
   );
 
@@ -1185,7 +1190,7 @@ begin
   --     through an open report, with the original text, and is logged.
   perform set_config(
     'request.jwt.claims',
-    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
     true
   );
 
@@ -1256,7 +1261,7 @@ begin
 
   perform set_config(
     'request.jwt.claims',
-    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
     true
   );
   perform public.restrict_account(user_a, 'restore', 'Lifted for the rest of the check.');
@@ -1465,7 +1470,7 @@ begin
   --     As C: reads the log and the counts, but roles are an admin's call.
   perform set_config(
     'request.jwt.claims',
-    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
     true
   );
 
@@ -1501,7 +1506,7 @@ begin
   --     As D: grants and revokes, sees the staff list, cannot strand the project.
   perform set_config(
     'request.jwt.claims',
-    json_build_object('sub', user_d, 'role', 'authenticated')::text,
+    json_build_object('sub', user_d, 'role', 'authenticated', 'aal', 'aal2')::text,
     true
   );
 
@@ -1591,7 +1596,7 @@ begin
   --     As C: approve again. The reason is settled.
   perform set_config(
     'request.jwt.claims',
-    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
     true
   );
   perform public.decide_verification(
@@ -1643,7 +1648,7 @@ begin
   --     b_listing published with two badges, as they did before this step.
   perform set_config(
     'request.jwt.claims',
-    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
     true
   );
   perform public.decide_verification(
@@ -1950,7 +1955,7 @@ begin
 
   perform set_config(
     'request.jwt.claims',
-    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
     true
   );
 
@@ -2127,6 +2132,136 @@ begin
   );
   if not public.has_role('verifier') then
     raise exception 'FAIL: staff who passed the second factor lost their role.';
+  end if;
+
+  -- 24. Follow-ups. Still C (aal2) from step 23.
+  --     A staff role without the second factor counts for nothing, enrolled or not.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_d, 'role', 'authenticated')::text,
+    true
+  );
+  if public.has_role('admin') then
+    raise exception 'FAIL: an admin with no second factor in the session kept the role.';
+  end if;
+  begin
+    perform public.staff_stats();
+    raise exception 'FAIL: staff read the console without the second factor.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  --     A case no longer names who decided it.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+  select count(*) into visible from public.verification_cases where decided_by is not null;
+  if visible <> 0 then
+    raise exception 'FAIL: user B can read which staff member decided % of its cases.', visible;
+  end if;
+
+  --     B (landlord) replies once to A's review, and reviews A as a renter.
+  select id into the_review from public.reviews where booking_id = completed_booking;
+
+  begin
+    perform public.reply_to_review(the_review, '   ');
+    raise exception 'FAIL: an empty reply was accepted.';
+  exception
+    when invalid_parameter_value then null;
+  end;
+
+  perform public.reply_to_review(the_review, 'Thank you. The caretaker is on 0788 123 456.');
+  if not exists (
+    select 1 from public.reviews where id = the_review and reply is not null and reply not like '%0788%'
+  ) then
+    raise exception 'FAIL: a reply was not stored, or kept a phone number.';
+  end if;
+
+  begin
+    perform public.reply_to_review(the_review, 'One more thing');
+    raise exception 'FAIL: a landlord replied to one review twice.';
+  exception
+    when object_not_in_prerequisite_state then null;
+  end;
+
+  begin
+    perform public.remove_review(the_review, 'I do not like it');
+    raise exception 'FAIL: a landlord removed a review of their own place.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  perform public.submit_tenant_review(completed_booking, 5, 'Paid on time.');
+
+  begin
+    perform public.submit_tenant_review(completed_booking, 1, 'Second thoughts');
+    raise exception 'FAIL: one renter was reviewed twice for one rental.';
+  exception
+    when object_not_in_prerequisite_state then null;
+  end;
+
+  --     As A: cannot reply to their own review or review themselves as a
+  --     renter, and can read what was written about them.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+
+  begin
+    perform public.reply_to_review(the_review, 'Replying to myself');
+    raise exception 'FAIL: the author replied to their own review as the landlord.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.submit_tenant_review(completed_booking, 5, 'I am a model tenant');
+    raise exception 'FAIL: a renter wrote their own tenant review.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  select count(*) into visible from public.tenant_reviews where renter_id = user_a;
+  if visible <> 1 then
+    raise exception 'FAIL: a renter cannot read the review written about them.';
+  end if;
+
+  --     As C: a landlord with no booking from A sees nothing of A's standing;
+  --     as staff (aal2), C removes the review, with a note, and it disappears.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    true
+  );
+  select count(*) into visible from public.tenant_reviews;
+  if visible <> 0 then
+    raise exception 'FAIL: a stranger can read a renter''s tenant reviews.';
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
+    true
+  );
+  begin
+    perform public.remove_review(the_review, null);
+    raise exception 'FAIL: staff removed a review without a note.';
+  exception
+    when invalid_parameter_value then null;
+  end;
+  perform public.remove_review(the_review, 'Names a third party.');
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+  select count(*) into visible from public.reviews where id = the_review;
+  if visible <> 0 then
+    raise exception 'FAIL: a removed review is still public.';
   end if;
 
   -- 8. Anonymous users see published listings only.

@@ -353,7 +353,7 @@ make.
 | Item | Blocks | Status |
 |---|---|---|
 | FCM `google-services.json` + EAS project, APNs key | Push delivery (M3) | `eas.json` and the client are in place. Steps below |
-| Pindo account, API token, sender ID | Phone OTP | Decided, not started |
+| Pindo account, API token, sender ID | Phone OTP | Function built and deployed. Steps below |
 | A monitored support inbox | Appeals and deletion requests (M5) | Set `EXPO_PUBLIC_SUPPORT_EMAIL`; until then the help screens say support is being set up |
 | Data residency (Rwanda DPP law, §50) | Any real user data, especially IDs | Legal question |
 | Evidence retention period | Purge job for ID photos | Undecided |
@@ -396,3 +396,25 @@ created_at desc limit 5;`. A null `pushed_at` means `send-push` was never
 reached (check that the `pg_net` extension is enabled). A set one with no
 banner means Expo or FCM refused it: look at the `send-push` logs in the
 Supabase dashboard.
+
+### Turning phone sign-in on (owner steps)
+
+The `send-sms` function is deployed and does nothing until these are done.
+
+1. **Open a Pindo account** at <https://www.pindo.io>, add credit, and register
+   a sender ID (the name the SMS comes from, for example `RwRentals`).
+2. **Copy the API token** from the Pindo dashboard's Security page.
+3. **Enable the hook.** Supabase dashboard → Authentication → Hooks → Send SMS
+   hook → HTTPS, URL
+   `https://urfmftxepopqmhhmzpqh.supabase.co/functions/v1/send-sms`. Generate
+   the secret there and copy it (it starts `v1,whsec_`).
+4. **Set the three secrets:**
+   `npx supabase secrets set SEND_SMS_HOOK_SECRET="v1,whsec_…" PINDO_API_TOKEN="…" PINDO_SENDER_ID="RwRentals"`
+5. **Allow phone sign-ups.** Dashboard → Authentication → Providers → Phone:
+   enable it. (Do not run `supabase config push` for this; see `CLAUDE.md`.)
+6. **Switch the app.** Put `EXPO_PUBLIC_AUTH_CHANNEL=phone` in `.env` and
+   restart the dev server. The sign-in screen then asks for a phone number.
+7. **Test** with your own number. If no SMS arrives, the `send-sms` logs in
+   the Supabase dashboard say whether Pindo refused it and why.
+
+The SMS code is 6 digits; the app already expects that for the phone channel.

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -16,6 +16,7 @@ import {
   listingFacts,
   listingTermRows,
 } from '@/features/listings/types';
+import { useMyListingSuspensions } from '@/features/moderation/queries';
 import { AMENITY_LABELS, knownAmenities } from '@/lib/amenities';
 import { openPhoneCall, openWhatsApp } from '@/lib/contact';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
@@ -39,6 +40,10 @@ const DESCRIPTION_TRUNCATE_AT = 240;
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
+  const router = useRouter();
+  // RLS returns only suspensions of the caller's own listings, so for anyone
+  // but the owner this map is empty.
+  const suspensions = useMyListingSuspensions(session?.user.id ?? '');
   const favorites = useFavoriteControl(session?.user.id ?? null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const { data: listing, isPending, isError, error, refetch } = useListingDetail(id);
@@ -70,6 +75,8 @@ export default function ListingDetailScreen() {
   };
 
   const facts = listingFacts(listing);
+  const suspension =
+    listing.status === 'suspended' ? suspensions.data?.get(listing.id) : undefined;
   const amenities = knownAmenities(listing.amenities);
 
   return (
@@ -131,6 +138,11 @@ export default function ListingDetailScreen() {
               <Text style={styles.statusText}>
                 This listing is {LISTING_STATUS_LABELS[listing.status].toLowerCase()}.
               </Text>
+              {!!suspension && (
+                <Text style={styles.statusNote}>
+                  Rwanda Rentals suspended it: {suspension.note}
+                </Text>
+              )}
             </View>
           )}
 
@@ -192,6 +204,22 @@ export default function ListingDetailScreen() {
                   </Text>
                 </Pressable>
               )}
+            </View>
+          )}
+
+          {!!listing.profiles && (
+            <View style={styles.section}>
+              <SectionTitle>Listed by</SectionTitle>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push(`/user/${listing.owner_id}`)}
+                style={({ pressed }) => [styles.landlordRow, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={styles.termValue}>
+                  {listing.profiles.full_name ?? 'Rwanda Rentals user'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+              </Pressable>
             </View>
           )}
 
@@ -263,6 +291,22 @@ export default function ListingDetailScreen() {
                 exact address.
               </Text>
             </View>
+          )}
+
+          {!isOwner && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                router.push({
+                  pathname: '/report',
+                  params: { type: 'listing', id: listing.id },
+                })
+              }
+              style={styles.reportLink}
+            >
+              <Ionicons name="flag-outline" size={16} color={colors.muted} />
+              <Text style={styles.reportText}>Report this listing</Text>
+            </Pressable>
           )}
         </View>
       </ScrollView>
@@ -337,6 +381,25 @@ const styles = StyleSheet.create({
     ...type.label,
     color: colors.charcoal,
   },
+
+  statusNote: { ...type.meta, marginTop: spacing.xs },
+  landlordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  reportLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+  },
+  reportText: { ...type.meta, textDecorationLine: 'underline' },
 
   factRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   factPill: {

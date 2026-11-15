@@ -14,7 +14,8 @@ Storage) · TanStack Query · react-native-maps.
 **Built:** auth (email OTP), feed, filters, detail, posting, editing, profile,
 and the three AI features (assistant, natural-language search,
 photo-to-description). The exact location is private (Phase 1 below). There are
-no tests and no CI.
+no unit tests. CI (`.github/workflows/ci.yml`) typechecks and lints every push;
+it never touches the database.
 
 ## Source docs: the Blueprint wins
 
@@ -82,8 +83,11 @@ The plan maps the Blueprint's phases onto what was already built:
   landlord ID verification with in-app document upload, listing review, specific
   badges, and staff review screens in the app (`/review`). Branch
   `feat/phase-3a-verification`.
-- **Phase 3, rest:** reports, moderation actions (suspend/restore), in-app chat
-  (which removes WhatsApp), push, and the rest of the admin console.
+- **Phase 3b (done, live 2026-11-15):** reports, and the moderation actions
+  (suspend/restore a listing, restrict/restore an account) with a staff
+  reports queue at `/staff/reports`.
+- **Phase 3, rest:** in-app chat (which removes WhatsApp), notifications and
+  push, and the rest of the admin console.
 - **Phase 4:** booking (Instant Book + Request to Book).
 - **Later:** AI matching and alerts, payments, digital rental, and agencies.
 
@@ -99,6 +103,21 @@ Decisions taken 2026-11-12 (details in the work plan):
   web app.
 - Contact details in chat are **masked server-side** (`•••`) until a booking
   is confirmed. The original text is readable by staff only.
+
+Decisions taken by the model under the work plan's authority. The owner can
+overturn any of them:
+- **2026-11-15, one staff role moderates.** `verifier` (and `admin`) handle
+  reports and suspensions as well as verification. A separate moderator role
+  would be a third thing to grant with no second person to hold it yet.
+  Restricting a *staff* account is admin-only.
+- **2026-11-15, the reporter is told the outcome, not the reason given to the
+  landlord.** A report closed by an action shows fixed words ("We suspended
+  the listing"). The note staff write for the landlord is never shown to the
+  reporter, and the reverse.
+- **2026-11-15, at most 10 reports per account per 24 hours**, on top of one
+  live report per target.
+- **2026-11-15, a public landlord page exists** (`/user/[id]`): name, join
+  year, the ID badge and live listings. No contact details.
 
 ### Open non-code decisions
 
@@ -335,7 +354,43 @@ trigger, so a client can't backdate or pre-date a confirmation. "Still
 available" therefore sends any value; it is the change that counts.
 
 **`listing_status_history` is written only by trigger** and is readable only by
-the owner. There are deliberately no write policies.
+the owner. There are deliberately no write policies. `changed_by` is filled
+only when the owner made the change. The owner reads this table and anyone
+signed in reads `profiles`, so a staff id there was a name; staff actions are
+attributed in the staff-only logs instead. (`verification_cases.decided_by`
+still has this leak to the case's owner. Fixing it needs a column-level
+revoke, which breaks `select *`.)
+
+**A report never reaches the reported party.** `reports` has a select policy
+for the reporter and for staff, and none for the target, so they learn neither
+who reported them nor that anyone did. `reports.target_id` is polymorphic with
+no foreign key, so one queue covers listings, users and messages, and a report
+outlives its target. The insert trigger runs as the caller, so "does the
+target exist" is answered through RLS: a listing you cannot see cannot be
+reported, which stops reporting from being a probe for hidden listings.
+
+**A report has two notes for two readers.** `resolution_note` goes to the
+reporter. The note on a suspension or restriction goes to the affected user.
+`action_taken` lets the reporter's screen say what happened without either
+note crossing over.
+
+**Restrictions and suspensions are their own tables** (`account_restrictions`,
+`listing_suspensions`), one row per event, kept after lifting, so the history
+is the table. Neither names the actor, because the affected user reads them.
+The actor is in `moderation_events`, which is staff-only and written only by
+the functions.
+
+**A restricted account's listings keep their status.** They leave public reads
+through `is_restricted(owner_id)` in the two listings select policies, so
+lifting the restriction puts every listing back exactly as it was.
+`is_restricted` is security definer and callable by anon, because the anon
+feed evaluates the policy. `listing_images` and `favorites` decide visibility
+by querying `listings`, so they inherit this without their own change.
+
+**Restoring a listing returns it to the status before the suspension**, read
+from `listing_status_history`, never straight to `published`. It also does
+not re-stamp `availability_confirmed_at`: coming back from a suspension is not
+the landlord confirming anything.
 
 **Unstated rental terms match filters.** `maxMinRentalMonths` and
 `availableBy` are built as `or=(col.is.null,col.lte.X)`, because a landlord who
@@ -358,7 +413,10 @@ from `src/lib/maps.ts`.
 
 **Typed routes come from the dev server.** A new route file isn't a valid
 `router.push` target for `tsc` until `.expo/types/router.d.ts` is regenerated
-by `npx expo start` (it was, for `/compare`).
+by `npx expo start`. Starting it is enough; nothing has to bundle:
+`npx expo start --offline --max-workers 1 --port 8099`, wait a few seconds for
+the file to change, then kill the process. CI has no such file, so there typed
+routes are simply not enforced.
 
 **Amenity keys exist in two copies:** `src/lib/amenities.ts` and
 `supabase/functions/_shared/filters.ts`. The function's copy is a schema enum,
@@ -518,6 +576,10 @@ src/
     compare.tsx             2–4 listings side by side
     verify-identity.tsx     landlord ID upload (not (auth)/verify, the OTP step)
     review/                 staff queue + case decision
+    staff/reports/          staff reports queue + report detail and actions
+    report.tsx              report form (modal): /report?type=listing|user&id=
+    my-reports.tsx          the reporter's own reports and their outcome
+    user/[id].tsx           a landlord as others see them; no contact details
     listing/[id].tsx        detail + map + WhatsApp CTA
     listing/edit/[id].tsx   edit fields + photos (flat form, not the wizard)
     filters.tsx             filter sheet (modal)
@@ -526,6 +588,8 @@ src/
     listings/               types, queries, create, filters-context,
                             smart-search, chat, auto-describe
     verification/           badge labels, case queries, evidence upload
+    moderation/             report reasons, report + moderation queries
+    profile/                public profile query
   lib/                      supabase, auth, contact, format, locations,
                             edge-functions, images (pick + compress)
   theme/                    colour, spacing, radius, shadow tokens
@@ -543,6 +607,8 @@ supabase/
   migrations/20261024140000_favorites.sql        favorites + saved visibility
   migrations/20261110120000_roles_and_verification.sql  roles, cases, badges,
                                                   review gate, evidence bucket
+  migrations/20261115120000_reports_and_moderation.sql  reports, restrictions,
+                                                  suspensions, moderation log
   seed.sql                  15 demo Kigali listings (no photos — nothing in
                             the storage bucket to point at until a real upload)
   rls_check.sql             security assertions

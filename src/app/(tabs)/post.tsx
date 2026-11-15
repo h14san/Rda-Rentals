@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
+import { EmptyState } from '@/components/states';
 import { Button, Chip, SectionTitle, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
 import {
@@ -34,6 +35,7 @@ import {
   type PickedImage,
 } from '@/features/listings/create';
 import { listingKeys } from '@/features/listings/queries';
+import { useMyRestriction } from '@/features/moderation/queries';
 import { useMyIdentity } from '@/features/verification/queries';
 import { ListingTermsFields, validateTerms } from '@/features/listings/terms-fields';
 import {
@@ -65,7 +67,24 @@ export default function PostListingScreen() {
   // Null for a render after sign-out: tabs stay mounted until AuthGate's
   // redirect effect runs. See ProfileScreen.
   if (!session) return null;
-  return <SignedInPostListing userId={session.user.id} />;
+  return <PostGate userId={session.user.id} />;
+}
+
+/**
+ * A suspended account cannot post: the insert policy refuses it. Saying so
+ * here beats letting someone fill in five steps and fail on the last one.
+ */
+function PostGate({ userId }: { userId: string }) {
+  const restriction = useMyRestriction(userId);
+  if (restriction.data) {
+    return (
+      <EmptyState
+        title="Your account is suspended"
+        message={`${restriction.data.note} You cannot post new listings until this is lifted.`}
+      />
+    );
+  }
+  return <SignedInPostListing userId={userId} />;
 }
 
 function SignedInPostListing({ userId }: { userId: string }) {

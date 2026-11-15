@@ -23,6 +23,7 @@ import {
   useMyListingCases,
   useResubmitListing,
 } from '@/features/verification/queries';
+import { useMyListingSuspensions, useMyRestriction } from '@/features/moderation/queries';
 import { CASE_STATUS_LABELS, PROFILE_BADGE_LABELS } from '@/features/verification/types';
 import { formatRwandanPhone, normalizeRwandanPhone, signOut } from '@/lib/auth';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
@@ -44,6 +45,8 @@ function SignedInProfile({ userId }: { userId: string }) {
   const listingCases = useMyListingCases(userId);
   const resubmit = useResubmitListing(userId);
   const identityCase = identity.data?.latestCase ?? null;
+  const restriction = useMyRestriction(userId);
+  const suspensions = useMyListingSuspensions(userId);
 
   const { data: listings, isPending, isError, error, refetch } = useMyListings(userId);
   const setStatus = useSetListingStatus(userId);
@@ -102,6 +105,17 @@ function SignedInProfile({ userId }: { userId: string }) {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
+      {!!restriction.data && (
+        <View style={styles.notice}>
+          <Text style={styles.noticeTitle}>Your account is suspended</Text>
+          <Text style={styles.noticeBody}>{restriction.data.note}</Text>
+          <Text style={styles.noticeBody}>
+            Your listings are hidden and you cannot post new ones until this is
+            lifted.
+          </Text>
+        </View>
+      )}
+
       <View style={styles.card}>
         {editing ? (
           <View style={styles.editForm}>
@@ -173,11 +187,20 @@ function SignedInProfile({ userId }: { userId: string }) {
       </View>
 
       {isStaff && (
-        <Button
-          label="Review queue"
-          variant="secondary"
-          onPress={() => router.push('/review')}
-        />
+        <View style={styles.row}>
+          <Button
+            label="Review queue"
+            variant="secondary"
+            style={styles.flex}
+            onPress={() => router.push('/review')}
+          />
+          <Button
+            label="Reports"
+            variant="secondary"
+            style={styles.flex}
+            onPress={() => router.push('/staff/reports')}
+          />
+        </View>
       )}
 
       <View style={styles.section}>
@@ -247,6 +270,11 @@ function SignedInProfile({ userId }: { userId: string }) {
                       <Text style={styles.listingMeta}>
                         {CASE_STATUS_LABELS[review.status]}
                         {review.decision_note ? `: ${review.decision_note}` : ''}
+                      </Text>
+                    )}
+                    {listing.status === 'suspended' && suspensions.data?.has(listing.id) && (
+                      <Text style={styles.listingMeta}>
+                        Suspended by Rwanda Rentals: {suspensions.data.get(listing.id)!.note}
                       </Text>
                     )}
                     {isLive && !!listing.availability_confirmed_at && (
@@ -332,6 +360,12 @@ function SignedInProfile({ userId }: { userId: string }) {
       </View>
 
       <Button
+        label="Your reports"
+        variant="secondary"
+        onPress={() => router.push('/my-reports')}
+      />
+
+      <Button
         label="Sign out"
         variant="ghost"
         onPress={() =>
@@ -359,6 +393,23 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     gap: spacing.sm,
+  },
+  notice: {
+    gap: spacing.xs,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.danger,
+  },
+  noticeTitle: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.md,
+    color: colors.danger,
+  },
+  noticeBody: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    color: colors.charcoal,
   },
   editForm: { gap: spacing.md },
   identityRow: { gap: spacing.sm },

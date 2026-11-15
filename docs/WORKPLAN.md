@@ -211,7 +211,7 @@ reads nothing, and WhatsApp is gone from the app.
 
 ---
 
-## M3: Notifications (Phase 3d)
+## M3: Notifications (Phase 3d) — DONE 2026-11-17, push delivery waits on credentials
 
 Blueprint §37. Features #47, #48.
 
@@ -352,8 +352,46 @@ make.
 
 | Item | Blocks | Status |
 |---|---|---|
-| FCM `google-services.json` + EAS project, APNs key | Push delivery (M3) | EAS CLI signed in as `finnadosome` (2026-11-12). No `eas.json` and no FCM file yet |
+| FCM `google-services.json` + EAS project, APNs key | Push delivery (M3) | `eas.json` and the client are in place. Steps below |
 | Pindo account, API token, sender ID | Phone OTP | Decided, not started |
 | Data residency (Rwanda DPP law, §50) | Any real user data, especially IDs | Legal question |
 | Evidence retention period | Purge job for ID photos | Undecided |
 | Device testing on a dev build | Map, push, realtime on real networks | Manual |
+
+### Turning push on (owner steps, about 20 minutes)
+
+Everything else is built and deployed. These need your accounts.
+
+1. **Create the EAS project.** In the repo: `npx eas-cli@latest init`. Accept
+   the project name. It writes `extra.eas.projectId` into `app.json`. Commit
+   that change.
+2. **Create a Firebase project** at <https://console.firebase.google.com>
+   (free; Analytics is not needed).
+3. **Add an Android app** to it with package name `rw.rwandarentals.app`.
+   Download `google-services.json` and put it in the repo root, next to
+   `app.json`. Commit it (it is a client config, not a secret).
+   `app.config.ts` picks it up by itself.
+4. **Create the FCM V1 key.** Firebase Console → Project settings → Service
+   accounts → Generate new private key. This JSON **is** a secret: do not put
+   it in the repo.
+5. **Upload it to EAS.** `npx eas-cli@latest credentials` → Android →
+   development (repeat for production later) → Google Service Account →
+   "Manage your Google Service Account Key for Push Notifications (FCM V1)" →
+   upload the JSON from step 4. Delete your local copy afterwards.
+6. **Build a development client:**
+   `npx eas-cli@latest build --profile development --platform android`,
+   install the APK, then `npx expo start --dev-client --max-workers 1`.
+7. **Test.** Sign in on the phone, open a listing from a second account and
+   send a message, and accept the permission prompt. Then
+   `select * from push_tokens;` in the SQL editor should show one row. Close
+   the app and send it a message from the other account: the phone should
+   show it, and tapping it should open the conversation.
+
+iOS additionally needs a paid Apple Developer account. `eas build` offers to
+create the APNs key on the first iOS build; say yes.
+
+If nothing arrives: `select id, kind, pushed_at from notifications order by
+created_at desc limit 5;`. A null `pushed_at` means `send-push` was never
+reached (check that the `pg_net` extension is enabled). A set one with no
+banner means Expo or FCM refused it: look at the `send-push` logs in the
+Supabase dashboard.

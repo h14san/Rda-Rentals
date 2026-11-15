@@ -96,6 +96,11 @@ function AuthGate() {
         options={{ title: 'Reported conversation' }}
       />
       <Stack.Screen name="conversation/[id]" options={{ title: '' }} />
+      <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
+      <Stack.Screen
+        name="notification-settings"
+        options={{ title: 'Notification settings' }}
+      />
       <Stack.Screen name="user/[id]" options={{ title: '' }} />
       <Stack.Screen name="my-reports" options={{ title: 'Your reports' }} />
       <Stack.Screen name="report" options={{ presentation: 'modal', title: 'Report' }} />

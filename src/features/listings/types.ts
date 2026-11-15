@@ -8,6 +8,11 @@ import type {
   UserBlockRow,
 } from '@/features/messaging/types';
 import type {
+  NotificationPreferencesRow,
+  NotificationRow,
+  PushTokenRow,
+} from '@/features/notifications/types';
+import type {
   AccountRestrictionRow,
   ListingSuspensionRow,
   ModerationAction,
@@ -414,6 +419,26 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // Written only by notify_user(); a user may mark their own read.
+      notifications: {
+        Row: NotificationRow;
+        Insert: never;
+        Update: { read_at: string };
+        Relationships: [];
+      };
+      // Written only by register_push_token() / unregister_push_token().
+      push_tokens: {
+        Row: PushTokenRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      notification_preferences: {
+        Row: NotificationPreferencesRow;
+        Insert: Partial<NotificationPreferencesRow> & { user_id: string };
+        Update: Partial<NotificationPreferencesRow>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -432,6 +457,11 @@ export type Database = {
         Args: { p_listing_id: string };
         Returns: { address: string | null; latitude: number | null; longitude: number | null }[];
       };
+      register_push_token: {
+        Args: { p_token: string; p_platform: 'android' | 'ios' };
+        Returns: undefined;
+      };
+      unregister_push_token: { Args: { p_token: string }; Returns: undefined };
       start_conversation: { Args: { p_listing_id: string }; Returns: string };
       staff_report_conversation: { Args: { p_report_id: string }; Returns: StaffTranscript };
       triage_report: {

@@ -36,6 +36,8 @@ import {
   MAX_MESSAGE_LENGTH,
   type MessageRow,
 } from '@/features/messaging/types';
+import { useClearMessageNotification } from '@/features/notifications/queries';
+import { registerForPush } from '@/lib/push';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
 
 export default function ConversationScreen() {
@@ -57,6 +59,7 @@ function Conversation({ id, userId }: { id: string; userId: string }) {
   const send = useSendMessage(id, userId);
   const { mutate: markRead } = useMarkRead(id, userId);
   const setState = useSetConversationState(id, userId);
+  const { mutate: clearNotification } = useClearMessageNotification(userId);
 
   const other = conversation.data ? otherParty(conversation.data, userId) : null;
   const blocked = useHasBlocked(userId, other?.id ?? null);
@@ -68,8 +71,11 @@ function Conversation({ id, userId }: { id: string; userId: string }) {
   // changes, so one that arrives while the screen is open is read too.
   const newestId = messages.data?.[0]?.id;
   useEffect(() => {
-    if (newestId) markRead();
-  }, [newestId, markRead]);
+    if (!newestId) return;
+    markRead();
+    // Reading the conversation also clears its line in the notifications list.
+    clearNotification(id);
+  }, [newestId, markRead, clearNotification, id]);
 
   if (conversation.isPending || messages.isPending)
     return <LoadingState label="Loading the conversation…" />;
@@ -89,7 +95,13 @@ function Conversation({ id, userId }: { id: string; userId: string }) {
     const body = draft.trim();
     if (!body || send.isPending) return;
     send.mutate(body, {
-      onSuccess: () => setDraft(''),
+      onSuccess: () => {
+        setDraft('');
+        // The moment someone has just asked a question is the moment "do you
+        // want to hear the answer?" explains itself. Asked once by the OS;
+        // after that this only refreshes the token.
+        void registerForPush({ prompt: true });
+      },
       // The draft stays in the box, so a failed send on a bad connection
       // costs a tap, not the message.
       onError: (e) => Alert.alert('Message not sent', e.message),

@@ -1,9 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/features/auth/context';
 import { useInboxRealtime, useUnreadCount } from '@/features/messaging/queries';
-import { colors } from '@/theme';
+import {
+  useNotificationsRealtime,
+  useUnreadNotificationCount,
+} from '@/features/notifications/queries';
+import { usePush } from '@/features/notifications/use-push';
+import { colors, spacing } from '@/theme';
 
 export default function TabsLayout() {
   const { session } = useAuth();
@@ -11,6 +17,10 @@ export default function TabsLayout() {
   // Mounted here, above every tab, so the badge is live wherever the user is.
   useInboxRealtime(userId);
   const unread = useUnreadCount(userId);
+  const router = useRouter();
+  useNotificationsRealtime(userId);
+  usePush(userId);
+  const unreadNotifications = useUnreadNotificationCount(userId);
 
   return (
     <Tabs
@@ -90,6 +100,30 @@ export default function TabsLayout() {
         options={{
           title: 'Profile',
           headerTitle: 'Your profile',
+          headerRight: () => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                unreadNotifications > 0
+                  ? `Notifications, ${unreadNotifications} unread`
+                  : 'Notifications'
+              }
+              hitSlop={8}
+              onPress={() => router.push('/notifications')}
+              style={styles.bell}
+            >
+              <Ionicons name="notifications-outline" size={24} color={colors.softBlack} />
+              {unreadNotifications > 0 && <View style={styles.bellDot} />}
+            </Pressable>
+          ),
+          // The dot on the tab is what tells someone on another tab to look.
+          tabBarBadge: unreadNotifications > 0 ? '' : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.softBlack,
+            minWidth: 10,
+            height: 10,
+            borderRadius: 5,
+          },
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" color={color} size={size} />
           ),
@@ -98,3 +132,18 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  bell: { marginRight: spacing.md },
+  bellDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.softBlack,
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+});

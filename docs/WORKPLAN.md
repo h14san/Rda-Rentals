@@ -278,7 +278,7 @@ notice. Keep the copy short and plain.
 
 ---
 
-## M6: Re-review after edits (open decision; decide it here)
+## M6: Re-review after edits (open decision; decide it here) — DONE 2026-11-19
 
 `CLAUDE.md` lists this as undecided. Recommended default, to implement unless
 it turns out to be wrong: changes to **location or photos** on an approved

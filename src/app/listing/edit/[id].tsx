@@ -130,6 +130,11 @@ function SignedInEditListing({ userId }: { userId: string }) {
   }
 
   const priceValue = Number.parseInt(price.replace(/[^\d]/g, ''), 10);
+  // Only an approved listing has anything to lose by a material edit. Saying
+  // so before the edit beats a listing that quietly leaves the feed after it.
+  const reviewWarning = ['published', 'paused', 'unavailable', 'rented'].includes(
+    listing.status,
+  );
   // Captured out of the closure: the early returns above narrow `listing`, but
   // that narrowing does not survive into an async callback.
   const listingId = listing.id;
@@ -231,6 +236,7 @@ function SignedInEditListing({ userId }: { userId: string }) {
           <Text style={styles.fieldLabel}>Photos</Text>
           <Text style={styles.help}>
             The first photo is what tenants see in the feed.
+            {reviewWarning ? ' Adding or removing a photo sends the listing back for review.' : ''}
           </Text>
 
           <View style={styles.thumbGrid}>
@@ -367,6 +373,12 @@ function SignedInEditListing({ userId }: { userId: string }) {
 
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>District</Text>
+          {reviewWarning && (
+            <Text style={styles.help}>
+              Changing the district, sector or address sends the listing back for
+              review, and its checks are done again.
+            </Text>
+          )}
           <View style={styles.chipWrap}>
             {KIGALI_DISTRICTS.map((d) => (
               <Chip

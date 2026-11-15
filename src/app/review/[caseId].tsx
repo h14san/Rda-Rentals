@@ -98,6 +98,13 @@ export default function ReviewCaseScreen() {
             {c.ownerHasIdentity ? 'ID checked' : 'ID not checked yet'}
           </Text>
         )}
+        {c.reopen_reason && (
+          <Text style={styles.warning}>
+            {c.reopen_reason === 'location'
+              ? 'Approved before. The landlord has since changed the location, and every earlier check was removed. Check it as a new property.'
+              : 'Approved before. The landlord has since changed the photos. "Details reviewed" was removed; the other checks stand unless you see a reason to doubt them.'}
+          </Text>
+        )}
       </View>
 
       {isListing && listing && (

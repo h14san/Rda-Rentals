@@ -126,6 +126,11 @@ overturn any of them:
   reporter, and the reverse.
 - **2026-11-15, at most 10 reports per account per 24 hours**, on top of one
   live report per target.
+- **2026-11-19, re-review after edits (was an open decision).** Changing the
+  **location or photos** of an approved listing sends it back to review.
+  **Rent, terms and description** do not. A location change removes all three
+  listing badges, because it is a different property. A photo change removes
+  only "Details reviewed", the one check that looked at the photos.
 - **2026-11-18, there is no support email in the app yet.** The help screens
   read `EXPO_PUBLIC_SUPPORT_EMAIL`. While it is unset they say support is
   being set up and point to Report, rather than print an address nobody reads
@@ -176,9 +181,6 @@ overturn any of them:
   undecided. `decided_at` is recorded so a purge job can be added; it has to
   delete through the Storage API, because deleting `storage.objects` rows in SQL
   leaves the files behind.
-- **Re-review after edits.** An approved listing can be edited freely and keeps
-  its badges. Whether a material edit (rent, location, photos) should send it
-  back to review is undecided.
 - **Phone OTP: decided 2026-10-30, use Pindo.** The plan is a Supabase Send SMS
   auth hook (an Edge Function) that calls Pindo, with no screen changes. It is
   not built yet. It still needs a Pindo account, an API token, a sender ID and
@@ -394,6 +396,21 @@ itself and raises `42501` otherwise. Because they run as their owner, the
 status trigger lets their moves through. A new staff function that forgets the
 role check is open to every signed-in user. `isStaff` in the auth context only
 decides which screens are shown.
+
+**A material edit is detected by triggers, not by the edit screen.**
+`listing_material_edit()` is called from triggers on `listing_locations`,
+`listing_images` and `listings.district/sector`, and only acts when
+`auth.uid()` is the owner. A published listing moves to `pending_review` at
+once. A paused, unavailable or rented one keeps its status and gets
+`review_reason`, and `listings_guard_status` turns its next "republish" into
+`pending_review`. Without that second half, pausing first would be a way
+around the rule. The landlord cannot write `review_reason`; staff approval
+clears it. The case carries `reopen_reason` so the reviewer sees why an
+approved listing is back.
+
+**Unchanged values are not an edit.** The edit screen upserts the location on
+every save, so the location trigger compares old and new. Reordering photos
+(`position`) is not a photo change.
 
 **Entering `pending_review` opens the review case by trigger**
 (`listings_open_review_case`), so submitting stays one update. Approving a
@@ -846,6 +863,8 @@ supabase/
                                       preferences, notify_user + its triggers
   migrations/20261118120000_staff_console.sql  set_staff_role, staff_audit_log,
                                       staff_stats, admin read of user_roles
+  migrations/20261119120000_re_review_after_edits.sql  review_reason,
+                                      material-edit triggers, guard update
   seed.sql                  15 demo Kigali listings (no photos — nothing in
                             the storage bucket to point at until a real upload)
   rls_check.sql             security assertions

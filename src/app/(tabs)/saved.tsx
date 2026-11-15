@@ -69,15 +69,26 @@ function SignedInSaved({ userId }: { userId: string }) {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.count}>
-          {data.length} saved
-          {selecting ? ` · ${selected.length} of ${COMPARE_MAX} selected` : ''}
+          {selecting
+            ? `Choose ${COMPARE_MIN} to ${COMPARE_MAX} · ${selected.length} chosen`
+            : `${data.length} saved`}
         </Text>
+        {/* A filled pill, not a text link: comparing is the reason to save
+            more than one place, and nobody found it as a link. */}
         {comparable.length >= COMPARE_MIN && (
           <Pressable
             accessibilityRole="button"
             onPress={selecting ? stopSelecting : () => setSelecting(true)}
+            style={({ pressed }) => [
+              styles.comparePill,
+              selecting && styles.comparePillQuiet,
+              pressed && { opacity: 0.8 },
+            ]}
           >
-            <Text style={styles.link}>{selecting ? 'Cancel' : 'Compare'}</Text>
+            {!selecting && <Ionicons name="git-compare-outline" size={16} color={colors.white} />}
+            <Text style={[styles.compareText, selecting && styles.compareTextQuiet]}>
+              {selecting ? 'Cancel' : 'Compare'}
+            </Text>
           </Pressable>
         )}
       </View>
@@ -218,8 +229,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  count: type.meta,
-  link: type.label,
+  count: type.bodyStrong,
+  comparePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.softBlack,
+  },
+  comparePillQuiet: { backgroundColor: colors.lightGray },
+  compareText: { ...type.label, color: colors.white },
+  compareTextQuiet: { color: colors.charcoal },
   list: { padding: spacing.md, paddingTop: 0, gap: spacing.md },
   row: {
     flexDirection: 'row',

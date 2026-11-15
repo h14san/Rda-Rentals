@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { accountModeOf, type AccountMode } from '@/features/auth/mode';
 import type { ProfileRow, StaffRole } from '@/features/listings/types';
 import { supabase } from '@/lib/supabase';
 
@@ -20,9 +21,14 @@ interface AuthState {
    */
   roles: StaffRole[];
   isStaff: boolean;
+  /**
+   * Guest, host or both, from the user's own auth metadata. Arranges the tabs
+   * and nothing else; it is never a permission. Null until chosen at setup.
+   */
+  mode: AccountMode | null;
   /** True until the persisted session has been read from secure storage. */
   initializing: boolean;
-  /** A profile is "complete" once it has a name. Nothing else is collected. */
+  /** Complete once it has a name and the account has said what it is here for. */
   needsProfileSetup: boolean;
   refreshProfile: () => Promise<void>;
 }
@@ -96,11 +102,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       roles,
       isStaff: roles.length > 0,
+      mode: accountModeOf(session),
       initializing,
       // Only assert setup is needed once the profile row has actually loaded,
       // otherwise the first render after sign-in bounces to the setup screen.
       needsProfileSetup:
-        !!session && !!profile && !profile.full_name,
+        !!session && !!profile && (!profile.full_name || !accountModeOf(session)),
       refreshProfile,
     };
   }, [session, profile, roles, initializing, userId]);

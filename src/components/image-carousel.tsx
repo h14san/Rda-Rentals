@@ -88,7 +88,9 @@ const styles = StyleSheet.create({
   fallbackText: type.meta,
   counter: {
     position: 'absolute',
-    right: spacing.md,
+    // Bottom left, because the listing page's save button hangs off the
+    // bottom-right corner of the photo.
+    left: spacing.md,
     bottom: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',

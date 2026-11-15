@@ -33,7 +33,7 @@ export default function ProfileScreen() {
  */
 function SignedInProfile({ userId }: { userId: string }) {
   const router = useRouter();
-  const { profile, isStaff } = useAuth();
+  const { profile, isStaff, mode } = useAuth();
   const identity = useMyIdentity(userId);
   const restriction = useMyRestriction(userId);
   const listings = useMyListings(userId);
@@ -100,7 +100,7 @@ function SignedInProfile({ userId }: { userId: string }) {
 
       {/* Shown until the ID is checked, because nothing a landlord posts can
           go live before it (rule 9). */}
-      {identity.isSuccess && !identity.data.badge && (
+      {identity.isSuccess && !identity.data.badge && (mode !== 'guest' || !!identityCase) && (
         <View style={styles.prompt}>
           <Text style={styles.promptTitle}>
             {identityCase?.status === 'submitted'
@@ -126,13 +126,25 @@ function SignedInProfile({ userId }: { userId: string }) {
         </View>
       )}
 
-      <MenuSection title="Renting and hosting">
-        <MenuRow
-          icon="home-outline"
-          label="Your listings"
-          detail={listings.isPending ? undefined : listingsDetail}
-          onPress={() => router.push('/my-listings')}
-        />
+      <MenuSection title={mode === 'guest' ? 'Renting' : 'Renting and hosting'}>
+        {/* A guest who has listings anyway still sees them: the mode arranges
+            the app, it does not hide what someone owns. */}
+        {(mode !== 'guest' || listingCount > 0) && (
+          <MenuRow
+            icon="home-outline"
+            label="Your listings"
+            detail={listings.isPending ? undefined : listingsDetail}
+            onPress={() => router.push('/my-listings')}
+          />
+        )}
+        {mode === 'guest' && (
+          <MenuRow
+            icon="add-circle-outline"
+            label="Rent out a place"
+            detail="Switch to hosting"
+            onPress={() => router.push('/edit-profile')}
+          />
+        )}
         <MenuRow
           icon="calendar-outline"
           label="Bookings"

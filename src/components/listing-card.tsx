@@ -4,40 +4,52 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CompactBadges } from '@/components/verification-badges';
 import { listingFacts, type ListingWithImages } from '@/features/listings/types';
-import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
+import { formatLocation, formatPrice, formatPriceCompact, timeAgo } from '@/lib/format';
 import { imageUrl } from '@/lib/supabase';
-import { colors, fontFamily, radius, spacing, type } from '@/theme';
+import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
 
 /**
- * Feed card: image-first, per the Airbnb-inspired direction in the framework
- * doc. Price gets the strongest type on the card because it is the field
- * tenants scan for.
+ * Feed card, in two sizes.
+ *
+ * `compact` is the default on Explore: half the screen wide, so four to six
+ * places are on screen at once and a long feed is a scan rather than a scroll.
+ * It keeps only what decides whether to tap: the photo, the price, where it is
+ * and what it is. The large card adds the title, the checks and when
+ * availability was confirmed, for looking at fewer places more closely.
+ *
+ * Neither has a box. The photo is the card and the text sits under it.
  */
 export function ListingCard({
   listing,
   onPress,
   favorite,
+  compact,
 }: {
   listing: ListingWithImages;
   onPress: () => void;
   /** Omitted where saving makes no sense, e.g. a landlord's own listings. */
   favorite?: { saved: boolean; onToggle: () => void };
+  compact?: boolean;
 }) {
   const cover = listing.listing_images?.[0];
   const facts = listingFacts(listing);
+  const checked = (listing.listing_badges?.length ?? 0) > 0;
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${listing.title}, ${formatPrice(listing.price_rwf)} per month`}
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}
+      style={({ pressed }) => [
+        compact ? styles.cardCompact : styles.card,
+        pressed && { opacity: 0.9 },
+      ]}
     >
-      <View style={styles.imageWrap}>
+      <View>
         {cover ? (
           <Image
             source={{ uri: imageUrl(cover.storage_path) }}
-            style={styles.image}
+            style={compact ? styles.imageCompact : styles.image}
             contentFit="cover"
             // Fades in over the placeholder instead of popping, which reads far
             // better when images arrive slowly.
@@ -45,13 +57,13 @@ export function ListingCard({
             placeholder={{ blurhash: 'L6PZfSjE.AyE_3t7t7R**0o#DgR4' }}
           />
         ) : (
-          <View style={[styles.image, styles.imageFallback]}>
-            <Text style={styles.imageFallbackText}>No photo</Text>
+          <View style={[compact ? styles.imageCompact : styles.image, styles.imageFallback]}>
+            <Ionicons name="image-outline" size={compact ? 22 : 28} color={colors.muted} />
           </View>
         )}
 
         {listing.is_featured && (
-          <View style={styles.featuredBadge}>
+          <View style={[styles.featuredBadge, compact && styles.overlayCompact]}>
             <Text style={styles.featuredText}>Featured</Text>
           </View>
         )}
@@ -63,48 +75,76 @@ export function ListingCard({
             accessibilityState={{ selected: favorite.saved }}
             hitSlop={8}
             onPress={favorite.onToggle}
-            style={styles.heart}
+            style={[styles.heart, compact && styles.heartCompact]}
           >
             <Ionicons
               name={favorite.saved ? 'heart' : 'heart-outline'}
-              size={20}
+              size={compact ? 18 : 20}
               color={colors.white}
             />
           </Pressable>
         )}
       </View>
 
-      <View style={styles.body}>
-        <Text style={styles.price}>
-          {formatPrice(listing.price_rwf)}
-          <Text style={styles.perMonth}> / month</Text>
-        </Text>
-        <Text style={styles.title} numberOfLines={1}>
-          {listing.title}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {[formatLocation(listing.sector, listing.district), ...facts].join(' · ')}
-        </Text>
-        <CompactBadges badges={listing.listing_badges} />
-        {!!listing.availability_confirmed_at && (
-          <Text style={styles.confirmed} numberOfLines={1}>
-            Availability confirmed {timeAgo(listing.availability_confirmed_at)}
+      {compact ? (
+        <View style={styles.bodyCompact}>
+          <View style={styles.priceLine}>
+            <Text style={styles.priceCompact} numberOfLines={1}>
+              {formatPriceCompact(listing.price_rwf)}
+              <Text style={styles.perMonthCompact}> / mo</Text>
+            </Text>
+            {/* A green shield only: which checks, and what they mean, is on the
+                listing page. Never gold, which is paid placement. */}
+            {checked && (
+              <Ionicons
+                name="shield-checkmark"
+                size={14}
+                color={colors.success}
+                accessibilityLabel="Checked by Rwanda Rentals"
+              />
+            )}
+          </View>
+          <Text style={styles.placeCompact} numberOfLines={1}>
+            {formatLocation(listing.sector, listing.district)}
           </Text>
-        )}
-      </View>
+          <Text style={styles.metaCompact} numberOfLines={1}>
+            {facts.slice(0, 2).join(' · ')}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.body}>
+          <Text style={styles.price}>
+            {formatPrice(listing.price_rwf)}
+            <Text style={styles.perMonth}> / month</Text>
+          </Text>
+          <Text style={styles.title} numberOfLines={1}>
+            {listing.title}
+          </Text>
+          <Text style={styles.meta} numberOfLines={1}>
+            {[formatLocation(listing.sector, listing.district), ...facts].join(' · ')}
+          </Text>
+          <CompactBadges badges={listing.listing_badges} />
+          {!!listing.availability_confirmed_at && (
+            <Text style={styles.confirmed} numberOfLines={1}>
+              Availability confirmed {timeAgo(listing.availability_confirmed_at)}
+            </Text>
+          )}
+        </View>
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  // No box around the card: the photo is the card, and the text sits under it
-  // on the page. A border and shadow on every listing made the feed a stack of
-  // frames instead of a column of places.
-  card: {
+  card: { backgroundColor: colors.white, marginBottom: spacing.xl },
+  // The grid's row gap and gutter come from here, so the list needs no
+  // per-column maths: each card pads half a gutter on both sides.
+  cardCompact: {
+    flex: 1,
     backgroundColor: colors.white,
-    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.sm - 2,
+    marginBottom: spacing.lg,
   },
-  imageWrap: { position: 'relative' },
   image: {
     width: '100%',
     // Slightly taller than 4:3. Rental interiors are shot in portrait on a
@@ -114,8 +154,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: colors.lightGray,
   },
+  imageCompact: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: radius.md,
+    backgroundColor: colors.lightGray,
+  },
   imageFallback: { alignItems: 'center', justifyContent: 'center' },
-  imageFallbackText: type.meta,
 
   featuredBadge: {
     position: 'absolute',
@@ -126,6 +171,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: radius.pill,
   },
+  overlayCompact: { top: spacing.sm, left: spacing.sm },
   featuredText: {
     ...type.caption,
     fontFamily: fontFamily.bold,
@@ -145,19 +191,28 @@ const styles = StyleSheet.create({
     // spending the accent colour, which is reserved for price and featured.
     backgroundColor: 'rgba(17,24,39,0.55)',
   },
+  heartCompact: { top: spacing.sm, right: spacing.sm, width: 30, height: 30, borderRadius: 15 },
 
   body: { paddingTop: spacing.sm + 2, gap: 2 },
   // Price and "/ month" sit on one baseline, with the unit deliberately quiet:
   // the figure is what gets scanned, the unit only disambiguates it.
   price: type.price,
-  perMonth: {
-    ...type.meta,
-    fontFamily: fontFamily.medium,
-  },
-  title: {
-    ...type.bodyStrong,
-    color: colors.charcoal,
-  },
+  perMonth: { ...type.meta, fontFamily: fontFamily.medium },
+  title: { ...type.bodyStrong, color: colors.charcoal },
   meta: type.meta,
   confirmed: type.caption,
+
+  bodyCompact: { paddingTop: spacing.sm, gap: 1 },
+  priceLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  priceCompact: {
+    flexShrink: 1,
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.md,
+    lineHeight: 22,
+    letterSpacing: -0.3,
+    color: colors.softBlack,
+  },
+  perMonthCompact: { ...type.caption, fontFamily: fontFamily.medium },
+  placeCompact: { ...type.label, color: colors.charcoal },
+  metaCompact: type.caption,
 });

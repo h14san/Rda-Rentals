@@ -1,9 +1,10 @@
-import Slider from '@react-native-community/slider';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Chip, SectionTitle } from '@/components/ui';
+import { RangeSlider } from '@/components/range-slider';
+import { Button, Chip } from '@/components/ui';
 import { useFilters } from '@/features/listings/filters-context';
 import { moveInOptions } from '@/features/listings/terms-fields';
 import {
@@ -15,17 +16,31 @@ import {
   type Filters,
 } from '@/features/listings/types';
 import { AMENITIES, AMENITY_LABELS, type Amenity } from '@/lib/amenities';
-import { formatPriceCompact } from '@/lib/format';
+import { formatPrice } from '@/lib/format';
 import { KIGALI_DISTRICTS, sectorsFor } from '@/lib/locations';
-import { colors, fontFamily, fontSize, spacing } from '@/theme';
+import { colors, spacing, type } from '@/theme';
 
 const BEDROOM_OPTIONS = [0, 1, 2, 3, 4] as const;
 const BATHROOM_OPTIONS = [1, 2, 3] as const;
 /** "I can commit to at most N months." Matches the landlord-side choices. */
 const STAY_OPTIONS = [1, 3, 6, 12] as const;
 
+/** How many of the filters behind "More filters" are set. */
+function moreCount(f: Filters): number {
+  return [
+    f.minBathrooms !== null,
+    f.amenities.length > 0,
+    f.maxMinRentalMonths !== null,
+    f.availableBy !== null,
+  ].filter(Boolean).length;
+}
+
 /**
  * Filter sheet.
+ *
+ * The five filters nearly everyone uses come first: price, type, bedrooms,
+ * area, furnished. The rest are behind "More filters", so the sheet is one
+ * screen tall for most people instead of four.
  *
  * Edits a local draft and only commits on "Show results", so a half-set filter
  * never triggers a query — each intermediate state would otherwise be a round
@@ -39,19 +54,12 @@ export default function FiltersScreen() {
   const router = useRouter();
   const { filters, setFilters, resetFilters } = useFilters();
   const [draft, setDraft] = useState<Filters>(filters);
+  // Open from the start when one of them is already set, so a filter in force
+  // is never hidden behind a closed section.
+  const [showMore, setShowMore] = useState(moreCount(filters) > 0);
 
-  const minPrice = draft.minPrice ?? PRICE_BOUNDS.min;
-  const maxPrice = draft.maxPrice ?? PRICE_BOUNDS.max;
   const sectors = sectorsFor(draft.district);
-
-  const priceIsSet = draft.minPrice !== null || draft.maxPrice !== null;
-  const priceLabel = !priceIsSet
-    ? 'Any price'
-    : draft.maxPrice === null
-      ? `From ${formatPriceCompact(minPrice)}`
-      : draft.minPrice === null
-        ? `Up to ${formatPriceCompact(maxPrice)}`
-        : `${formatPriceCompact(minPrice)} — ${formatPriceCompact(maxPrice)}`;
+  const hidden = moreCount(draft);
 
   function patch(next: Partial<Filters>) {
     setDraft((d) => ({ ...d, ...next }));
@@ -80,50 +88,63 @@ export default function FiltersScreen() {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>
-          <SectionTitle>Price per month</SectionTitle>
-          <View style={styles.priceHeader}>
-            <Text style={styles.priceReadout}>{priceLabel}</Text>
-            {priceIsSet && (
-              <Pressable
-                onPress={() => patch({ minPrice: null, maxPrice: null })}
-                accessibilityRole="button"
-              >
-                <Text style={styles.clearLink}>Clear</Text>
-              </Pressable>
-            )}
-          </View>
-
-          <Text style={styles.sliderLabel}>Minimum</Text>
-          <Slider
-            minimumValue={PRICE_BOUNDS.min}
-            maximumValue={PRICE_BOUNDS.max}
+          <Text style={styles.heading}>Price per month</Text>
+          <RangeSlider
+            min={PRICE_BOUNDS.min}
+            max={PRICE_BOUNDS.max}
             step={PRICE_BOUNDS.step}
-            value={minPrice}
-            minimumTrackTintColor={colors.softBlack}
-            maximumTrackTintColor={colors.border}
-            thumbTintColor={colors.softBlack}
-            // Only ever write the bound being dragged. Writing both would turn
-            // an untouched (null) maximum into a real 1,000,000 filter just
-            // because the minimum moved, quietly excluding nothing while
-            // showing up as an extra active filter.
-            onSlidingComplete={(v) => patch({ minPrice: Math.min(v, maxPrice) })}
-          />
-
-          <Text style={styles.sliderLabel}>Maximum</Text>
-          <Slider
-            minimumValue={PRICE_BOUNDS.min}
-            maximumValue={PRICE_BOUNDS.max}
-            step={PRICE_BOUNDS.step}
-            value={maxPrice}
-            minimumTrackTintColor={colors.softBlack}
-            maximumTrackTintColor={colors.border}
-            thumbTintColor={colors.softBlack}
-            onSlidingComplete={(v) => patch({ maxPrice: Math.max(v, minPrice) })}
+            low={draft.minPrice ?? PRICE_BOUNDS.min}
+            high={draft.maxPrice ?? PRICE_BOUNDS.max}
+            // A handle resting on its end of the bar means "no limit on this
+            // side", and is stored as null. Storing the bound itself would
+            // quietly hide every listing above 1,000,000 and count as a filter
+            // the renter never set.
+            onChange={(low, high) =>
+              patch({
+                minPrice: low <= PRICE_BOUNDS.min ? null : low,
+                maxPrice: high >= PRICE_BOUNDS.max ? null : high,
+              })
+            }
+            format={(value, end) =>
+              end === 'high' && value >= PRICE_BOUNDS.max
+                ? 'Any'
+                : end === 'low' && value <= PRICE_BOUNDS.min
+                  ? 'Any'
+                  : formatPrice(value)
+            }
           />
         </View>
 
         <View style={styles.section}>
-          <SectionTitle>District</SectionTitle>
+          <Text style={styles.heading}>Type of place</Text>
+          <View style={styles.chipWrap}>
+            {PROPERTY_TYPES.map((t) => (
+              <Chip
+                key={t}
+                label={PROPERTY_TYPE_LABELS[t]}
+                selected={draft.propertyType === t}
+                onPress={() => patch({ propertyType: draft.propertyType === t ? null : t })}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.heading}>Bedrooms</Text>
+          <View style={styles.chipWrap}>
+            {BEDROOM_OPTIONS.map((n) => (
+              <Chip
+                key={n}
+                label={n === 0 ? 'Studio' : `${n}+`}
+                selected={draft.minBedrooms === n}
+                onPress={() => patch({ minBedrooms: draft.minBedrooms === n ? null : n })}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.heading}>Area</Text>
           <View style={styles.chipWrap}>
             {KIGALI_DISTRICTS.map((district) => (
               <Chip
@@ -142,62 +163,25 @@ export default function FiltersScreen() {
               />
             ))}
           </View>
-        </View>
-
-        {sectors.length > 0 && (
-          <View style={styles.section}>
-            <SectionTitle>Sector</SectionTitle>
-            <View style={styles.chipWrap}>
-              {sectors.map((sector) => (
-                <Chip
-                  key={sector}
-                  label={sector}
-                  selected={draft.sector === sector}
-                  onPress={() =>
-                    patch({ sector: draft.sector === sector ? null : sector })
-                  }
-                />
-              ))}
-            </View>
-          </View>
-        )}
-
-        <View style={styles.section}>
-          <SectionTitle>Property type</SectionTitle>
-          <View style={styles.chipWrap}>
-            {PROPERTY_TYPES.map((type) => (
-              <Chip
-                key={type}
-                label={PROPERTY_TYPE_LABELS[type]}
-                selected={draft.propertyType === type}
-                onPress={() =>
-                  patch({
-                    propertyType: draft.propertyType === type ? null : type,
-                  })
-                }
-              />
-            ))}
-          </View>
+          {sectors.length > 0 && (
+            <>
+              <Text style={styles.subheading}>Sector in {draft.district}</Text>
+              <View style={styles.chipWrap}>
+                {sectors.map((sector) => (
+                  <Chip
+                    key={sector}
+                    label={sector}
+                    selected={draft.sector === sector}
+                    onPress={() => patch({ sector: draft.sector === sector ? null : sector })}
+                  />
+                ))}
+              </View>
+            </>
+          )}
         </View>
 
         <View style={styles.section}>
-          <SectionTitle>Bedrooms</SectionTitle>
-          <View style={styles.chipWrap}>
-            {BEDROOM_OPTIONS.map((n) => (
-              <Chip
-                key={n}
-                label={n === 0 ? 'Studio' : `${n}+`}
-                selected={draft.minBedrooms === n}
-                onPress={() =>
-                  patch({ minBedrooms: draft.minBedrooms === n ? null : n })
-                }
-              />
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <SectionTitle>Furnishing</SectionTitle>
+          <Text style={styles.heading}>Furnishing</Text>
           <View style={styles.chipWrap}>
             <Chip
               label="Furnished only"
@@ -207,81 +191,91 @@ export default function FiltersScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <SectionTitle>Bathrooms</SectionTitle>
-          <View style={styles.chipWrap}>
-            {BATHROOM_OPTIONS.map((n) => (
-              <Chip
-                key={n}
-                label={`${n}+`}
-                selected={draft.minBathrooms === n}
-                onPress={() =>
-                  patch({ minBathrooms: draft.minBathrooms === n ? null : n })
-                }
-              />
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <SectionTitle>Amenities</SectionTitle>
-          <View style={styles.chipWrap}>
-            {AMENITIES.map((a) => (
-              <Chip
-                key={a}
-                label={AMENITY_LABELS[a]}
-                selected={draft.amenities.includes(a)}
-                onPress={() => toggleAmenity(a)}
-              />
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <SectionTitle>Longest lease you can commit to</SectionTitle>
-          <View style={styles.chipWrap}>
-            {STAY_OPTIONS.map((n) => (
-              <Chip
-                key={n}
-                label={n === 1 ? '1 month' : `${n} months`}
-                selected={draft.maxMinRentalMonths === n}
-                onPress={() =>
-                  patch({
-                    maxMinRentalMonths: draft.maxMinRentalMonths === n ? null : n,
-                  })
-                }
-              />
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <SectionTitle>Move in by</SectionTitle>
-          <View style={styles.chipWrap}>
-            {moveInOptions().map((d) => (
-              <Chip
-                key={d}
-                label={formatShortDate(d)}
-                selected={draft.availableBy === d}
-                onPress={() =>
-                  patch({ availableBy: draft.availableBy === d ? null : d })
-                }
-              />
-            ))}
-          </View>
-          <Text style={styles.sliderLabel}>
-            Listings without a stated date are always included.
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: showMore }}
+          onPress={() => setShowMore((v) => !v)}
+          style={({ pressed }) => [styles.moreToggle, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.moreLabel}>
+            {showMore ? 'Fewer filters' : 'More filters'}
+            {hidden > 0 ? ` (${hidden} set)` : ''}
           </Text>
-        </View>
+          <Ionicons
+            name={showMore ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={colors.softBlack}
+          />
+        </Pressable>
+
+        {showMore && (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.heading}>Bathrooms</Text>
+              <View style={styles.chipWrap}>
+                {BATHROOM_OPTIONS.map((n) => (
+                  <Chip
+                    key={n}
+                    label={`${n}+`}
+                    selected={draft.minBathrooms === n}
+                    onPress={() => patch({ minBathrooms: draft.minBathrooms === n ? null : n })}
+                  />
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.heading}>Amenities</Text>
+              <View style={styles.chipWrap}>
+                {AMENITIES.map((a) => (
+                  <Chip
+                    key={a}
+                    label={AMENITY_LABELS[a]}
+                    selected={draft.amenities.includes(a)}
+                    onPress={() => toggleAmenity(a)}
+                  />
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.heading}>Longest lease you can commit to</Text>
+              <View style={styles.chipWrap}>
+                {STAY_OPTIONS.map((n) => (
+                  <Chip
+                    key={n}
+                    label={n === 1 ? '1 month' : `${n} months`}
+                    selected={draft.maxMinRentalMonths === n}
+                    onPress={() =>
+                      patch({ maxMinRentalMonths: draft.maxMinRentalMonths === n ? null : n })
+                    }
+                  />
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.heading}>Move in by</Text>
+              <View style={styles.chipWrap}>
+                {moveInOptions().map((d) => (
+                  <Chip
+                    key={d}
+                    label={formatShortDate(d)}
+                    selected={draft.availableBy === d}
+                    onPress={() => patch({ availableBy: draft.availableBy === d ? null : d })}
+                  />
+                ))}
+              </View>
+              <Text style={styles.caption}>
+                Listings without a stated date are always included.
+              </Text>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button
-          label="Clear all"
-          variant="ghost"
-          onPress={clearAll}
-          style={styles.footerButton}
-        />
+        <Button label="Clear all" variant="ghost" onPress={clearAll} style={styles.footerButton} />
         <Button label="Show results" onPress={apply} style={styles.footerButton} />
       </View>
     </View>
@@ -291,28 +285,21 @@ export default function FiltersScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.white },
   content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.xxl },
-  section: { gap: spacing.sm },
-  priceHeader: {
+  section: { gap: spacing.sm + 4 },
+  heading: type.bodyStrong,
+  subheading: { ...type.meta, marginTop: spacing.xs },
+  caption: type.caption,
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  moreToggle: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
-  priceReadout: {
-    fontSize: fontSize.md,
-    fontFamily: fontFamily.semibold,
-    color: colors.softBlack,
-  },
-  clearLink: {
-    fontSize: fontSize.sm,
-    fontFamily: fontFamily.semibold,
-    color: colors.muted,
-  },
-  sliderLabel: {
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.xs,
-    color: colors.muted,
-  },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  moreLabel: type.bodyStrong,
   footer: {
     flexDirection: 'row',
     gap: spacing.sm,

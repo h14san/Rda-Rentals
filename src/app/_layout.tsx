@@ -32,7 +32,7 @@ const queryClient = new QueryClient({
  * conversation with a nameless stranger is not one anyone answers), and ready.
  */
 function AuthGate() {
-  const { session, profile, initializing } = useAuth();
+  const { session, profile, mode, initializing } = useAuth();
   // Held behind the splash screen: rendering in the fallback face and then
   // swapping to Inter reflows every screen, which looks like a bug.
   const [fontsLoaded, fontError] = useFonts(fontAssets);
@@ -52,7 +52,9 @@ function AuthGate() {
 
     const inAuthGroup = segments[0] === '(auth)';
     const onProfileSetup = segments[1] === 'profile-setup';
-    const profileIncomplete = !!profile && !profile.full_name;
+    // No name yet, or the account has not said whether it is here to rent,
+    // to host, or both. Accounts from before that question are asked once.
+    const profileIncomplete = !!profile && (!profile.full_name || !mode);
 
     if (!session && !inAuthGroup) {
       router.replace('/sign-in');
@@ -61,7 +63,7 @@ function AuthGate() {
     } else if (session && !profileIncomplete && inAuthGroup) {
       router.replace('/');
     }
-  }, [ready, session, profile, segments, router]);
+  }, [ready, session, profile, mode, segments, router]);
 
   useEffect(() => {
     if (ready && !splashHidden.current) {

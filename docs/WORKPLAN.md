@@ -63,7 +63,7 @@ Metro runs out of memory on this 8 GB machine. Start it with `--max-workers 1`.
 
 ---
 
-## M0: Housekeeping (do first, small)
+## M0: Housekeeping (do first, small) — DONE 2026-11-15
 
 - **Get `main` current.** `main` holds only "Docs 1". The real history is on
   `feat/mvp-phases-1-2` (on origin) and `feat/phase-3a-verification` (local,
@@ -76,7 +76,7 @@ Metro runs out of memory on this 8 GB machine. Start it with `--max-workers 1`.
 
 ---
 
-## M1: Reports and moderation (Phase 3b)
+## M1: Reports and moderation (Phase 3b) — DONE 2026-11-15
 
 Blueprint §27, §40. Features #23, #24, #58.
 

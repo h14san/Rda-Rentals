@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+import type {
+  AccountRestrictionRow,
+  ListingSuspensionRow,
+  ModerationAction,
+  ModerationEventRow,
+  ReportReason,
+  ReportRow,
+  ReportSeverity,
+  ReportTarget,
+} from '@/features/moderation/types';
 import { AMENITIES, AMENITY_LABELS } from '@/lib/amenities';
 import { formatPrice } from '@/lib/format';
 
@@ -338,6 +348,38 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // A reporter inserts their own report; everything else about it, and
+      // every table below, is written only by the moderation functions.
+      reports: {
+        Row: ReportRow;
+        Insert: {
+          reporter_id: string;
+          target_type: ReportTarget;
+          target_id: string;
+          reason: ReportReason;
+          note?: string | null;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      account_restrictions: {
+        Row: AccountRestrictionRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      listing_suspensions: {
+        Row: ListingSuspensionRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      moderation_events: {
+        Row: ModerationEventRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -355,6 +397,32 @@ export type Database = {
       staff_listing_location: {
         Args: { p_listing_id: string };
         Returns: { address: string | null; latitude: number | null; longitude: number | null }[];
+      };
+      triage_report: {
+        Args: { p_report_id: string; p_severity: ReportSeverity };
+        Returns: undefined;
+      };
+      resolve_report: {
+        Args: { p_report_id: string; p_outcome: 'resolved' | 'dismissed'; p_note: string };
+        Returns: undefined;
+      };
+      moderate_listing: {
+        Args: {
+          p_listing_id: string;
+          p_action: ModerationAction;
+          p_note: string;
+          p_report_id?: string | null;
+        };
+        Returns: undefined;
+      };
+      restrict_account: {
+        Args: {
+          p_user_id: string;
+          p_action: ModerationAction;
+          p_note: string;
+          p_report_id?: string | null;
+        };
+        Returns: undefined;
       };
     };
     Enums: Record<string, never>;

@@ -661,6 +661,9 @@ export const FR_MORE: Record<string, string> = {
   'Other landlords rated this renter {avg} of 5 ({n}).':
     'D’autres propriétaires ont noté ce locataire {avg} sur 5 ({n}).',
   ' · {n} without a location': ' · {n} sans emplacement',
+  // Two-way switches
+  Archived: 'Archivées',
+  Hosting: 'Hôte',
   // Map: near me
   'Show places near me': 'Afficher les logements près de moi',
   'Search this area': 'Rechercher dans cette zone',

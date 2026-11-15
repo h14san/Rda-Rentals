@@ -4,13 +4,12 @@ import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { BookingCard } from '@/components/booking-card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
-import { Button, Chip } from '@/components/ui';
+import { Button, Segmented } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
 import { useMyBookings } from '@/features/bookings/queries';
 import { isActiveBooking } from '@/features/bookings/types';
 import { useStartConversation } from '@/features/messaging/queries';
 import { spacing } from '@/theme';
-import { translate } from '@/lib/i18n';
 
 type Side = 'renting' | 'hosting';
 
@@ -54,21 +53,20 @@ export default function BookingsScreen() {
       }
       ListHeaderComponent={
         <View style={styles.filters}>
-          <Chip
-            label={translate('Places I am booking ({n})', { n: renting.length })}
-            selected={side === 'renting'}
-            onPress={() => setChosen('renting')}
-          />
-          <Chip
-            label={translate('Requests for my listings ({n})', { n: hosting.length })}
-            selected={side === 'hosting'}
-            onPress={() => setChosen('hosting')}
+          <Segmented<Side>
+            value={side}
+            onChange={setChosen}
+            options={[
+              { key: 'renting', label: 'Renting', count: renting.length },
+              { key: 'hosting', label: 'Hosting', count: hosting.length },
+            ]}
           />
         </View>
       }
       ListEmptyComponent={
         side === 'renting' ? (
           <EmptyState
+            icon="calendar-outline"
             title="No bookings yet"
             message="Open a rental and choose Request to book. It will appear here."
             actionLabel="Browse rentals"
@@ -76,6 +74,7 @@ export default function BookingsScreen() {
           />
         ) : (
           <EmptyState
+            icon="calendar-outline"
             title="No requests yet"
             message="When someone asks to book one of your listings, you answer it here."
           />
@@ -123,9 +122,9 @@ export default function BookingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.md, gap: spacing.md, flexGrow: 1 },
-  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  item: { gap: spacing.xs },
+  content: { padding: spacing.md, paddingBottom: spacing.xl, flexGrow: 1 },
+  filters: { marginBottom: spacing.md },
+  item: { gap: spacing.xs, marginBottom: spacing.md },
   links: { flexDirection: 'row', gap: spacing.sm },
   flex: { flex: 1 },
 });

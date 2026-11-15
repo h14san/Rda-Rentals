@@ -97,10 +97,12 @@ export default function NotificationsScreen() {
         }
         ListEmptyComponent={
           <EmptyState
+            icon="notifications-outline"
             title="Nothing yet"
             message="Replies, decisions on your listings and changes to rentals you saved will appear here."
           />
         }
+        ItemSeparatorComponent={() => <View style={styles.rule} />}
         renderItem={({ item }) => (
           <Pressable
             accessibilityRole="button"
@@ -108,15 +110,16 @@ export default function NotificationsScreen() {
             onPress={() => open(item)}
             style={({ pressed }) => [
               styles.row,
-              !item.read_at && styles.rowUnread,
               pressed && { opacity: 0.85 },
             ]}
           >
-            <Ionicons
-              name={ICONS[item.category] ?? 'notifications-outline'}
-              size={20}
-              color={colors.charcoal}
-            />
+            <View style={[styles.iconTile, !item.read_at && styles.iconTileUnread]}>
+              <Ionicons
+                name={ICONS[item.category] ?? 'notifications-outline'}
+                size={19}
+                color={item.read_at ? colors.charcoal : colors.white}
+              />
+            </View>
             <View style={styles.text}>
               <Text style={[styles.title, !item.read_at && styles.titleUnread]}>
                 {t(item.title)}
@@ -136,18 +139,28 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.md, gap: spacing.sm, flexGrow: 1 },
-  markAll: { alignSelf: 'flex-end', paddingVertical: spacing.xs },
-  markAllText: { ...type.label, textDecorationLine: 'underline' },
-  row: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+  content: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl, flexGrow: 1 },
+  markAll: {
+    alignSelf: 'flex-end',
+    marginVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.lightGray,
   },
-  rowUnread: { backgroundColor: colors.lightGray, borderColor: colors.lightGray },
+  markAllText: type.label,
+  // Boxless rows; unread is a dark icon tile and a bold title, not a grey slab.
+  row: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.md },
+  rule: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  iconTile: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.lightGray,
+  },
+  iconTileUnread: { backgroundColor: colors.softBlack },
   text: { flex: 1, gap: 2 },
   title: type.body,
   titleUnread: { fontFamily: fontFamily.semibold, color: colors.softBlack },

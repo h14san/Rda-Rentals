@@ -9,7 +9,6 @@ import {
   REPORT_REASON_LABELS,
   REPORT_STATUS_LABELS,
   REPORT_TARGET_LABELS,
-  isOpenReport,
 } from '@/features/moderation/types';
 import { timeAgo } from '@/lib/format';
 import { colors, radius, spacing, type } from '@/theme';
@@ -52,7 +51,7 @@ export default function MyReportsScreen() {
               {item.note}
             </Text>
           )}
-          <View style={[styles.result, isOpenReport(item.status) && styles.resultOpen]}>
+          <View style={styles.result}>
             <Text style={styles.resultTitle}>{REPORT_STATUS_LABELS[item.status]}</Text>
             {!!item.action_taken && (
               <Text style={styles.meta}>{REPORT_ACTION_LABELS[item.action_taken]}</Text>
@@ -70,9 +69,8 @@ const styles = StyleSheet.create({
   row: {
     gap: spacing.xs,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.lightGray,
   },
   caption: type.caption,
   title: type.bodyStrong,
@@ -81,9 +79,8 @@ const styles = StyleSheet.create({
     gap: 2,
     marginTop: spacing.xs,
     padding: spacing.sm,
-    borderRadius: radius.sm,
-    backgroundColor: colors.lightGray,
+    borderRadius: radius.md,
+    backgroundColor: colors.white,
   },
-  resultOpen: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
   resultTitle: type.label,
 });

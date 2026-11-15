@@ -43,16 +43,19 @@ export function EmptyState({
   message,
   actionLabel,
   onAction,
+  icon = 'file-tray-outline',
 }: {
   title: string;
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** The mark names the place: a heart on Saved, a bubble on Messages. */
+  icon?: keyof typeof Ionicons.glyphMap;
 }) {
   const t = useT();
   return (
     <View style={styles.center}>
-      <Mark icon="file-tray-outline" />
+      <Mark icon={icon} />
       <Text style={styles.title}>{t(title)}</Text>
       <Text style={styles.muted}>{t(message)}</Text>
       {actionLabel && onAction && (

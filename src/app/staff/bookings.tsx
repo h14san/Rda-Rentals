@@ -16,7 +16,7 @@ import {
 } from '@/features/bookings/types';
 import { formatShortDate } from '@/features/listings/types';
 import { timeAgo } from '@/lib/format';
-import { colors, radius, spacing, type } from '@/theme';
+import { colors, radius, shadow, spacing, type } from '@/theme';
 
 const FILTERS: (BookingStatus | null)[] = [
   null,
@@ -184,9 +184,9 @@ const styles = StyleSheet.create({
   card: {
     gap: spacing.xs,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.white,
+    ...shadow,
   },
   row: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   flex: { flex: 1 },

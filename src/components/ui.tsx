@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
@@ -25,7 +26,7 @@ interface ButtonProps {
   variant?: ButtonVariant;
   disabled?: boolean;
   loading?: boolean;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   icon?: ReactNode;
 }
 
@@ -114,6 +115,48 @@ export function Chip({
         {t(label)}
       </Text>
     </Pressable>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Segmented — one of two or three views of the same list                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A tinted track with the chosen segment raised in white. Used where a screen
+ * shows one of a few lists (renting or hosting, inbox or archived): chips
+ * read as filters that combine, and these do not.
+ */
+export function Segmented<K extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { key: K; label: string; count?: number }[];
+  value: K;
+  onChange: (key: K) => void;
+}) {
+  const t = useT();
+  return (
+    <View style={styles.segTrack} accessibilityRole="tablist">
+      {options.map((o) => {
+        const on = o.key === value;
+        return (
+          <Pressable
+            key={o.key}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            onPress={() => onChange(o.key)}
+            style={[styles.seg, on && styles.segOn]}
+          >
+            <Text style={[styles.segLabel, on && styles.segLabelOn]} numberOfLines={1}>
+              {t(o.label)}
+              {o.count !== undefined ? ` ${o.count}` : ''}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -218,6 +261,31 @@ const styles = StyleSheet.create({
   chipSelected: { backgroundColor: colors.softBlack },
   chipLabel: { ...type.label, color: colors.charcoal },
   chipLabelSelected: { color: colors.white },
+
+  segTrack: {
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: radius.md,
+    backgroundColor: colors.lightGray,
+  },
+  seg: {
+    flex: 1,
+    minHeight: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md - 3,
+  },
+  segOn: {
+    backgroundColor: colors.white,
+    shadowColor: '#0E1116',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  segLabel: { ...type.label, color: colors.muted },
+  segLabelOn: { color: colors.softBlack },
 
   fieldWrap: { gap: spacing.sm },
   fieldLabelRow: {

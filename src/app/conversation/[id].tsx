@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -13,6 +14,7 @@ import {
 import { Text } from '@/components/text';
 import { Alert } from '@/lib/alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { imageUrl } from '@/lib/supabase';
 
 import { ActionSheet } from '@/components/action-sheet';
 import { BookingCard } from '@/components/booking-card';
@@ -170,8 +172,19 @@ function Conversation({ id, userId }: { id: string; userId: string }) {
         accessibilityRole="button"
         disabled={!c.listings}
         onPress={() => c.listing_id && router.push(`/listing/${c.listing_id}`)}
-        style={styles.listingCard}
+        style={({ pressed }) => [styles.listingCard, pressed && { opacity: 0.8 }]}
       >
+        {c.listings?.listing_images[0] ? (
+          <Image
+            source={{ uri: imageUrl(c.listings.listing_images[0].storage_path) }}
+            style={styles.listingThumb}
+            contentFit="cover"
+          />
+        ) : (
+          <View style={styles.listingThumb}>
+            <Ionicons name="home-outline" size={18} color={colors.muted} />
+          </View>
+        )}
         <View style={styles.listingText}>
           <Text style={styles.caption}>About</Text>
           <Text style={styles.listingTitle} numberOfLines={1}>
@@ -346,8 +359,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  listingThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.sm,
+    backgroundColor: colors.lightGray,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   listingText: { flex: 1 },
   listingTitle: type.bodyStrong,
@@ -356,7 +378,20 @@ const styles = StyleSheet.create({
 
   list: { padding: spacing.md, gap: spacing.sm },
   intro: { ...type.caption, textAlign: 'center', paddingVertical: spacing.md },
-  system: { ...type.caption, textAlign: 'center', paddingVertical: spacing.xs },
+  // System lines (booking events) sit in a quiet pill in the middle, so they
+  // read as things that happened rather than things someone said.
+  system: {
+    ...type.caption,
+    textAlign: 'center',
+    alignSelf: 'center',
+    maxWidth: '86%',
+    marginVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.lightGray,
+    overflow: 'hidden',
+  },
 
   bubbleWrap: { maxWidth: '82%', gap: 2 },
   left: { alignSelf: 'flex-start', alignItems: 'flex-start' },
@@ -380,18 +415,19 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
+    backgroundColor: colors.white,
   },
   input: {
     flex: 1,
     minHeight: 44,
     maxHeight: 120,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
+    paddingTop: 11,
+    paddingBottom: 11,
+    borderRadius: 22,
+    backgroundColor: colors.lightGray,
     fontFamily: fontFamily.regular,
     fontSize: fontSize.md,
     color: colors.softBlack,
@@ -407,7 +443,7 @@ const styles = StyleSheet.create({
   blocked: {
     gap: spacing.sm,
     padding: spacing.md,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
 });

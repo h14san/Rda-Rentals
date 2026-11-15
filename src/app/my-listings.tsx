@@ -274,13 +274,14 @@ function MyListings({ userId }: { userId: string }) {
                     accessibilityRole="button"
                     accessibilityLabel={`${tile.n ?? 0} ${tile.label}`}
                     onPress={tile.go}
-                    style={({ pressed }) => [
-                      styles.tile,
-                      !!tile.n && styles.tileActive,
-                      pressed && { opacity: 0.8 },
-                    ]}
+                    style={({ pressed }) => [styles.tile, pressed && { opacity: 0.8 }]}
                   >
-                    <Text style={styles.tileNumber}>{tile.n ?? '–'}</Text>
+                    <View style={styles.tileTop}>
+                      <Text style={[styles.tileNumber, !tile.n && styles.tileNumberQuiet]}>
+                        {tile.n ?? '–'}
+                      </Text>
+                      {!!tile.n && <View style={styles.tileDot} />}
+                    </View>
                     <Text style={styles.tileLabel}>{tile.label}</Text>
                   </Pressable>
                 ))}
@@ -301,6 +302,7 @@ function MyListings({ userId }: { userId: string }) {
         ListEmptyComponent={
           listings.data.length === 0 ? (
             <EmptyState
+              icon="home-outline"
               title="No listings yet"
               message="Post your first rental and it will appear here."
               actionLabel="Post a rental"
@@ -310,6 +312,7 @@ function MyListings({ userId }: { userId: string }) {
             <EmptyState title="Nothing here" message="No listings are in this group." />
           )
         }
+        ItemSeparatorComponent={() => <View style={styles.rule} />}
         renderItem={({ item: l }) => {
           const cover = l.listing_images?.[0];
           const note = noteFor(l);
@@ -390,28 +393,27 @@ function MyListings({ userId }: { userId: string }) {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.md, gap: spacing.md, flexGrow: 1 },
+  content: { padding: spacing.md, paddingBottom: spacing.xl, flexGrow: 1 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  headerBlock: { gap: spacing.md },
+  headerBlock: { gap: spacing.md, marginBottom: spacing.sm },
   dashboard: { flexDirection: 'row', gap: spacing.sm },
   tile: {
     flex: 1,
     gap: 2,
-    padding: spacing.sm + 2,
-    borderRadius: radius.md,
+    padding: spacing.md - 4,
+    borderRadius: radius.lg,
     backgroundColor: colors.lightGray,
   },
-  tileActive: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.softBlack },
+  // Fill only. A tile with something waiting has a dark number and a dot;
+  // an empty one goes quiet rather than shouting a zero.
+  tileTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   tileNumber: type.h2,
+  tileNumberQuiet: { color: colors.muted },
+  tileDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.softBlack },
   tileLabel: type.caption,
-  card: {
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.white,
-  },
+  // A listing is a row on the page, not a box: photo, words, one action.
+  card: { gap: spacing.sm, paddingVertical: spacing.md },
+  rule: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   main: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   thumb: {
     width: 84,

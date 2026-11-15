@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/features/auth/context';
 import { lists, rents } from '@/features/auth/mode';
+import { useMyBookings } from '@/features/bookings/queries';
 import { useInboxRealtime, useUnreadCount } from '@/features/messaging/queries';
 import {
   useNotificationsRealtime,
@@ -31,6 +32,16 @@ export default function TabsLayout() {
   useNotificationsRealtime(userId);
   usePush(userId);
   const unreadNotifications = useUnreadNotificationCount(userId);
+  // Bookings live under Profile, two taps from anywhere. A request waiting
+  // for an answer expires in 72 hours, so the way to it also sits on the
+  // Messages header, where the person asking already is.
+  const bookings = useMyBookings(userId);
+  const bookingsWaiting =
+    bookings.data?.filter(
+      (b) =>
+        (b.landlord_id === userId && b.status === 'requested') ||
+        (b.renter_id === userId && b.status === 'accepted'),
+    ).length ?? 0;
 
   return (
     <Tabs
@@ -102,6 +113,20 @@ export default function TabsLayout() {
         name="messages"
         options={{
           title: t('Messages'),
+          headerRight: () => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                bookingsWaiting > 0 ? `Bookings, ${bookingsWaiting} waiting` : 'Bookings'
+              }
+              hitSlop={8}
+              onPress={() => router.push('/bookings')}
+              style={styles.headerButton}
+            >
+              <Ionicons name="calendar-outline" size={20} color={colors.softBlack} />
+              {bookingsWaiting > 0 && <View style={styles.bellDot} />}
+            </Pressable>
+          ),
           tabBarBadge: unread > 0 ? unread : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.softBlack, color: colors.white },
           tabBarIcon: ({ color, focused }) => (
@@ -124,9 +149,9 @@ export default function TabsLayout() {
               }
               hitSlop={8}
               onPress={() => router.push('/notifications')}
-              style={styles.bell}
+              style={styles.headerButton}
             >
-              <Ionicons name="notifications-outline" size={24} color={colors.softBlack} />
+              <Ionicons name="notifications-outline" size={20} color={colors.softBlack} />
               {unreadNotifications > 0 && <View style={styles.bellDot} />}
             </Pressable>
           ),
@@ -148,11 +173,20 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  bell: { marginRight: spacing.md },
+  // Header actions are round filled tiles, the same family as the menu icons.
+  headerButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.lightGray,
+    marginRight: spacing.md,
+  },
   bellDot: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: 2,
+    right: 2,
     width: 10,
     height: 10,
     borderRadius: 5,

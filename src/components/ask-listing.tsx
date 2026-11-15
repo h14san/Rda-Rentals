@@ -14,7 +14,7 @@ import {
   SUGGESTED_QUESTIONS,
   useAskListing,
 } from '@/features/listings/ask-listing';
-import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
+import { colors, fontFamily, fontSize, radius, shadow, spacing, type } from '@/theme';
 
 /**
  * "Ask about this place": a small box on the listing page that answers from
@@ -145,17 +145,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radius.lg,
+    backgroundColor: colors.lightGray,
   },
   collapsedText: { ...type.bodyStrong, flex: 1 },
   box: {
     gap: spacing.md,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radius.lg,
+    backgroundColor: colors.white,
+    ...shadow,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   heading: { ...type.bodyStrong, flex: 1 },
@@ -183,8 +182,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.lightGray,
   },
   chipText: type.label,
   answer: {

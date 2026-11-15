@@ -6,9 +6,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/components/text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, TextField } from '@/components/ui';
@@ -21,6 +21,7 @@ import {
   verifyCode,
 } from '@/lib/auth';
 import { colors, fontFamily, fontSize, spacing } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 /** Matches auth.email.max_frequency in supabase/config.toml. */
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -60,7 +61,7 @@ export default function VerifyScreen() {
 
   async function onVerify() {
     if (code.length !== OTP_LENGTH) {
-      setError(`Enter the ${OTP_LENGTH}-digit code.`);
+      setError(translate('Enter the {n}-digit code.', { n: OTP_LENGTH }));
       return;
     }
 
@@ -141,7 +142,7 @@ export default function VerifyScreen() {
             >
               <Text style={[styles.link, cooldown > 0 && styles.linkDisabled]}>
                 {cooldown > 0
-                  ? `Resend in ${cooldown}s`
+                  ? translate('Resend in {n}s', { n: cooldown })
                   : resent
                     ? 'Code resent'
                     : 'Resend code'}

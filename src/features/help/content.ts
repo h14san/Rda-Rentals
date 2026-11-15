@@ -54,7 +54,6 @@ export const HELP: Record<HelpTopic, { title: string; summary: string; sections:
         heading: 'What a badge is not',
         body: [
           'A badge lowers the risk. It is not a guarantee, and a listing with no badge for something has simply not had that checked.',
-          '"Featured" is paid placement. It is not a check and says nothing about the listing.',
           'Always see the place yourself before you pay anything.',
         ],
       },
@@ -188,7 +187,7 @@ export const HELP: Record<HelpTopic, { title: string; summary: string; sections:
         heading: 'Deleting your information',
         body: [
           'You can delete any listing, with its photos, from your profile.',
-          'To delete your account and everything attached to it, contact support from the email or phone number you sign in with.',
+          'To delete your account and everything attached to it, open Edit profile and choose Delete account.',
         ],
       },
     ],

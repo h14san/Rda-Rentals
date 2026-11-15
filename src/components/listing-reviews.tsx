@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
+import { Alert } from '@/lib/alert';
 
 import { Button, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
@@ -153,7 +155,7 @@ export function ListingReviews({
       {reviews.data.length > PREVIEW && (
         <Pressable accessibilityRole="button" onPress={() => setShowAll((v) => !v)}>
           <Text style={styles.link}>
-            {showAll ? t('Show less') : `Show all ${reviews.data.length} reviews`}
+            {showAll ? t('Show less') : t('Show all {n} reviews', { n: reviews.data.length })}
           </Text>
         </Pressable>
       )}

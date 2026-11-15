@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { Chip, TextField } from '@/components/ui';
 import type { ListingTerms } from '@/features/listings/create';
@@ -11,6 +12,7 @@ import {
 } from '@/lib/amenities';
 import { formatPrice } from '@/lib/format';
 import { colors, fontFamily, fontSize, spacing } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 const BATHROOM_OPTIONS = [1, 2, 3, 4] as const;
 const MIN_STAY_OPTIONS = [1, 3, 6, 12] as const;
@@ -49,7 +51,7 @@ export function validateTerms(terms: ListingTerms): Record<string, string> {
     terms.size_sqm !== null &&
     (terms.size_sqm < SIZE_BOUNDS.min || terms.size_sqm > SIZE_BOUNDS.max)
   ) {
-    errors.size = `Enter a size between ${SIZE_BOUNDS.min} and ${SIZE_BOUNDS.max} m².`;
+    errors.size = translate('Enter a size between {min} and {max} m².', { min: SIZE_BOUNDS.min, max: SIZE_BOUNDS.max });
   }
   return errors;
 }

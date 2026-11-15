@@ -1,7 +1,8 @@
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { StaffOnly } from '@/components/staff';
 import { ErrorState, LoadingState } from '@/components/states';

@@ -10,6 +10,7 @@ import { useMyBookings } from '@/features/bookings/queries';
 import { isActiveBooking } from '@/features/bookings/types';
 import { useStartConversation } from '@/features/messaging/queries';
 import { spacing } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 type Side = 'renting' | 'hosting';
 
@@ -54,12 +55,12 @@ export default function BookingsScreen() {
       ListHeaderComponent={
         <View style={styles.filters}>
           <Chip
-            label={`Places I am booking (${renting.length})`}
+            label={translate('Places I am booking ({n})', { n: renting.length })}
             selected={side === 'renting'}
             onPress={() => setChosen('renting')}
           />
           <Chip
-            label={`Requests for my listings (${hosting.length})`}
+            label={translate('Requests for my listings ({n})', { n: hosting.length })}
             selected={side === 'hosting'}
             onPress={() => setChosen('hosting')}
           />

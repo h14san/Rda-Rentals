@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Chip } from '@/components/ui';
@@ -16,6 +17,7 @@ import {
 import { timeAgo } from '@/lib/format';
 import { imageUrl } from '@/lib/supabase';
 import { colors, fontFamily, radius, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 /** The inbox: one row per listing you are talking about, newest first. */
 export default function MessagesScreen() {
@@ -47,7 +49,7 @@ export default function MessagesScreen() {
           <View style={styles.filters}>
             <Chip label="Inbox" selected={!showArchived} onPress={() => setShowArchived(false)} />
             <Chip
-              label={`Archived (${archivedCount})`}
+              label={translate('Archived ({n})', { n: archivedCount })}
               selected={showArchived}
               onPress={() => setShowArchived(true)}
             />
@@ -124,7 +126,7 @@ function Row({
         <Text style={[styles.preview, unread && styles.unreadText]} numberOfLines={1}>
           {c.last_message_preview === null
             ? 'No messages yet'
-            : `${mine ? 'You: ' : ''}${c.last_message_preview}`}
+            : `${mine ? translate('You: ') : ''}${c.last_message_preview}`}
         </Text>
       </View>
 

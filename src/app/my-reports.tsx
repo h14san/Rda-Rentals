@@ -1,4 +1,5 @@
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { useAuth } from '@/features/auth/context';

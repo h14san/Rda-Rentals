@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
+import { Alert } from '@/lib/alert';
 
 import { Button, TextField } from '@/components/ui';
 import { useSubmitReview, useSubmitTenantReview } from '@/features/listings/extras';

@@ -1,14 +1,15 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/components/text';
+import { Alert } from '@/lib/alert';
 
 import { ModePicker } from '@/components/mode-picker';
 import { Button, Chip, TextField } from '@/components/ui';
@@ -42,6 +43,7 @@ export default function EditProfileScreen() {
   const t = useT();
   const language = useLanguage();
   const deleteAccount = useDeleteAccount();
+  const queryClient = useQueryClient();
 
   if (!session) return null;
 
@@ -156,14 +158,16 @@ export default function EditProfileScreen() {
                 // Applies at once: a language you cannot read is not something
                 // to confirm with a Save button in that language.
                 onPress={() =>
-                  void setLanguage(l).catch((e: Error) => Alert.alert('Not changed', e.message))
+                  void setLanguage(l)
+                    .then(() => queryClient.invalidateQueries())
+                    .catch((e: Error) => Alert.alert('Not changed', e.message))
                 }
               />
             ))}
           </View>
           <Text style={styles.caption}>
-            French covers the main screens. Notifications and some details are still
-            in English.
+            French covers the app. The text of notifications and a few details are
+            still in English.
           </Text>
         </View>
 

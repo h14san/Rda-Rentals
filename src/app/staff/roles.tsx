@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { FlatList, RefreshControl, StyleSheet, Text } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { Text } from '@/components/text';
 
 import { StaffOnly, StaffRow } from '@/components/staff';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';

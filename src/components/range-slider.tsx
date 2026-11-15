@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { PanResponder, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Text } from '@/components/text';
 
 import { colors, fontFamily, fontSize, spacing } from '@/theme';
 

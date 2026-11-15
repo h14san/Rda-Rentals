@@ -1,6 +1,7 @@
 import * as Linking from 'expo-linking';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, SectionTitle } from '@/components/ui';

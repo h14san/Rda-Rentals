@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
+import { Alert } from '@/lib/alert';
 
 import { MenuRow, MenuSection } from '@/components/menu-row';
 import { Button } from '@/components/ui';
@@ -15,6 +17,7 @@ import { CASE_STATUS_LABELS, PROFILE_BADGE_LABELS } from '@/features/verificatio
 import { signOut } from '@/lib/auth';
 import { unregisterPush } from '@/lib/push';
 import { colors, fontFamily, radius, shadow, spacing, type } from '@/theme';
+import { translate } from '@/lib/i18n';
 
 export default function ProfileScreen() {
   const { session } = useAuth();
@@ -47,7 +50,7 @@ function SignedInProfile({ userId }: { userId: string }) {
   const live = listings.data?.filter((l) => l.status === 'published').length ?? 0;
   const listingCount = listings.data?.length ?? 0;
   const listingsDetail =
-    listingCount === 0 ? 'None yet' : `${live} live · ${listingCount} in all`;
+    listingCount === 0 ? 'None yet' : translate('{live} live · {total} in all', { live, total: listingCount });
 
   // Requests waiting for this person as a landlord, or acceptances waiting for
   // them as a renter: the two things on the bookings screen that need a tap.
@@ -155,7 +158,7 @@ function SignedInProfile({ userId }: { userId: string }) {
         <MenuRow
           icon="calendar-outline"
           label="Bookings"
-          detail={bookingsWaiting > 0 ? `${bookingsWaiting} waiting for you` : undefined}
+          detail={bookingsWaiting > 0 ? translate('{n} waiting for you', { n: bookingsWaiting }) : undefined}
           badge={bookingsWaiting > 0}
           onPress={() => router.push('/bookings')}
         />

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { ACCOUNT_MODES, ACCOUNT_MODE_COPY, type AccountMode } from '@/features/auth/mode';
 import { colors, radius, spacing, type } from '@/theme';

@@ -1,5 +1,6 @@
 import * as Linking from 'expo-linking';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { Button } from '@/components/ui';
 import { SUPPORT_EMAIL } from '@/features/help/content';

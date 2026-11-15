@@ -830,16 +830,33 @@ factor on the opposite, wrong, reasoning. It left every staff account that had
 not opened the console on one emailed code.) In `rls_check.sql` staff sessions
 carry `'aal', 'aal2'` in their claims for this reason.
 
-**French is a dictionary keyed by the English string** (`src/lib/i18n-fr.ts`,
-`useT()`). A missing line shows English instead of a key. The shared
-components (Button, Chip, TextField, SectionTitle, the menu rows, the states,
-the action sheet) and the tab and stack titles translate what they are given,
-which covers most screens without edits. `t('{n} rentals', { n })` handles text with a number in it; the template is
-the key. Notification **titles** are a fixed set and translate in the list;
-their bodies, push banners and chat system messages are composed in the
-database and stay English. **Not translated:** most text built from numbers
-or names, the help pages, and the staff console. The language is in the
-user's auth metadata, like the account mode, and defaults to the phone's.
+**French is a dictionary keyed by the English string** (`src/lib/i18n-fr.ts`
+and `i18n-fr-more.ts`). A missing line shows English instead of a key. Three
+things do the work, so screens rarely call anything:
+
+- **`@/components/text` is the app's `Text`, and `@/lib/alert` its `Alert`.
+  Import those, never react-native's.** `Text` translates a child that is one
+  plain string; `Alert` translates title, message and buttons. A new screen
+  that imports react-native's versions silently stays English.
+- The shared components translate their label, hint and placeholder.
+- Text with a number or a name in it needs a template:
+  `t('{n} saved', { n })` in a component, `translate(...)` elsewhere. JSX like
+  `{count} saved` is an array, not a string, and passes through untranslated.
+
+`lib/format.ts`, `listingFacts`, `listingTermRows` and `filterSummary` build
+their own French ("il y a 2 jours", "3 chambres") from `i18n-state.ts`, a file
+with no imports, because `i18n.ts` needs the auth context and those helpers
+are imported by it. The non-hook paths read the language the root layout last
+set, so they are right on the next render; changing language invalidates every
+query to force one.
+
+`node scripts/i18n-missing.mjs out.tsv labels.tsv` lists static strings with
+no French line. It read zero real ones on 2026-11-25. **Not translated:**
+notification bodies, push banners and chat system messages (composed in the
+database), error text from the server, screen-reader labels, and a few
+templates in the staff console. The help pages are translated in full: they
+are statements about safety and data, so change the French with the English.
+The language is in the user's auth metadata and defaults to the phone's.
 
 **Photos reorder with arrows on the edit screen**, staged until Save like
 every photo change. Saving writes the kept photos to fresh positions below

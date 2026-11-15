@@ -1,4 +1,5 @@
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { Button } from '@/components/ui';
 import { useT } from '@/lib/i18n';

@@ -126,6 +126,15 @@ overturn any of them:
   reporter, and the reverse.
 - **2026-11-15, at most 10 reports per account per 24 hours**, on top of one
   live report per target.
+- **2026-11-18, there is no support email in the app yet.** The help screens
+  read `EXPO_PUBLIC_SUPPORT_EMAIL`. While it is unset they say support is
+  being set up and point to Report, rather than print an address nobody reads
+  to someone asking for their data to be deleted. **The owner needs to supply
+  a monitored inbox before launch**: appeals and deletion requests depend on it.
+- **2026-11-18, the privacy screen states where data is kept** (EU, Frankfurt)
+  and that the AI features send text and photos to Google. Both are true today
+  and both are what the open data-residency decision is about. Rewrite the
+  screen when that is settled.
 - **2026-11-17, preferences switch push only.** The in-app list always
   records everything, so turning a category off never loses information.
 - **2026-11-17, account and safety notifications cannot be turned off**
@@ -566,6 +575,20 @@ the unfiltered inbox subscription only receives the caller's own
 conversations. `rls-check` cannot exercise Realtime: a non-participant
 subscribing and receiving nothing is a manual test.
 
+## Help content
+
+**The help screens are bundled text, not fetched** (`src/features/help/
+content.ts`, routes `/help` and `/help/[topic]`). Someone reads "paying
+safely" when a deal feels wrong, which is when the connection is bad.
+
+**Every sentence there describes real behaviour.** What is masked, what staff
+can read, where data is stored. If a rule changes, change the words in the
+same commit. The privacy topic is a statement to users about their data.
+
+Linked from: the profile tab, the badge list on a listing ("What these checks
+mean"), the masking notice under a chat bubble ("Why?"), the line at the top
+of a conversation, and the suspension notice.
+
 ## Notifications
 
 **`notify_user()` is the only writer of `notifications`, and it is internal.**
@@ -766,6 +789,7 @@ src/
                             profile; post is a hidden tab reached from profile
     (tabs)/messages.tsx     inbox, with archived filter and unread state
     conversation/[id].tsx   one conversation: bubbles, composer, block/report menu
+    help/                   safety and help: index + one screen per topic
     notifications.tsx       the in-app list; tap opens the screen it is about
     notification-settings.tsx  push state + per-category switches
     staff/conversation/[reportId].tsx  logged staff read of a reported conversation
@@ -791,6 +815,7 @@ src/
     verification/           badge labels, case queries, evidence upload
     moderation/             report reasons, report + moderation queries
     staff/                  console queries: stats, lookups, audit, roles
+    help/                   the help text itself (content.ts)
     messaging/              inbox, messages, realtime, blocks (not the AI chat)
     notifications/          list, preferences, realtime, push tap routing
     profile/                public profile query

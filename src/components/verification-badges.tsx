@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { ListingBadgeKind } from '@/features/listings/types';
 import {
@@ -65,9 +66,12 @@ export function BadgeList({
 
   if (rows.length === 0) {
     return (
-      <Text style={styles.none}>
-        This listing has not been checked by Rwanda Rentals yet.
-      </Text>
+      <View style={styles.list}>
+        <Text style={styles.none}>
+          This listing has not been checked by Rwanda Rentals yet.
+        </Text>
+        <ExplainerLink />
+      </View>
     );
   }
 
@@ -88,7 +92,17 @@ export function BadgeList({
         Checks lower the risk; they are not a guarantee. Never pay before you have
         seen the place.
       </Text>
+      <ExplainerLink />
     </View>
+  );
+}
+
+function ExplainerLink() {
+  const router = useRouter();
+  return (
+    <Pressable accessibilityRole="link" onPress={() => router.push('/help/badges')}>
+      <Text style={styles.link}>What these checks mean</Text>
+    </Pressable>
   );
 }
 
@@ -117,6 +131,7 @@ const styles = StyleSheet.create({
   rowLabel: type.bodyStrong,
   rowDetail: type.meta,
   none: type.caption,
+  link: { ...type.caption, color: colors.softBlack, textDecorationLine: 'underline' },
 
   pill: {
     flexDirection: 'row',

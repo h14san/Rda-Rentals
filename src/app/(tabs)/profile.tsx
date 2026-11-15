@@ -108,6 +108,11 @@ function SignedInProfile({ userId }: { userId: string }) {
             Your listings are hidden and you cannot post new ones until this is
             lifted.
           </Text>
+          <Pressable accessibilityRole="link" onPress={() => router.push('/help/reporting')}>
+            <Text style={[styles.noticeBody, styles.noticeLink]}>
+              What this means and how to appeal
+            </Text>
+          </Pressable>
         </View>
       )}
 
@@ -349,6 +354,12 @@ function SignedInProfile({ userId }: { userId: string }) {
       />
 
       <Button
+        label="Safety and help"
+        variant="secondary"
+        onPress={() => router.push('/help')}
+      />
+
+      <Button
         label="Sign out"
         variant="ghost"
         onPress={() =>
@@ -392,6 +403,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     color: colors.danger,
   },
+  noticeLink: { textDecorationLine: 'underline' },
   noticeBody: {
     fontFamily: fontFamily.regular,
     fontSize: fontSize.sm,

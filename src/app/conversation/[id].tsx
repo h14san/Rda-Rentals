@@ -202,9 +202,12 @@ function Conversation({ id, userId }: { id: string; userId: string }) {
               onPress={() => setLimit((n) => n + PAGE)}
             />
           ) : (
-            <Text style={styles.intro}>
-              Keep the conversation here. Never pay before you have seen the place.
-            </Text>
+            <Pressable accessibilityRole="link" onPress={() => router.push('/help/payments')}>
+              <Text style={styles.intro}>
+                Keep the conversation here. Never pay before you have seen the place.{' '}
+                <Text style={styles.noticeLink}>Paying safely</Text>
+              </Text>
+            </Pressable>
           )
         }
       />
@@ -279,6 +282,7 @@ function Bubble({
   mine: boolean;
   onLongPress?: () => void;
 }) {
+  const router = useRouter();
   if (message.kind === 'system') {
     return <Text style={styles.system}>{message.body}</Text>;
   }
@@ -291,7 +295,16 @@ function Bubble({
       >
         <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{message.body}</Text>
       </Pressable>
-      {message.masked && <Text style={styles.notice}>{MASKED_NOTICE}</Text>}
+      {message.masked && (
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => router.push('/help/contact-details')}
+        >
+          <Text style={styles.notice}>
+            {MASKED_NOTICE} <Text style={styles.noticeLink}>Why?</Text>
+          </Text>
+        </Pressable>
+      )}
       <Text style={styles.stamp}>{clock(message.created_at)}</Text>
     </View>
   );
@@ -340,6 +353,7 @@ const styles = StyleSheet.create({
   bubbleText: type.body,
   bubbleTextMine: { color: colors.white },
   notice: { ...type.caption, maxWidth: 260 },
+  noticeLink: { color: colors.softBlack, textDecorationLine: 'underline' },
   stamp: { ...type.caption, fontFamily: fontFamily.regular },
 
   composer: {

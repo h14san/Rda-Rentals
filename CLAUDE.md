@@ -175,10 +175,11 @@ overturn any of them:
   setup now asks for a name only. Once a booking is confirmed the two people
   exchange numbers in chat, unmasked. A stored number would need its own
   release rule and nothing needs it (rule 10).
-- **2026-11-16, Post left the tab bar.** Tabs are Explore, Ask, Saved,
-  Messages, Profile. Five is the limit on a small phone, and messaging is
-  daily while posting is occasional. `/post` is unchanged and is reached from
-  the profile.
+- **2026-11-21 (owner), the Ask tab is off the tab bar and Post is back.**
+  Tabs are Explore, Saved, Post, Messages, Profile. The owner found Ask did
+  the same job as the search bar on Explore. Asking now lives on each listing
+  ("Ask about this place"). `(tabs)/chat.tsx` and the `chat` function are
+  kept with `href: null`, so restoring the tab is one line.
 - **2026-11-16, flagged messages are never blocked or altered.** Links and
   payment wording raise one automated report per conversation and nothing
   else. A false positive costs a reviewer a minute; blocking would cost a
@@ -224,6 +225,7 @@ npm run db:rls-check   # asserts the RLS policies hold (passes --yes; always rol
 npx supabase functions deploy chat           # the three AI functions;
 npx supabase functions deploy smart-search   # no Docker needed to deploy
 npx supabase functions deploy auto-describe
+npx supabase functions deploy ask-listing
 npx supabase functions deploy send-push --no-verify-jwt   # called by Postgres
 ```
 
@@ -756,7 +758,45 @@ use `src/components/action-sheet.tsx`.
 the `chat` Edge Function are the AI assistant, and the Ask tab's file is
 `(tabs)/chat.tsx`.
 
-## AI features (all three built)
+## UI direction (owner feedback, 2026-11-21): take cues from Airbnb
+
+- **Explore** is one raised search pill, a round filter button with a count,
+  the active filters as chips with a Clear chip, and a results row. No title
+  and no neighbourhood shortcuts: the owner asked for the sector chips to go.
+- **Sort is a picker, not a cycle.** Tapping the sort pill opens a sheet of
+  the four orders with the current one ticked. It used to advance to the next
+  order on each tap, which applied a sort nobody chose.
+- **"Clear all" in the filter sheet commits at once.** Every other change
+  there waits for "Show results". Clearing then going back used to leave the
+  old filters in place, which read as the button not working.
+- **A listing card has no box.** Rounded photo, text beneath, on the page.
+- **Photos open a gallery** (`photo-gallery.tsx`, a Modal): a grid of all of
+  them, then one at a time, swiped sideways, shown whole (`contain`).
+- **The profile tab is a menu.** Identity card, then rows that go somewhere.
+  Editing the profile (`/edit-profile`) and the landlord's listings
+  (`/my-listings`) are their own screens.
+- **A listing in "Your listings" shows at most one button**, the thing most
+  worth doing now (`primaryFor`). Everything else is behind the "⋯" menu.
+  Five buttons under every listing made three listings a wall of buttons.
+
+## AI features (four built)
+
+**`ask-listing` answers a question about one listing, from that listing's
+own details.** It is the opposite arrangement to the search assistant below,
+which never sees a listing, so the same guarantees are rebuilt differently:
+
+- The listing is read **with the caller's token**, so RLS decides what exists.
+  A draft or suspended listing cannot be asked about, because the function
+  cannot read it either. `listing_locations` is never selected.
+- Only columns already shown on the listing page go to the model.
+- The model returns `known`. When the details do not answer the question it
+  is false, and the screen offers "Message the landlord to ask" instead of
+  presenting the reply as an answer (rule 11).
+- "Not stated" is passed as unknown and the prompt forbids reading it as "no".
+- The description is reported as what the landlord says, not as a checked
+  fact. Temperature 0.
+- It was deployed and typechecked, **not exercised end to end**: that needs a
+  signed-in session on a device.
 
 Three Edge Functions, one shared key: `smart-search`, `chat` and `auto-describe`
 under `supabase/functions/`, all holding `GEMINI_API_KEY` (Google AI Studio free
@@ -879,9 +919,11 @@ before writing SDK calls rather than working from memory.
 src/
   app/                      expo-router routes
     (auth)/                 sign-in, verify, profile-setup
-    (tabs)/                 index (feed + map), chat (Ask), saved, messages,
-                            profile; post is a hidden tab reached from profile
+    (tabs)/                 index (feed + map), saved, post, messages, profile;
+                            chat (the Ask assistant) is kept but hidden
     (tabs)/messages.tsx     inbox, with archived filter and unread state
+    edit-profile.tsx        name, and the private sign-in email shown read-only
+    my-listings.tsx         the landlord's listings: groups, one action, "⋯" menu
     conversation/[id].tsx   one conversation: bubbles, composer, block/report menu
     book/[listingId].tsx    request or instant-book form: date, length, note
     bookings.tsx            my bookings, as renter and as landlord
@@ -926,6 +968,7 @@ supabase/
   functions/smart-search/             query -> Filters
   functions/chat/                     conversation -> reply + Filters
   functions/auto-describe/            photos -> description
+  functions/ask-listing/              one listing + a question -> answer, known
   functions/send-push/                notification id -> Expo Push (no JWT; see
                                       its header for why that is safe)
   migrations/20260910120000_init.sql  schema, indexes, RLS, storage policies

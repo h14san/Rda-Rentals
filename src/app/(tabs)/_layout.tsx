@@ -52,6 +52,11 @@ export default function TabsLayout() {
         options={{
           title: 'Ask',
           headerTitle: 'Ask about rentals',
+          // Off the tab bar: it did the same job as the search bar on Explore.
+          // Asking now lives on each listing ("Ask about this place"), which
+          // is a question the search bar cannot answer. The screen is kept, so
+          // bringing the tab back is deleting this line.
+          href: null,
           // Same sparkles mark as the feed's smart search bar and the
           // "Write it for me" action: one icon means "a model did this".
           tabBarIcon: ({ color, size }) => (
@@ -70,6 +75,16 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="post"
+        options={{
+          title: 'Post',
+          headerTitle: 'Post a rental',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="add-circle-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="messages"
         options={{
           title: 'Messages',
@@ -77,21 +92,6 @@ export default function TabsLayout() {
           tabBarBadgeStyle: { backgroundColor: colors.softBlack, color: colors.white },
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubbles-outline" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="post"
-        options={{
-          title: 'Post',
-          headerTitle: 'Post a rental',
-          // Five tabs is the limit on a small phone, and Messages needed one.
-          // Posting is something a landlord does a few times, messaging is
-          // daily, so Post is reached from the profile instead. The route
-          // itself is unchanged.
-          href: null,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle-outline" color={color} size={size} />
           ),
         }}
       />

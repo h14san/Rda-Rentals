@@ -30,10 +30,14 @@ const STAY_OPTIONS = [1, 3, 6, 12] as const;
  * Edits a local draft and only commits on "Show results", so a half-set filter
  * never triggers a query — each intermediate state would otherwise be a round
  * trip on a metered connection.
+ *
+ * "Clear all" is the exception and commits at once. Clearing is a decision, not
+ * a half-set filter, and having to press "Show results" afterwards to make it
+ * stick read as the button not working: going back showed the old filters.
  */
 export default function FiltersScreen() {
   const router = useRouter();
-  const { filters, setFilters } = useFilters();
+  const { filters, setFilters, resetFilters } = useFilters();
   const [draft, setDraft] = useState<Filters>(filters);
 
   const minPrice = draft.minPrice ?? PRICE_BOUNDS.min;
@@ -64,6 +68,12 @@ export default function FiltersScreen() {
   function apply() {
     setFilters(draft);
     router.back();
+  }
+
+  function clearAll() {
+    setDraft(EMPTY_FILTERS);
+    // Also drops the smart-search explanation, which described these filters.
+    resetFilters();
   }
 
   return (
@@ -269,7 +279,7 @@ export default function FiltersScreen() {
         <Button
           label="Clear all"
           variant="ghost"
-          onPress={() => setDraft(EMPTY_FILTERS)}
+          onPress={clearAll}
           style={styles.footerButton}
         />
         <Button label="Show results" onPress={apply} style={styles.footerButton} />

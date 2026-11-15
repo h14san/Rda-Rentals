@@ -16,7 +16,7 @@ import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
 /* Button                                                                     */
 /* -------------------------------------------------------------------------- */
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'whatsapp' | 'danger';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 interface ButtonProps {
   label: string;
@@ -35,7 +35,6 @@ const BUTTON_COLORS: Record<
   primary: { bg: colors.softBlack, fg: colors.white },
   secondary: { bg: colors.white, fg: colors.charcoal, border: colors.border },
   ghost: { bg: 'transparent', fg: colors.charcoal },
-  whatsapp: { bg: colors.whatsapp, fg: colors.white },
   danger: { bg: colors.white, fg: colors.danger, border: colors.danger },
 };
 

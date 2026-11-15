@@ -146,7 +146,7 @@ export function useListingDetail(id: string) {
         .select(
           // The profiles embed is hinted by column so it stays unambiguous as
           // more tables gain foreign keys to both listings and profiles.
-          `*, ${IMAGE_SELECT}, ${BADGE_SELECT}, profiles!owner_id (id, full_name, whatsapp_phone, profile_badges (kind, checked_at)), listing_locations (address, latitude, longitude)`,
+          `*, ${IMAGE_SELECT}, ${BADGE_SELECT}, profiles!owner_id (id, full_name, profile_badges (kind, checked_at)), listing_locations (address, latitude, longitude)`,
         )
         .eq('id', id)
         .single();

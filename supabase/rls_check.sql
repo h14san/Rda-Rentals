@@ -13,6 +13,95 @@
 
 begin;
 
+-- Contact masking fixtures. Pure functions, so no impersonation is needed.
+-- The traps are the false positives: a price or a date read as a phone number
+-- would make every conversation about rent unreadable.
+do $mask$
+declare
+  s text;
+  must_mask text[] := array[
+    '0788123456',
+    'Call me on 0788123456 please',
+    '078 812 3456',
+    '0788 123 456',
+    '07.88.12.34.56',
+    '0722-123-456',
+    '+250788123456',
+    '+250 788 123 456',
+    '250788123456',
+    '250 788 123 456',
+    'my number is 788123456',
+    '+254 712 345 678',
+    'write to me.name+rent@example.co.rw',
+    'dial *182*1*1*0788123456*5000# now',
+    'use *182# to pay'
+  ];
+  must_keep text[] := array[
+    '250,000 RWF',
+    '250 000 RWF',
+    'Rent is 250000 RWF per month',
+    'The deposit is 780000',
+    'Available from 2026-11-15',
+    'I can visit on 15/07/2026',
+    '15-07-2026 at 10:30',
+    '2 bedrooms, 3 bathrooms, 120 m2',
+    'between 300000 and 350000',
+    '730000 or 800000',
+    'KG 123 St, near the market',
+    'Call me after 7',
+    'Is 7 pm ok? I finish at 6:30',
+    'the room is 3 * 4 metres'
+  ];
+  must_flag text[] := array[
+    'see https://example.com/house',
+    'www.cheap-houses.rw has more',
+    'look at myhouse.com',
+    'Please send money first',
+    'Pay first and I will send the address',
+    'whatsapp me',
+    'ohereza amafaranga kuri momo',
+    'Banza wishyure',
+    'il faut payer d''abord',
+    'envoyer l''argent par virement'
+  ];
+  must_not_flag text[] := array[
+    'Is the house still available?',
+    'How much is the deposit?',
+    'I can come on Monday at 10.',
+    'Rent is 250.000 per month',
+    'Murakoze, nzaza ejo'
+  ];
+begin
+  foreach s in array must_mask loop
+    if public.mask_contact_details(s) !~ '•••'
+       or public.mask_contact_details(s) ~ '\d{3}'
+       or public.mask_contact_details(s) ~ '@' then
+      raise exception 'FAIL: contact details survived masking: "%" -> "%"',
+        s, public.mask_contact_details(s);
+    end if;
+  end loop;
+
+  foreach s in array must_keep loop
+    if public.mask_contact_details(s) <> s then
+      raise exception 'FAIL: masking changed an innocent message: "%" -> "%"',
+        s, public.mask_contact_details(s);
+    end if;
+  end loop;
+
+  foreach s in array must_flag loop
+    if not public.message_is_suspicious(s) then
+      raise exception 'FAIL: not flagged: "%"', s;
+    end if;
+  end loop;
+
+  foreach s in array must_not_flag loop
+    if public.message_is_suspicious(s) then
+      raise exception 'FAIL: an innocent message was flagged: "%"', s;
+    end if;
+  end loop;
+end;
+$mask$;
+
 do $check$
 declare
   user_a uuid := 'aaaaaaaa-0000-4000-8000-000000000001';
@@ -26,6 +115,11 @@ declare
   a_report uuid;
   b_report uuid;
   v_status text;
+  conv uuid;
+  a_message uuid;
+  b_message uuid;
+  m_report uuid;
+  transcript jsonb;
   a_active_listing uuid;
   a_draft_listing uuid;
   visible int;
@@ -790,6 +884,365 @@ begin
     raise exception 'FAIL: restoring an account did not bring its listing back.';
   end if;
 
+  -- 15. Chat. A is the renter, B the landlord of b_listing, C is staff and a
+  --     stranger to the conversation.
+  --     (Still A from the step above.)
+  conv := public.start_conversation(b_listing);
+  if conv is null then
+    raise exception 'FAIL: user A cannot start a conversation on a published listing.';
+  end if;
+
+  if public.start_conversation(b_listing) <> conv then
+    raise exception 'FAIL: starting the same conversation twice made a second one.';
+  end if;
+
+  begin
+    perform public.start_conversation(a_draft_listing);
+    raise exception 'FAIL: a conversation was opened on a listing that is not published.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.conversations (listing_id, listing_title, renter_id, landlord_id)
+    values (b_listing, 'forged', user_a, user_c);
+    raise exception 'FAIL: user A inserted a conversation directly.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  insert into public.messages (conversation_id, sender_id, body)
+  values (conv, user_a, 'Hello, is it free? Call me on 0788 123 456 or a@example.com')
+  returning id into a_message;
+
+  if not exists (
+    select 1 from public.messages
+    where id = a_message and masked
+      and body = 'Hello, is it free? Call me on ••• or •••'
+  ) then
+    raise exception 'FAIL: a phone number and an email were stored unmasked: %',
+      (select body from public.messages where id = a_message);
+  end if;
+
+  -- Not even the sender reads the original back.
+  begin
+    select count(*) into visible from public.message_originals;
+    if visible <> 0 then
+      raise exception 'FAIL: the sender can read the unmasked original.';
+    end if;
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.messages (conversation_id, sender_id, body)
+    values (conv, user_b, 'forged');
+    raise exception 'FAIL: user A sent a message as user B.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.messages (conversation_id, sender_id, kind, body)
+    values (conv, user_a, 'system', 'Booking confirmed.');
+    raise exception 'FAIL: user A forged a system message.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  update public.messages set body = 'edited' where id = a_message;
+  get diagnostics affected = row_count;
+  if affected <> 0 then
+    raise exception 'FAIL: a sent message was edited.';
+  end if;
+
+  delete from public.messages where id = a_message;
+  get diagnostics affected = row_count;
+  if affected <> 0 then
+    raise exception 'FAIL: a sent message was deleted.';
+  end if;
+
+  --     As B: reads it masked, replies, and keeps their own read state.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+
+  select count(*) into visible from public.messages
+  where conversation_id = conv and body like '%•••%' and body not like '%0788%';
+  if visible <> 1 then
+    raise exception 'FAIL: the landlord cannot read the (masked) message.';
+  end if;
+
+  begin
+    select count(*) into visible from public.message_originals;
+    if visible <> 0 then
+      raise exception 'FAIL: the recipient can read the unmasked original.';
+    end if;
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  insert into public.messages (conversation_id, sender_id, body)
+  values (conv, user_b, 'Yes, it is free from next month.')
+  returning id into b_message;
+
+  if not exists (
+    select 1 from public.conversations
+    where id = conv and last_message_sender_id = user_b
+      and last_message_preview = 'Yes, it is free from next month.'
+  ) then
+    raise exception 'FAIL: the conversation preview did not follow the last message.';
+  end if;
+
+  select count(*) into visible from public.conversation_participants where conversation_id = conv;
+  if visible <> 1 then
+    raise exception 'FAIL: user B sees % participant rows, expected only its own.', visible;
+  end if;
+
+  update public.conversation_participants set last_read_at = '2100-01-01'
+  where conversation_id = conv and user_id = user_b;
+  if exists (
+    select 1 from public.conversation_participants
+    where conversation_id = conv and user_id = user_b
+      and last_read_at > now() + interval '1 minute'
+  ) then
+    raise exception 'FAIL: a client-supplied read time was stored.';
+  end if;
+
+  update public.conversation_participants set muted = true
+  where conversation_id = conv and user_id = user_a;
+  get diagnostics affected = row_count;
+  if affected <> 0 then
+    raise exception 'FAIL: user B muted the conversation for user A.';
+  end if;
+
+  begin
+    update public.conversation_participants set user_id = user_c
+    where conversation_id = conv and user_id = user_b;
+    raise exception 'FAIL: a participant row was re-pointed at another user.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  --     As C: a stranger, even one with a staff role, reads and writes nothing.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    true
+  );
+
+  select count(*) into visible from public.conversations where id = conv;
+  if visible <> 0 then
+    raise exception 'FAIL: a non-participant can read the conversation.';
+  end if;
+
+  select count(*) into visible from public.messages where conversation_id = conv;
+  if visible <> 0 then
+    raise exception 'FAIL: a non-participant can read the messages.';
+  end if;
+
+  begin
+    insert into public.messages (conversation_id, sender_id, body)
+    values (conv, user_c, 'hello from outside');
+    raise exception 'FAIL: a non-participant sent a message.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.reports (reporter_id, target_type, target_id, reason)
+    values (user_c, 'message', a_message, 'scam');
+    raise exception 'FAIL: a non-participant reported a message it cannot see.';
+  exception
+    when no_data_found then null;
+  end;
+
+  -- A closed report (the listing report from step 13) opens no conversation.
+  begin
+    perform public.staff_report_conversation(a_report);
+    raise exception 'FAIL: staff read a conversation through a closed report.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  --     Blocks stop both directions, and the blocked side cannot see or lift it.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+
+  insert into public.user_blocks (blocker_id, blocked_id) values (user_b, user_a);
+
+  begin
+    insert into public.user_blocks (blocker_id, blocked_id) values (user_a, user_b);
+    raise exception 'FAIL: user B created a block in user A''s name.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.messages (conversation_id, sender_id, body)
+    values (conv, user_b, 'one more thing');
+    raise exception 'FAIL: the blocker could still send.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+
+  begin
+    insert into public.messages (conversation_id, sender_id, body)
+    values (conv, user_a, 'are you there?');
+    raise exception 'FAIL: a blocked user sent a message.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  select count(*) into visible from public.user_blocks;
+  if visible <> 0 then
+    raise exception 'FAIL: user A can see that user B blocked them.';
+  end if;
+
+  delete from public.user_blocks where blocked_id = user_a;
+  get diagnostics affected = row_count;
+  if affected <> 0 then
+    raise exception 'FAIL: a blocked user lifted the block.';
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+  delete from public.user_blocks where blocker_id = user_b and blocked_id = user_a;
+
+  --     Reports on messages, and the automated flag.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+
+  begin
+    insert into public.reports (reporter_id, target_type, target_id, reason)
+    values (user_a, 'message', a_message, 'scam');
+    raise exception 'FAIL: user A reported its own message.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  insert into public.reports (reporter_id, target_type, target_id, reason)
+  values (user_a, 'message', b_message, 'harassment')
+  returning id into m_report;
+
+  if not exists (
+    select 1 from public.reports where id = m_report and subject_user_id = user_b
+  ) then
+    raise exception 'FAIL: a message report does not name the sender as its subject.';
+  end if;
+
+  -- The client cannot choose who a report is about.
+  insert into public.reports (reporter_id, target_type, target_id, reason, subject_user_id)
+  values (user_a, 'conversation', conv, 'scam', user_c);
+  if not exists (
+    select 1 from public.reports
+    where reporter_id = user_a and target_type = 'conversation' and subject_user_id = user_b
+  ) then
+    raise exception 'FAIL: a reporter chose the subject of a report.';
+  end if;
+
+  insert into public.messages (conversation_id, sender_id, body)
+  values (conv, user_a, 'Please send money to my MoMo first');
+  insert into public.messages (conversation_id, sender_id, body)
+  values (conv, user_a, 'Pay first, see https://example.com');
+
+  --     As C: the flag reached the queue once, and the conversation opens only
+  --     through an open report, with the original text, and is logged.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    true
+  );
+
+  select count(*) into visible from public.reports
+  where reporter_id is null and target_type = 'message'
+    and subject_user_id = user_a and status = 'open';
+  if visible <> 1 then
+    raise exception 'FAIL: two flagged messages made % automated reports, expected 1.', visible;
+  end if;
+
+  transcript := public.staff_report_conversation(m_report);
+  if jsonb_array_length(transcript -> 'messages') <> 4 then
+    raise exception 'FAIL: staff transcript has % messages, expected 4.',
+      jsonb_array_length(transcript -> 'messages');
+  end if;
+
+  if not exists (
+    select 1 from jsonb_array_elements(transcript -> 'messages') m
+    where m ->> 'original_body' = 'Hello, is it free? Call me on 0788 123 456 or a@example.com'
+  ) then
+    raise exception 'FAIL: staff transcript is missing the original text.';
+  end if;
+
+  select count(*) into visible from public.moderation_events
+  where action = 'conversation_viewed' and subject_id = conv
+    and actor = user_c and report_id = m_report;
+  if visible <> 1 then
+    raise exception 'FAIL: a staff look at a conversation was not logged.';
+  end if;
+
+  -- Still no direct read, even with a report open.
+  select count(*) into visible from public.messages where conversation_id = conv;
+  if visible <> 0 then
+    raise exception 'FAIL: staff read messages directly.';
+  end if;
+
+  perform public.resolve_report(m_report, 'dismissed', 'Nothing against the rules.');
+  begin
+    perform public.staff_report_conversation(m_report);
+    raise exception 'FAIL: staff read a conversation after its report was closed.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  --     A suspended account cannot send or start conversations.
+  perform public.restrict_account(user_a, 'suspend', 'Asking for payment off the platform.');
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+
+  begin
+    insert into public.messages (conversation_id, sender_id, body)
+    values (conv, user_a, 'still here');
+    raise exception 'FAIL: a suspended account sent a message.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.staff_report_conversation(m_report);
+    raise exception 'FAIL: a non-staff user called the staff conversation function.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    true
+  );
+  perform public.restrict_account(user_a, 'restore', 'Lifted for the rest of the check.');
+
   -- 8. Anonymous users see published listings only.
   set local role anon;
   perform set_config('request.jwt.claims', null, true);
@@ -858,6 +1311,32 @@ begin
   begin
     perform public.moderate_listing(b_listing, 'suspend', 'anon');
     raise exception 'FAIL: anonymous user suspended a listing.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- 16. Anonymous users see nothing of chat.
+  begin
+    select count(*) into visible from public.messages;
+    if visible <> 0 then
+      raise exception 'FAIL: anonymous user can read messages.';
+    end if;
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    select count(*) into visible from public.conversations;
+    if visible <> 0 then
+      raise exception 'FAIL: anonymous user can read conversations.';
+    end if;
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.start_conversation(b_listing);
+    raise exception 'FAIL: anonymous user started a conversation.';
   exception
     when insufficient_privilege then null;
   end;

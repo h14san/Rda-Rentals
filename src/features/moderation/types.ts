@@ -3,7 +3,7 @@
  * supabase/migrations/20261115120000_reports_and_moderation.sql.
  */
 
-export type ReportTarget = 'listing' | 'user' | 'message';
+export type ReportTarget = 'listing' | 'user' | 'message' | 'conversation';
 export type ReportStatus = 'open' | 'in_review' | 'resolved' | 'dismissed';
 export type ReportSeverity = 'low' | 'medium' | 'high';
 export type ReportAction = 'listing_suspended' | 'account_suspended';
@@ -74,12 +74,21 @@ export const REASONS_FOR_TARGET: Record<ReportTarget, ReportReason[]> = {
     'inappropriate_content',
     'other',
   ],
+  conversation: [
+    'scam',
+    'suspicious_payment_request',
+    'harassment',
+    'fake_landlord',
+    'inappropriate_content',
+    'other',
+  ],
 };
 
 export const REPORT_TARGET_LABELS: Record<ReportTarget, string> = {
   listing: 'Listing',
   user: 'Account',
   message: 'Message',
+  conversation: 'Conversation',
 };
 
 export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
@@ -115,6 +124,12 @@ export type ReportRow = {
   reporter_id: string | null;
   target_type: ReportTarget;
   target_id: string;
+  /**
+   * Who the report is about, resolved by the server when it is made: the
+   * listing's owner, the account, the message's sender, or the other person in
+   * the conversation.
+   */
+  subject_user_id: string | null;
   reason: ReportReason;
   note: string | null;
   status: ReportStatus;

@@ -46,14 +46,14 @@ values
   )
 on conflict (id) do nothing;
 
--- The trigger fills id/full_name; add the contact numbers the app needs
--- for the WhatsApp CTA.
+-- The trigger fills id/full_name from the metadata; set them again so a
+-- re-run repairs an edited name. No contact number: profiles holds none.
 update public.profiles
-set full_name = 'Aline Uwase', whatsapp_phone = '+250788111222'
+set full_name = 'Aline Uwase'
 where id = 'aaaaaaaa-0000-4000-8000-000000000001';
 
 update public.profiles
-set full_name = 'Eric Habimana', whatsapp_phone = '+250788333444'
+set full_name = 'Eric Habimana'
 where id = 'aaaaaaaa-0000-4000-8000-000000000002';
 
 -- ---------------------------------------------------------------------------

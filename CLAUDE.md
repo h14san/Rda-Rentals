@@ -5,8 +5,8 @@
 Long-term rental marketplace for Rwanda, starting in Kigali. Tenants browse,
 filter and ask an AI assistant for listings; landlords post rentals with photos.
 The target product is a privacy-controlled marketplace with in-app chat,
-specific verification badges, booking and an admin console. Contact is still
-over WhatsApp until in-app chat ships.
+specific verification badges, booking and an admin console. Contact is through
+in-app chat only; there is no phone number or email anywhere a user can read.
 
 Expo SDK 57 (RN 0.86, React 19.2) + expo-router · Supabase (Postgres/Auth/
 Storage) · TanStack Query · react-native-maps.
@@ -47,8 +47,9 @@ app knows which model answers.
 
 ### Product rules (Blueprint §68): check every change against these
 
-1. No landlord phone number on public listings. *Temporary exception: the
-   WhatsApp CTA stays until in-app chat (Phase 3), then goes.*
+1. No landlord phone number on public listings. *The temporary WhatsApp
+   exception ended with chat (2026-11-16): `profiles.whatsapp_phone` is
+   dropped and nothing replaces it.*
 2. No landlord email on public listings.
 3. No exact address before the appropriate booking or payment stage.
 4. No exact map pin before that stage.
@@ -86,8 +87,10 @@ The plan maps the Blueprint's phases onto what was already built:
 - **Phase 3b (done, live 2026-11-15):** reports, and the moderation actions
   (suspend/restore a listing, restrict/restore an account) with a staff
   reports queue at `/staff/reports`.
-- **Phase 3, rest:** in-app chat (which removes WhatsApp), notifications and
-  push, and the rest of the admin console.
+- **Phase 3c (done, live 2026-11-16):** in-app chat with server-side contact
+  masking, blocks, message and conversation reports, and a logged staff read
+  path. WhatsApp and the contact number are gone.
+- **Phase 3, rest:** notifications and push, and the rest of the admin console.
 - **Phase 4:** booking (Instant Book + Request to Book).
 - **Later:** AI matching and alerts, payments, digital rental, and agencies.
 
@@ -116,6 +119,23 @@ overturn any of them:
   reporter, and the reverse.
 - **2026-11-15, at most 10 reports per account per 24 hours**, on top of one
   live report per target.
+- **2026-11-16, `profiles.whatsapp_phone` was dropped, not hidden.** Profile
+  setup now asks for a name only. Once a booking is confirmed the two people
+  exchange numbers in chat, unmasked. A stored number would need its own
+  release rule and nothing needs it (rule 10).
+- **2026-11-16, Post left the tab bar.** Tabs are Explore, Ask, Saved,
+  Messages, Profile. Five is the limit on a small phone, and messaging is
+  daily while posting is occasional. `/post` is unchanged and is reached from
+  the profile.
+- **2026-11-16, flagged messages are never blocked or altered.** Links and
+  payment wording raise one automated report per conversation and nothing
+  else. A false positive costs a reviewer a minute; blocking would cost a
+  renter a legitimate question about the deposit.
+- **2026-11-16, a block is silent and mutual.** Neither side can send, the
+  blocked person is not told and cannot see the block, and both get the same
+  refusal wording.
+- **2026-11-16, 30 messages per sender per minute**, enforced in the insert
+  trigger.
 - **2026-11-15, a public landlord page exists** (`/user/[id]`): name, join
   year, the ID badge and live listings. No contact details.
 
@@ -237,8 +257,8 @@ Verified end to end against the live project: an anonymous caller sees 15 of 17
 listings (drafts and rented hidden), gets `[]` for a draft query, and is
 rejected with `42501` when inserting. Note that `profiles` is readable only by
 authenticated users, so an anonymous client gets `profiles: null` on a listing
-and the WhatsApp CTA has no number — if anonymous browsing is ever enabled, that
-policy needs revisiting.
+and no landlord name. If anonymous browsing is ever enabled, that policy needs
+revisiting.
 
 **The exact location is in `listing_locations`, never on `listings`.** The
 `listings` row is readable by anon, so any column on it is public no matter
@@ -257,8 +277,9 @@ from the real pin by a random bearing and distance drawn uniformly over a
 - Phase 4 booking widens the `listing_locations` policy to the confirmed
   renter. Nothing else should.
 
-**`profiles` has no `phone` column.** The login number lives in `auth.users`
-and reaches its owner through `session.user.phone`. `profiles` is readable by
+**`profiles` has no phone column of any kind.** The login number lives in
+`auth.users` and reaches its owner through `session.user.phone`.
+`whatsapp_phone` was dropped when chat shipped. `profiles` is readable by
 every signed-in user, so whatever is added there is public to them.
 
 **Email OTP needs two things the defaults get wrong.** Supabase's stock
@@ -443,10 +464,82 @@ fewer photos rather than more than `MAX_IMAGES`.
 usable on Rwandan mobile data. Uploads are sequential, not parallel — concurrent
 uploads on a weak connection stall each other.
 
-**WhatsApp uses the `https://wa.me` link, not the `whatsapp://` scheme.**
-`canOpenURL` on a custom scheme needs an Android `<queries>` manifest entry and
-returns false without one, so the scheme route fails on exactly the devices that
-do have WhatsApp. Call is a separate button, not a fallback.
+## Chat
+
+**Conversations are created only by `start_conversation()`.** There is no
+insert policy. The rules need the listing's owner and the other side's blocks,
+and the renter's own policies show neither. One conversation per
+`(listing_id, renter_id)`. It survives the listing being paused, rented or
+deleted (`listing_id` is `on delete set null`, and `listing_title` is a
+snapshot so the inbox still reads).
+
+**Masking is a `before insert` trigger, and it keys on `kind`, not on the
+caller.** `messages_before_insert` is security definer, because it must see
+blocks the sender cannot read and write originals the sender cannot. Inside a
+definer function `current_user` is the owner, so the `current_user =
+'authenticated'` test the listing trigger uses is useless there. Instead:
+everything a person types is `kind = 'text'` (the insert policy allows nothing
+else) and is checked and masked; `system` rows come only from functions and
+pass through.
+
+**The original text is in `message_originals`, which has RLS on and no policy
+at all.** Not the recipient, and not the sender either. The foreign key is
+`deferrable initially deferred` because the trigger writes the original a
+moment before the message row exists.
+
+**The app shows what was stored, not what was typed.** `useSendMessage` reads
+the inserted row back and renders that, so the sender sees the `•••` the
+other person sees, with the notice under the bubble.
+
+**`mask_contact_details` and `message_is_suspicious` are pure SQL functions**
+so the fixtures at the top of `rls_check.sql` can call them. The order inside
+the mask matters: USSD codes first (they contain a phone number), then email,
+then `+`-prefixed numbers, then local Rwandan forms. The Rwandan pattern is
+exactly nine national digits starting 72/73/78/79 with no digit touching
+either end. That is what lets "250,000 RWF", "780000" and "2026-11-15"
+through. Add a fixture before touching either regex. Known gap: a bare
+nine-digit run like "780000 800" is masked.
+
+**Masking stops at a confirmed booking, for new messages only.**
+`contact_masking_active(conversation)` returns true until booking (M7)
+replaces it. Old messages stay masked: unmasking history would need a
+recipient read path into `message_originals`, and that is the back door the
+table exists to close.
+
+**Staff have no policy on any chat table.** Their only way in is
+`staff_report_conversation(report_id)`. It needs an *open* report on the
+conversation or on a message in it, returns the text as typed, refuses a
+reviewer who is a participant, and logs `conversation_viewed` every call.
+Closing the report closes the conversation to staff. The screen makes the
+reviewer press a button first, because opening it is the logged act.
+
+**`reports.subject_user_id` is resolved by the insert trigger**, as the
+caller: the listing's owner, the account, the message's sender, or the other
+participant. Staff cannot read conversations, so without it a message report
+would name nobody they could act on. The client cannot set it.
+
+**Realtime is a hint, never the source of truth.** Both subscriptions
+(`useInboxRealtime`, `useConversationRealtime`) refetch on `SUBSCRIBED` and
+when the app returns to the foreground, because on a flaky connection a dropped
+event is the normal case. Realtime applies the `messages` select policy, so
+the unfiltered inbox subscription only receives the caller's own
+conversations. `rls-check` cannot exercise Realtime: a non-participant
+subscribing and receiving nothing is a manual test.
+
+**"Read" is the server's clock**, like availability: any change to
+`last_read_at` is overwritten with `now()`. Only `last_read_at`, `archived`
+and `muted` are updatable (column grants), so a participant row cannot be
+re-pointed.
+
+**Message queries name their columns, never `*`.** A column added to
+`messages` later should not start arriving on phones by accident.
+
+**`Alert.alert` shows at most three buttons on Android.** Menus with more
+use `src/components/action-sheet.tsx`.
+
+**The feature folder is `messaging`**, because `features/listings/chat.ts` and
+the `chat` Edge Function are the AI assistant, and the Ask tab's file is
+`(tabs)/chat.tsx`.
 
 ## AI features (all three built)
 
@@ -571,7 +664,11 @@ before writing SDK calls rather than working from memory.
 src/
   app/                      expo-router routes
     (auth)/                 sign-in, verify, profile-setup
-    (tabs)/                 index (feed + map), chat (Ask), saved, post, profile
+    (tabs)/                 index (feed + map), chat (Ask), saved, messages,
+                            profile; post is a hidden tab reached from profile
+    (tabs)/messages.tsx     inbox, with archived filter and unread state
+    conversation/[id].tsx   one conversation: bubbles, composer, block/report menu
+    staff/conversation/[reportId].tsx  logged staff read of a reported conversation
     (tabs)/saved.tsx        favorites, with select-to-compare
     compare.tsx             2–4 listings side by side
     verify-identity.tsx     landlord ID upload (not (auth)/verify, the OTP step)
@@ -580,7 +677,7 @@ src/
     report.tsx              report form (modal): /report?type=listing|user&id=
     my-reports.tsx          the reporter's own reports and their outcome
     user/[id].tsx           a landlord as others see them; no contact details
-    listing/[id].tsx        detail + map + WhatsApp CTA
+    listing/[id].tsx        detail + map + "Message landlord"
     listing/edit/[id].tsx   edit fields + photos (flat form, not the wizard)
     filters.tsx             filter sheet (modal)
   features/
@@ -589,8 +686,9 @@ src/
                             smart-search, chat, auto-describe
     verification/           badge labels, case queries, evidence upload
     moderation/             report reasons, report + moderation queries
+    messaging/              inbox, messages, realtime, blocks (not the AI chat)
     profile/                public profile query
-  lib/                      supabase, auth, contact, format, locations,
+  lib/                      supabase, auth, format, locations,
                             edge-functions, images (pick + compress)
   theme/                    colour, spacing, radius, shadow tokens
 supabase/
@@ -609,6 +707,8 @@ supabase/
                                                   review gate, evidence bucket
   migrations/20261115120000_reports_and_moderation.sql  reports, restrictions,
                                                   suspensions, moderation log
+  migrations/20261116120000_chat.sql  conversations, messages, masking, blocks,
+                                      staff transcript, drops whatsapp_phone
   seed.sql                  15 demo Kigali listings (no photos — nothing in
                             the storage bucket to point at until a real upload)
   rls_check.sql             security assertions

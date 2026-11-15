@@ -76,7 +76,8 @@ export default function SignInScreen() {
           <View style={styles.header}>
             <Text style={styles.brand}>Rwanda Rentals</Text>
             <Text style={styles.tagline}>
-              Verified rentals in Kigali, without the WhatsApp group scroll.
+              Rentals in Kigali from landlords we have checked, without the
+              group-chat scroll.
             </Text>
           </View>
 
@@ -104,7 +105,8 @@ export default function SignInScreen() {
           </Pressable>
 
           <Text style={styles.legal}>
-            By continuing you agree to be contacted about listings you enquire about.
+            By continuing you agree to receive messages in the app about listings
+            you ask about.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

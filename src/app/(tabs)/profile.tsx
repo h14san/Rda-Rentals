@@ -25,7 +25,7 @@ import {
 } from '@/features/verification/queries';
 import { useMyListingSuspensions, useMyRestriction } from '@/features/moderation/queries';
 import { CASE_STATUS_LABELS, PROFILE_BADGE_LABELS } from '@/features/verification/types';
-import { formatRwandanPhone, normalizeRwandanPhone, signOut } from '@/lib/auth';
+import { signOut } from '@/lib/auth';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { imageUrl, supabase } from '@/lib/supabase';
 import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
@@ -55,16 +55,10 @@ function SignedInProfile({ userId }: { userId: string }) {
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(profile?.full_name ?? '');
-  const [whatsapp, setWhatsapp] = useState(profile?.whatsapp_phone ?? '');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function onSaveProfile() {
-    const normalized = normalizeRwandanPhone(whatsapp);
-    if (!normalized) {
-      setFieldError('Enter a Rwandan mobile number, for example 0788 123 456.');
-      return;
-    }
     if (name.trim().length < 2) {
       setFieldError('Enter your name.');
       return;
@@ -75,7 +69,7 @@ function SignedInProfile({ userId }: { userId: string }) {
     try {
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ full_name: name.trim(), whatsapp_phone: normalized })
+        .update({ full_name: name.trim() })
         .eq('id', userId);
 
       if (updateError) throw updateError;
@@ -119,12 +113,10 @@ function SignedInProfile({ userId }: { userId: string }) {
       <View style={styles.card}>
         {editing ? (
           <View style={styles.editForm}>
-            <TextField label="Full name" value={name} onChangeText={setName} />
             <TextField
-              label="WhatsApp number"
-              value={whatsapp}
-              onChangeText={setWhatsapp}
-              keyboardType="phone-pad"
+              label="Full name"
+              value={name}
+              onChangeText={setName}
               error={fieldError}
             />
             <View style={styles.row}>
@@ -136,7 +128,6 @@ function SignedInProfile({ userId }: { userId: string }) {
                   setEditing(false);
                   setFieldError(null);
                   setName(profile?.full_name ?? '');
-                  setWhatsapp(profile?.whatsapp_phone ?? '');
                 }}
               />
               <Button
@@ -150,11 +141,6 @@ function SignedInProfile({ userId }: { userId: string }) {
         ) : (
           <>
             <Text style={styles.name}>{profile?.full_name ?? 'Your profile'}</Text>
-            <Text style={styles.contact}>
-              {profile?.whatsapp_phone
-                ? formatRwandanPhone(profile.whatsapp_phone)
-                : 'No contact number'}
-            </Text>
             {identity.data?.badge ? (
               <BadgePill label={PROFILE_BADGE_LABELS.identity_checked.label} />
             ) : (
@@ -205,6 +191,11 @@ function SignedInProfile({ userId }: { userId: string }) {
 
       <View style={styles.section}>
         <SectionTitle>Your listings</SectionTitle>
+        {/* Posting left the tab bar to make room for Messages, so this is
+            now the way in. */}
+        {!!listings && listings.length > 0 && (
+          <Button label="Post a rental" onPress={() => router.push('/post')} />
+        )}
 
         {isPending ? (
           <LoadingState label="Loading your listings…" />
@@ -417,12 +408,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     fontFamily: fontFamily.bold,
     color: colors.softBlack,
-  },
-  contact: {
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.sm,
-    color: colors.muted,
-    marginBottom: spacing.sm,
   },
 
   section: { gap: spacing.md },

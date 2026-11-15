@@ -6,7 +6,7 @@ assistant. Landlords post a rental with photos in a few minutes.
 
 The product is heading toward a privacy-controlled marketplace: in-app chat
 instead of phone numbers, specific verification badges, booking, and an admin
-console. Contact is over WhatsApp until in-app chat ships.
+console. Contact is through in-app chat; no phone number or email is shown to anyone.
 
 ## Source documents
 
@@ -30,10 +30,12 @@ it: viewings are arranged in chat.
 | 0: Blueprint adopted | Done: `CLAUDE.md` lists the product rules every change is checked against |
 | 1: Privacy | Done, live: the exact address and pin are owner-only; tenants see a 500 m area |
 | 2: Marketplace | Done, live: rental terms, the full status model, favorites, comparison, map view |
-| 3: Trust and communication | Next: roles, in-app chat (replaces WhatsApp), push, reports, verification, admin |
+| 3: Trust and communication | Done, live: roles, verification, reports and moderation, in-app chat with contact masking. Next: notifications and the admin console |
 | Later | Booking, AI matching and alerts, payments, digital rental, agencies |
 
-The app has no tests and no CI, and has not been through a beta.
+The app has no unit tests and has not been through a beta. CI typechecks and
+lints every push, and `npm run db:rls-check` asserts the security rules
+against the database.
 
 ## Stack
 
@@ -125,8 +127,9 @@ and no exact address or pin before the booking stage.
   "Open in Maps". Phase 4 (booking) will reveal the exact location to the
   confirmed renter.
 - **`profiles` holds no login phone.** It lives in `auth.users` only.
-- **WhatsApp is a temporary exception to the phone rule.** The CTA goes away
-  when in-app chat ships in Phase 3.
+- **There is no contact number anywhere.** Tenants reach landlords through
+  in-app chat. Phone numbers, emails and MoMo codes typed into a message are
+  replaced with `•••` by the server until a booking is confirmed.
 
 ## Listing lifecycle
 
@@ -170,7 +173,7 @@ src/
   app/                      expo-router routes
     (auth)/                 sign-in, verify, profile-setup
     (tabs)/                 feed (list + map), chat (Ask), saved, post, profile
-    listing/[id].tsx        detail: terms, amenities, approximate area, WhatsApp CTA
+    listing/[id].tsx        detail: terms, amenities, approximate area, Message landlord
     listing/edit/[id].tsx   edit fields, terms and photos
     compare.tsx             2–4 saved rentals side by side
     filters.tsx             filter sheet (modal)

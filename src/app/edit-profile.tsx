@@ -9,9 +9,11 @@ import {
   View,
 } from 'react-native';
 
+import { ModePicker } from '@/components/mode-picker';
 import { Button, TextField } from '@/components/ui';
 import { BadgePill } from '@/components/verification-badges';
 import { useAuth } from '@/features/auth/context';
+import { setAccountMode, type AccountMode } from '@/features/auth/mode';
 import { useMyIdentity } from '@/features/verification/queries';
 import { PROFILE_BADGE_LABELS } from '@/features/verification/types';
 import { supabase } from '@/lib/supabase';
@@ -20,13 +22,15 @@ import { colors, fontFamily, radius, spacing, type } from '@/theme';
 /**
  * Edit your profile, on its own screen.
  *
- * There is one editable field, the name, because it is the one thing other
- * people see. The sign-in email or number is shown so it is clear which
- * account this is, and marked private because it is.
+ * The name is the one thing other people see. "I am here to" rearranges the
+ * app for this account and is seen by nobody else. The sign-in email or number
+ * is shown so it is clear which account this is, and marked private because
+ * it is.
  */
 export default function EditProfileScreen() {
   const router = useRouter();
-  const { session, profile, refreshProfile } = useAuth();
+  const { session, profile, mode: savedMode, refreshProfile } = useAuth();
+  const [mode, setMode] = useState<AccountMode | null>(savedMode);
   const identity = useMyIdentity(session?.user.id ?? '');
 
   const [name, setName] = useState(profile?.full_name ?? '');
@@ -37,7 +41,9 @@ export default function EditProfileScreen() {
 
   const signIn = session.user.email ?? session.user.phone ?? null;
   const initial = (name.trim().charAt(0) || '?').toUpperCase();
-  const changed = name.trim() !== (profile?.full_name ?? '');
+  const nameChanged = name.trim() !== (profile?.full_name ?? '');
+  const modeChanged = mode !== null && mode !== savedMode;
+  const changed = nameChanged || modeChanged;
 
   async function onSave() {
     if (name.trim().length < 2) {
@@ -47,12 +53,15 @@ export default function EditProfileScreen() {
     setError(null);
     setSaving(true);
     try {
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ full_name: name.trim() })
-        .eq('id', session!.user.id);
-      if (updateError) throw updateError;
-      await refreshProfile();
+      if (nameChanged) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ full_name: name.trim() })
+          .eq('id', session!.user.id);
+        if (updateError) throw updateError;
+        await refreshProfile();
+      }
+      if (modeChanged) await setAccountMode(mode);
       router.back();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save your profile.');
@@ -87,6 +96,15 @@ export default function EditProfileScreen() {
           onSubmitEditing={() => void onSave()}
         />
 
+        <View style={styles.group}>
+          <Text style={styles.label}>I am here to</Text>
+          <ModePicker value={mode} onChange={setMode} />
+          <Text style={styles.caption}>
+            Changes the tabs at the bottom of the app. Nothing you have posted or
+            booked is affected.
+          </Text>
+        </View>
+
         {!!signIn && (
           <View style={styles.readOnly}>
             <Text style={styles.label}>You sign in with</Text>
@@ -119,6 +137,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.softBlack,
   },
   avatarText: { fontFamily: fontFamily.bold, fontSize: 40, color: colors.white },
+  group: { gap: spacing.sm },
   readOnly: {
     gap: 2,
     padding: spacing.md,

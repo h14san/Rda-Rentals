@@ -175,8 +175,17 @@ overturn any of them:
   setup now asks for a name only. Once a booking is confirmed the two people
   exchange numbers in chat, unmasked. A stored number would need its own
   release rule and nothing needs it (rule 10).
+- **2026-11-22 (owner), accounts choose guest, host or both at setup, and the
+  tabs follow.** Guest: Explore, Saved, Messages, Profile. Host: Explore,
+  Listings, Post, Messages, Profile. Both: Explore, Saved, Post, Messages,
+  Profile. The choice lives in the auth user's own metadata
+  (`account_mode`), not on `profiles`, which every signed-in user can read.
+  **It arranges the app and is never a permission**: hidden tabs are still
+  routes, the database does not know the mode, and a guest can still post.
+  Renter and landlord are still not roles. An account from before the
+  question is asked once, by the same setup screen.
 - **2026-11-21 (owner), the Ask tab is off the tab bar and Post is back.**
-  Tabs are Explore, Saved, Post, Messages, Profile. The owner found Ask did
+  Tabs were Explore, Saved, Post, Messages, Profile (now per mode, above). The owner found Ask did
   the same job as the search bar on Explore. Asking now lives on each listing
   ("Ask about this place"). `(tabs)/chat.tsx` and the `chat` function are
   kept with `href: null`, so restoring the tab is one line.
@@ -770,6 +779,29 @@ the `chat` Edge Function are the AI assistant, and the Ask tab's file is
   there waits for "Show results". Clearing then going back used to leave the
   old filters in place, which read as the button not working.
 - **A listing card has no box.** Rounded photo, text beneath, on the page.
+- **Explore defaults to a two-column grid** (`ListingCard compact`). The
+  owner could not picture scrolling a hundred full-width cards; the grid puts
+  five or six places on screen. A three-way switch offers large cards and the
+  map. The compact card keeps only what decides a tap: photo, price, area,
+  two facts, and a green shield if anything was checked.
+- **The price filter is one bar with two handles** (`range-slider.tsx`,
+  written here because the community slider has one thumb). The amount under
+  each handle moves with it. A handle resting on its end of the bar means "no
+  limit" and is stored as null, never as the bound.
+- **The filter sheet shows five filters and hides four** behind "More
+  filters": price, type, bedrooms, area and furnished first; bathrooms,
+  amenities, lease length and move-in date after. The section opens by itself
+  when one of the hidden four is set.
+- **Compare fits the screen.** Columns share the width; nothing scrolls
+  sideways. Each attribute's label is a line of its own above its values, and
+  the photos stay pinned while the rows scroll. Values are short on purpose
+  ("250K", "6 mo"). The lowest rent and deposit are bold.
+- **Compare is a filled pill on Saved**, not a text link.
+- **Save on a listing is a labelled button hanging off the photo's
+  bottom-right corner**, not an icon in the header. The photo counter moved
+  to the bottom-left to make room.
+- **The listing page leads with the title, then a price card** (rent, deposit,
+  available from), then the facts as icons.
 - **Photos open a gallery** (`photo-gallery.tsx`, a Modal): a grid of all of
   them, then one at a time, swiped sideways, shown whole (`contain`).
 - **The profile tab is a menu.** Identity card, then rows that go somewhere.
@@ -919,8 +951,9 @@ before writing SDK calls rather than working from memory.
 src/
   app/                      expo-router routes
     (auth)/                 sign-in, verify, profile-setup
-    (tabs)/                 index (feed + map), saved, post, messages, profile;
-                            chat (the Ask assistant) is kept but hidden
+    (tabs)/                 index (feed: grid, large, map), saved, listings,
+                            post, messages, profile. Which show depends on the
+                            account mode. chat (the Ask assistant) is hidden
     (tabs)/messages.tsx     inbox, with archived filter and unread state
     edit-profile.tsx        name, and the private sign-in email shown read-only
     my-listings.tsx         the landlord's listings: groups, one action, "⋯" menu
@@ -948,7 +981,8 @@ src/
     listing/edit/[id].tsx   edit fields + photos (flat form, not the wizard)
     filters.tsx             filter sheet (modal)
   features/
-    auth/context.tsx        session + profile, routing gate
+    auth/context.tsx        session + profile + mode, routing gate
+    auth/mode.ts            guest / host / both: what it is, where it is stored
     listings/               types, queries, create, filters-context,
                             smart-search, chat, auto-describe
     verification/           badge labels, case queries, evidence upload

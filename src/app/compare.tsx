@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -8,23 +9,43 @@ import { useListingsByIds } from '@/features/listings/queries';
 import {
   LISTING_STATUS_LABELS,
   PROPERTY_TYPE_LABELS,
-  listingTermRows,
+  formatShortDate,
   type ListingWithImages,
 } from '@/features/listings/types';
 import { AMENITIES, AMENITY_LABELS, knownAmenities } from '@/lib/amenities';
-import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
+import { formatPriceCompact, timeAgo } from '@/lib/format';
 import { imageUrl } from '@/lib/supabase';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
 
-const LABEL_WIDTH = 112;
-const COLUMN_WIDTH = 148;
+type Row = {
+  label: string;
+  cell: (l: ListingWithImages) => string;
+  /** Index of the column worth pointing out (the cheapest), if any. */
+  best?: number | null;
+};
+
+/** The column with the lowest stated number, or null when fewer than two state one. */
+function lowest(values: (number | null)[]): number | null {
+  const stated = values.filter((v): v is number => v !== null);
+  if (stated.length < 2) return null;
+  const min = Math.min(...stated);
+  // A tie is not a winner.
+  return stated.filter((v) => v === min).length === 1 ? values.indexOf(min) : null;
+}
 
 /**
  * Side-by-side comparison (Features #19).
  *
+ * Every column fits the screen: two, three or four places share the width
+ * equally and nothing scrolls sideways. To make that readable at four columns
+ * the label is a line of its own above each row of values, instead of a fifth
+ * column eating a quarter of the width, and the values are short on purpose
+ * ("250K", "6 mo"). The photos stay pinned to the top while the rows scroll,
+ * so a value is never read against the wrong place.
+ *
  * Read straight off listing columns, with no AI summary: the point of
  * structured terms is that the comparison is the data. An unstated term reads
- * "Not stated", never blank, so a missing deposit is visibly a question to ask.
+ * "—", never a guess.
  */
 export default function CompareScreen() {
   const router = useRouter();
@@ -47,34 +68,34 @@ export default function CompareScreen() {
     );
   }
 
-  // Only amenities at least one of them has; a row of dashes is noise.
-  const amenityRows = AMENITIES.filter((a) =>
-    data.some((l) => knownAmenities(l.amenities).includes(a)),
-  );
+  const none = '—';
+  const months = (n: number | null) => (n === null ? none : `${n} mo`);
 
-  const rows: { label: string; cell: (l: ListingWithImages) => string }[] = [
-    { label: 'Rent', cell: (l) => formatPrice(l.price_rwf) },
-    { label: 'Area', cell: (l) => formatLocation(l.sector, l.district) },
+  const rows: Row[] = [
+    {
+      label: 'Rent per month',
+      cell: (l) => formatPriceCompact(l.price_rwf),
+      best: lowest(data.map((l) => l.price_rwf)),
+    },
+    {
+      label: 'Deposit',
+      cell: (l) => (l.deposit_rwf === null ? none : formatPriceCompact(l.deposit_rwf)),
+      best: lowest(data.map((l) => l.deposit_rwf)),
+    },
+    { label: 'Area', cell: (l) => l.sector ?? l.district ?? none },
     { label: 'Type', cell: (l) => PROPERTY_TYPE_LABELS[l.property_type] },
     {
       label: 'Bedrooms',
-      cell: (l) =>
-        l.bedrooms === null
-          ? 'Not stated'
-          : l.bedrooms === 0
-            ? 'Studio'
-            : String(l.bedrooms),
+      cell: (l) => (l.bedrooms === null ? none : l.bedrooms === 0 ? 'Studio' : String(l.bedrooms)),
     },
-    {
-      label: 'Bathrooms',
-      cell: (l) => (l.bathrooms === null ? 'Not stated' : String(l.bathrooms)),
-    },
+    { label: 'Bathrooms', cell: (l) => (l.bathrooms === null ? none : String(l.bathrooms)) },
     { label: 'Furnished', cell: (l) => (l.furnished ? 'Yes' : 'No') },
-    // Same wording as the detail page, from the same helper.
-    ...listingTermRows(data[0]).map(({ label }, i) => ({
-      label,
-      cell: (l: ListingWithImages) => listingTermRows(l)[i].value,
-    })),
+    { label: 'Size', cell: (l) => (l.size_sqm === null ? none : `${l.size_sqm} m²`) },
+    { label: 'Minimum stay', cell: (l) => months(l.min_rental_months) },
+    {
+      label: 'Available from',
+      cell: (l) => (l.available_from === null ? 'Now' : formatShortDate(l.available_from)),
+    },
     {
       label: 'Availability',
       cell: (l) =>
@@ -84,100 +105,152 @@ export default function CompareScreen() {
             : 'Live'
           : LISTING_STATUS_LABELS[l.status],
     },
-    ...amenityRows.map((a) => ({
-      label: AMENITY_LABELS[a],
-      cell: (l: ListingWithImages) =>
-        knownAmenities(l.amenities).includes(a) ? 'Yes' : '—',
-    })),
+    {
+      label: 'Checks by Rwanda Rentals',
+      cell: (l) => {
+        const n = l.listing_badges?.length ?? 0;
+        return n === 0 ? 'None yet' : `${n} check${n === 1 ? '' : 's'}`;
+      },
+    },
   ];
 
-  return (
-    <ScrollView contentContainerStyle={styles.page}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View>
-          <View style={styles.row}>
-            <View style={styles.labelCell} />
-            {data.map((l) => {
-              const cover = l.listing_images[0];
-              return (
-                <Pressable
-                  key={l.id}
-                  accessibilityRole="button"
-                  onPress={() => router.push(`/listing/${l.id}`)}
-                  style={styles.headCell}
-                >
-                  {cover ? (
-                    <Image
-                      source={{ uri: imageUrl(cover.storage_path) }}
-                      style={styles.thumb}
-                      contentFit="cover"
-                    />
-                  ) : (
-                    <View style={styles.thumb} />
-                  )}
-                  <Text style={styles.headTitle} numberOfLines={2}>
-                    {l.title}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+  // Only amenities at least one of them has; a row of dashes is noise.
+  const amenityRows = AMENITIES.filter((a) =>
+    data.some((l) => knownAmenities(l.amenities).includes(a)),
+  );
 
-          {rows.map((row, i) => (
-            <View
-              key={row.label}
-              style={[styles.row, i % 2 === 0 && styles.rowStriped]}
+  return (
+    <ScrollView contentContainerStyle={styles.page} stickyHeaderIndices={[0]}>
+      <View style={styles.head}>
+        {data.map((l) => {
+          const cover = l.listing_images[0];
+          return (
+            <Pressable
+              key={l.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${l.title}`}
+              onPress={() => router.push(`/listing/${l.id}`)}
+              style={styles.column}
             >
-              <Text style={[styles.labelCell, styles.label]}>{row.label}</Text>
-              {data.map((l) => (
-                <Text key={l.id} style={styles.cell}>
-                  {row.cell(l)}
-                </Text>
-              ))}
+              {cover ? (
+                <Image
+                  source={{ uri: imageUrl(cover.storage_path) }}
+                  style={styles.thumb}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={styles.thumb} />
+              )}
+              <Text style={styles.headTitle} numberOfLines={2}>
+                {l.title}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {rows.map((row) => (
+        <View key={row.label} style={styles.block}>
+          <Text style={styles.label}>{row.label}</Text>
+          <View style={styles.values}>
+            {data.map((l, i) => (
+              <Text
+                key={l.id}
+                style={[styles.value, styles.column, row.best === i && styles.best]}
+              >
+                {row.cell(l)}
+              </Text>
+            ))}
+          </View>
+        </View>
+      ))}
+
+      {amenityRows.length > 0 && (
+        <>
+          <Text style={styles.groupTitle}>Amenities</Text>
+          {amenityRows.map((a) => (
+            <View key={a} style={styles.block}>
+              <Text style={styles.label}>{AMENITY_LABELS[a]}</Text>
+              <View style={styles.values}>
+                {data.map((l) => {
+                  const has = knownAmenities(l.amenities).includes(a);
+                  return (
+                    <View
+                      key={l.id}
+                      style={styles.column}
+                      accessible
+                      accessibilityLabel={has ? 'Yes' : 'Not listed'}
+                    >
+                      <Ionicons
+                        name={has ? 'checkmark' : 'remove'}
+                        size={18}
+                        color={has ? colors.softBlack : colors.border}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           ))}
-        </View>
-      </ScrollView>
+        </>
+      )}
 
       <Text style={styles.note}>
-        Terms and amenities are as stated by each landlord. Tap a rental to open it.
+        The lowest rent and deposit are in bold. Terms and amenities are as stated by
+        each landlord. Tap a photo to open that rental.
       </Text>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { paddingVertical: spacing.md, gap: spacing.md },
-  row: { flexDirection: 'row', paddingHorizontal: spacing.md },
-  rowStriped: { backgroundColor: colors.lightGray },
-  labelCell: {
-    width: LABEL_WIDTH,
-    paddingVertical: spacing.sm,
-    paddingRight: spacing.sm,
-  },
-  label: type.meta,
-  headCell: {
-    width: COLUMN_WIDTH,
-    paddingRight: spacing.sm,
+  page: { paddingBottom: spacing.xxl },
+  // Every listing gets the same share of the width, in the header and in each
+  // row, so a value always sits under its own photo.
+  column: { flex: 1, paddingHorizontal: spacing.xs },
+  head: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md - spacing.xs,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
-    gap: spacing.xs,
+    backgroundColor: colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   thumb: {
-    width: COLUMN_WIDTH - spacing.sm,
+    width: '100%',
     aspectRatio: 4 / 3,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     backgroundColor: colors.lightGray,
   },
   headTitle: {
+    marginTop: spacing.xs,
     fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
+    lineHeight: 16,
     color: colors.softBlack,
   },
-  cell: {
-    width: COLUMN_WIDTH,
-    paddingVertical: spacing.sm,
-    paddingRight: spacing.sm,
-    ...type.body,
+  block: {
+    paddingHorizontal: spacing.md - spacing.xs,
+    paddingVertical: spacing.sm + 2,
+    gap: spacing.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
-  note: { ...type.caption, paddingHorizontal: spacing.md },
+  label: { ...type.caption, paddingHorizontal: spacing.xs },
+  values: { flexDirection: 'row', alignItems: 'flex-start' },
+  value: {
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    color: colors.charcoal,
+  },
+  best: { fontFamily: fontFamily.bold, color: colors.softBlack },
+  groupTitle: {
+    ...type.bodyStrong,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs,
+  },
+  note: { ...type.caption, padding: spacing.md },
 });

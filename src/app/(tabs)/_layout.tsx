@@ -3,6 +3,7 @@ import { Tabs, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/features/auth/context';
+import { lists, rents } from '@/features/auth/mode';
 import { useInboxRealtime, useUnreadCount } from '@/features/messaging/queries';
 import {
   useNotificationsRealtime,
@@ -12,8 +13,15 @@ import { usePush } from '@/features/notifications/use-push';
 import { colors, spacing } from '@/theme';
 
 export default function TabsLayout() {
-  const { session } = useAuth();
+  const { session, mode } = useAuth();
   const userId = session?.user.id ?? null;
+  // Which tabs show follows what the account said it is here for. Hidden tabs
+  // are still routes: a guest can reach /post from their profile. At most five
+  // show at once, which is the limit on a small phone.
+  //   guest: Explore, Saved, Messages, Profile
+  //   host:  Explore, Listings, Post, Messages, Profile
+  //   both:  Explore, Saved, Post, Messages, Profile (listings via the profile)
+  const hidden = (show: boolean) => (show ? {} : { href: null });
   // Mounted here, above every tab, so the badge is live wherever the user is.
   useInboxRealtime(userId);
   const unread = useUnreadCount(userId);
@@ -67,6 +75,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="saved"
         options={{
+          ...hidden(rents(mode)),
           title: 'Saved',
           headerTitle: 'Saved rentals',
           tabBarIcon: ({ color, size }) => (
@@ -75,8 +84,20 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="listings"
+        options={{
+          ...hidden(mode === 'host'),
+          title: 'Listings',
+          headerTitle: 'Your listings',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="post"
         options={{
+          ...hidden(lists(mode)),
           title: 'Post',
           headerTitle: 'Post a rental',
           tabBarIcon: ({ color, size }) => (

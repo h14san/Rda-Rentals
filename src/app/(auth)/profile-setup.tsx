@@ -9,22 +9,28 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ModePicker } from '@/components/mode-picker';
 import { Button, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
+import { setAccountMode, type AccountMode } from '@/features/auth/mode';
 import { supabase } from '@/lib/supabase';
-import { colors, fontFamily, fontSize, spacing } from '@/theme';
+import { colors, spacing, type } from '@/theme';
 
 /**
- * One-time completion step.
+ * One-time completion step: a name, and what you are here to do.
  *
- * Only a name. This used to demand a WhatsApp number, because that was the one
- * way a tenant could reach a landlord. Chat is that way now, so the number is
- * no longer necessary, and what is not necessary is not collected (rule 10).
+ * The name is all that is collected about a person. It used to demand a
+ * WhatsApp number, because that was the one way a tenant could reach a
+ * landlord. Chat is that way now, so the number is no longer necessary, and
+ * what is not necessary is not collected (rule 10).
+ *
+ * The second question only arranges the app. See features/auth/mode.ts.
  */
 export default function ProfileSetupScreen() {
-  const { session, profile, refreshProfile } = useAuth();
+  const { session, profile, mode: savedMode, refreshProfile } = useAuth();
 
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
+  const [mode, setMode] = useState<AccountMode | null>(savedMode);
   const [nameError, setNameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -35,7 +41,7 @@ export default function ProfileSetupScreen() {
       return;
     }
     setNameError(null);
-    if (!session) return;
+    if (!session || !mode) return;
 
     setSaving(true);
     setSubmitError(null);
@@ -44,9 +50,10 @@ export default function ProfileSetupScreen() {
         .from('profiles')
         .update({ full_name: fullName.trim() })
         .eq('id', session.user.id);
-
       if (error) throw error;
-      // The gate re-routes once the refreshed profile is complete.
+
+      await setAccountMode(mode);
+      // The gate re-routes once the refreshed profile and the mode are in.
       await refreshProfile();
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Could not save your profile.');
@@ -68,8 +75,8 @@ export default function ProfileSetupScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Almost there</Text>
             <Text style={styles.subtitle}>
-              Landlords and tenants see this name when you message them. Your
-              phone number and email stay private.
+              Landlords and tenants see your name when you message them. Your phone
+              number and email stay private.
             </Text>
           </View>
 
@@ -81,12 +88,25 @@ export default function ProfileSetupScreen() {
             placeholder="Your name"
             autoCapitalize="words"
             returnKeyType="done"
-            onSubmitEditing={() => void onSave()}
           />
+
+          <View style={styles.group}>
+            <Text style={styles.question}>What brings you here?</Text>
+            <ModePicker value={mode} onChange={setMode} />
+            <Text style={styles.caption}>
+              This sets up your home screen. You can change it any time from your
+              profile, and it never stops you doing the other.
+            </Text>
+          </View>
 
           {!!submitError && <Text style={styles.error}>{submitError}</Text>}
 
-          <Button label="Continue" onPress={() => void onSave()} loading={saving} />
+          <Button
+            label="Continue"
+            onPress={() => void onSave()}
+            loading={saving}
+            disabled={!mode}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -103,20 +123,10 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   header: { gap: spacing.sm },
-  title: {
-    fontSize: fontSize.xl,
-    fontFamily: fontFamily.bold,
-    color: colors.softBlack,
-  },
-  subtitle: {
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.sm,
-    color: colors.muted,
-    lineHeight: 22,
-  },
-  error: {
-    color: colors.danger,
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.sm,
-  },
+  title: type.h1,
+  subtitle: type.meta,
+  group: { gap: spacing.sm },
+  question: type.bodyStrong,
+  caption: type.caption,
+  error: { ...type.meta, color: colors.danger },
 });

@@ -14,7 +14,8 @@ import { useFavoriteControl } from '@/features/listings/favorites';
 import { useListingDetail } from '@/features/listings/queries';
 import {
   LISTING_STATUS_LABELS,
-  listingFacts,
+  PROPERTY_TYPE_LABELS,
+  formatShortDate,
   listingTermRows,
 } from '@/features/listings/types';
 import { useBookingForPair } from '@/features/bookings/queries';
@@ -24,7 +25,7 @@ import { useMyListingSuspensions } from '@/features/moderation/queries';
 import { AMENITY_LABELS, knownAmenities } from '@/lib/amenities';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { APPROX_RADIUS_M, openInMaps } from '@/lib/maps';
-import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
+import { colors, fontFamily, fontSize, radius, shadow, spacing, type } from '@/theme';
 
 /** Collapsed height for a long description, in lines. */
 const DESCRIPTION_LINES = 6;
@@ -77,7 +78,6 @@ export default function ListingDetailScreen() {
     listing.profiles?.profile_badges?.find((b) => b.kind === 'identity_checked')
       ?.checked_at ?? null;
 
-  const facts = listingFacts(listing);
 
   function openConversation() {
     startConversation.mutate(listing!.id, {
@@ -85,49 +85,72 @@ export default function ListingDetailScreen() {
       onError: (e) => Alert.alert('Could not open the conversation', e.message),
     });
   }
+  const heart = isOwner ? undefined : favorites.propsFor(listing.id);
+  // A listing that is no longer live can be unsaved but not saved: the
+  // database only accepts favorites on published listings.
+  const canSave = !!heart && (heart.saved || listing.status === 'published');
+
+  // The same facts the card shows, one icon each, so the row reads at a glance.
+  const stats: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
+    { icon: 'home-outline', label: PROPERTY_TYPE_LABELS[listing.property_type] },
+    ...(listing.bedrooms !== null && listing.bedrooms > 0
+      ? [
+          {
+            icon: 'bed-outline' as const,
+            label: `${listing.bedrooms} bed${listing.bedrooms === 1 ? '' : 's'}`,
+          },
+        ]
+      : []),
+    ...(listing.bathrooms !== null
+      ? [
+          {
+            icon: 'water-outline' as const,
+            label: `${listing.bathrooms} bath${listing.bathrooms === 1 ? '' : 's'}`,
+          },
+        ]
+      : []),
+    ...(listing.size_sqm !== null
+      ? [{ icon: 'resize-outline' as const, label: `${listing.size_sqm} m²` }]
+      : []),
+    {
+      icon: 'cube-outline',
+      label: listing.furnished ? 'Furnished' : 'Unfurnished',
+    },
+  ];
+
   const suspension =
     listing.status === 'suspended' ? suspensions.data?.get(listing.id) : undefined;
   const amenities = knownAmenities(listing.amenities);
 
   return (
     <View style={styles.container}>
-      <Stack.Screen
-        options={{
-          title: '',
-          headerRight: () => {
-            const heart = isOwner ? undefined : favorites.propsFor(listing.id);
-            // A listing that is no longer live can be unsaved but not saved:
-            // the database only accepts favorites on published listings.
-            if (!heart || (!heart.saved && listing.status !== 'published')) return null;
-            return (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={heart.saved ? 'Remove from saved' : 'Save'}
-                accessibilityState={{ selected: heart.saved }}
-                hitSlop={8}
-                onPress={heart.onToggle}
-              >
-                <Ionicons
-                  name={heart.saved ? 'heart' : 'heart-outline'}
-                  size={24}
-                  color={colors.softBlack}
-                />
-              </Pressable>
-            );
-          },
-        }}
-      />
+      <Stack.Screen options={{ title: '' }} />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <ImageCarousel paths={listing.listing_images.map((i) => i.storage_path)} />
 
         <View style={styles.body}>
+          {/* Half on the photo, half on the page, at the right edge: the first
+              thing under the picture, where a thumb already is. It was a small
+              icon in the header, which nobody found. */}
+          {canSave && heart && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={heart.saved ? 'Remove from saved' : 'Save this rental'}
+              accessibilityState={{ selected: heart.saved }}
+              onPress={heart.onToggle}
+              style={({ pressed }) => [styles.saveButton, pressed && { opacity: 0.85 }]}
+            >
+              <Ionicons
+                name={heart.saved ? 'heart' : 'heart-outline'}
+                size={22}
+                color={heart.saved ? colors.danger : colors.softBlack}
+              />
+              <Text style={styles.saveLabel}>{heart.saved ? 'Saved' : 'Save'}</Text>
+            </Pressable>
+          )}
+
           <View style={styles.headerBlock}>
-            <Text style={styles.price}>
-              {formatPrice(listing.price_rwf)}
-              <Text style={styles.perMonth}> / month</Text>
-            </Text>
-            <View style={styles.priceRule} />
             <Text style={styles.title}>{listing.title}</Text>
             <Text style={styles.location}>{location}</Text>
             {!!exact?.address && (
@@ -144,6 +167,26 @@ export default function ListingDetailScreen() {
             </Text>
           </View>
 
+          <View style={styles.priceCard}>
+            <View>
+              <Text style={styles.price}>{formatPrice(listing.price_rwf)}</Text>
+              <View style={styles.priceRule} />
+              <Text style={styles.perMonth}>per month</Text>
+            </View>
+            <View style={styles.priceSide}>
+              <Text style={styles.sideLabel}>Deposit</Text>
+              <Text style={styles.sideValue}>
+                {listing.deposit_rwf === null ? 'Not stated' : formatPrice(listing.deposit_rwf)}
+              </Text>
+              <Text style={styles.sideLabel}>Available</Text>
+              <Text style={styles.sideValue}>
+                {listing.available_from === null
+                  ? 'Now'
+                  : formatShortDate(listing.available_from)}
+              </Text>
+            </View>
+          </View>
+
           {listing.status !== 'published' && (
             <View style={styles.statusBanner}>
               <Text style={styles.statusText}>
@@ -157,10 +200,11 @@ export default function ListingDetailScreen() {
             </View>
           )}
 
-          <View style={styles.factRow}>
-            {facts.map((fact) => (
-              <View key={fact} style={styles.factPill}>
-                <Text style={styles.factText}>{fact}</Text>
+          <View style={styles.stats}>
+            {stats.map((stat) => (
+              <View key={stat.label} style={styles.stat}>
+                <Ionicons name={stat.icon} size={22} color={colors.softBlack} />
+                <Text style={styles.statText}>{stat.label}</Text>
               </View>
             ))}
           </View>
@@ -366,7 +410,8 @@ export default function ListingDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.white },
   scroll: { paddingBottom: spacing.xl },
-  body: { padding: spacing.md, gap: spacing.lg },
+  // Extra room at the top for the save button, which hangs off the photo.
+  body: { padding: spacing.md, paddingTop: spacing.xl, gap: spacing.lg },
 
   headerBlock: { gap: 2 },
   // The single warm mark in the app, anchored to the price. Short and heavy
@@ -377,18 +422,52 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: radius.pill,
     backgroundColor: colors.gold,
-    marginTop: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  price: type.priceHero,
-  perMonth: {
-    ...type.body,
-    color: colors.muted,
-  },
-  title: {
-    ...type.h2,
     marginTop: spacing.xs,
+    marginBottom: spacing.xs,
   },
+  price: { ...type.priceHero, fontSize: 28, lineHeight: 34 },
+  perMonth: type.meta,
+  title: type.h1,
+  priceCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  priceSide: { alignItems: 'flex-end', justifyContent: 'center', gap: 1 },
+  sideLabel: type.caption,
+  sideValue: { ...type.label, color: colors.softBlack, marginBottom: spacing.xs },
+  saveButton: {
+    position: 'absolute',
+    top: -24,
+    right: spacing.md,
+    zIndex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    height: 48,
+    paddingHorizontal: spacing.md,
+    borderRadius: 24,
+    backgroundColor: colors.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    ...shadow,
+  },
+  saveLabel: type.label,
+  stats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: spacing.md,
+    paddingVertical: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  stat: { width: '33.33%', alignItems: 'center', gap: spacing.xs },
+  statText: { ...type.label, textAlign: 'center' },
   location: type.body,
   address: type.meta,
   posted: {

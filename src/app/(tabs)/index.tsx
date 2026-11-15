@@ -32,6 +32,19 @@ import { colors, fontFamily, radius, shadow, spacing, type } from '@/theme';
 
 const SORT_OPTIONS: SortOrder[] = ['newest', 'price_asc', 'price_desc', 'confirmed'];
 
+/**
+ * How the results are laid out. The grid is the default: two places across,
+ * so five or six are on screen at once and a long feed can be scanned. The
+ * large cards show one place at a time with its title and checks.
+ */
+type Layout = 'grid' | 'large' | 'map';
+
+const LAYOUTS: { key: Layout; icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
+  { key: 'grid', icon: 'grid-outline', label: 'Grid' },
+  { key: 'large', icon: 'square-outline', label: 'Large photos' },
+  { key: 'map', icon: 'map-outline', label: 'Map' },
+];
+
 export default function FeedScreen() {
   const router = useRouter();
   const {
@@ -45,7 +58,7 @@ export default function FeedScreen() {
   } = useFilters();
 
   const [searchText, setSearchText] = useState('');
-  const [view, setView] = useState<'list' | 'map'>('list');
+  const [layout, setLayout] = useState<Layout>('grid');
   const [sortOpen, setSortOpen] = useState(false);
   const smartSearch = useSmartSearch();
   const { session } = useAuth();
@@ -198,19 +211,24 @@ export default function FeedScreen() {
                 <Ionicons name="chevron-down" size={14} color={colors.charcoal} />
               </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={view === 'list' ? 'Show on a map' : 'Show as a list'}
-                onPress={() => setView(view === 'list' ? 'map' : 'list')}
-                style={({ pressed }) => [styles.pillButton, pressed && { opacity: 0.7 }]}
-              >
-                <Ionicons
-                  name={view === 'list' ? 'map-outline' : 'list-outline'}
-                  size={15}
-                  color={colors.charcoal}
-                />
-                <Text style={styles.pillLabel}>{view === 'list' ? 'Map' : 'List'}</Text>
-              </Pressable>
+              <View style={styles.segmented} accessibilityRole="tablist">
+                {LAYOUTS.map((option) => (
+                  <Pressable
+                    key={option.key}
+                    accessibilityRole="tab"
+                    accessibilityLabel={option.label}
+                    accessibilityState={{ selected: layout === option.key }}
+                    onPress={() => setLayout(option.key)}
+                    style={[styles.segment, layout === option.key && styles.segmentOn]}
+                  >
+                    <Ionicons
+                      name={option.icon}
+                      size={16}
+                      color={layout === option.key ? colors.white : colors.charcoal}
+                    />
+                  </Pressable>
+                ))}
+              </View>
             </View>
           </View>
         )}
@@ -235,7 +253,7 @@ export default function FeedScreen() {
           actionLabel={filterCount > 0 ? 'Clear filters' : undefined}
           onAction={filterCount > 0 ? clearSearch : undefined}
         />
-      ) : view === 'map' ? (
+      ) : layout === 'map' ? (
         <FeedMap
           listings={listings}
           total={total}
@@ -246,11 +264,16 @@ export default function FeedScreen() {
         />
       ) : (
         <FlashList
+          // Remounted when the column count changes; a list cannot re-flow
+          // between one and two columns in place.
+          key={layout}
+          numColumns={layout === 'grid' ? 2 : 1}
           data={listings}
           keyExtractor={(item) => item.id}
           extraData={favorites.savedIds}
           renderItem={({ item }) => (
             <ListingCard
+              compact={layout === 'grid'}
               listing={item}
               onPress={() => router.push(`/listing/${item.id}`)}
               favorite={
@@ -260,7 +283,7 @@ export default function FeedScreen() {
               }
             />
           )}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={layout === 'grid' ? styles.gridContent : styles.listContent}
           onRefresh={() => void refetch()}
           refreshing={isRefetching}
           onEndReachedThreshold={0.5}
@@ -385,6 +408,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   pillLabel: type.label,
+  segmented: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  segment: { paddingHorizontal: spacing.sm + 4, paddingVertical: 7 },
+  segmentOn: { backgroundColor: colors.softBlack },
+  // Each compact card pads half a gutter on both sides, so the list supplies
+  // the other half at the screen edges.
+  gridContent: { paddingHorizontal: spacing.md - (spacing.sm - 2), paddingTop: spacing.md },
   listContent: { padding: spacing.md },
   listPadding: { padding: spacing.md },
   footer: { paddingVertical: spacing.lg },

@@ -176,8 +176,9 @@ overturn any of them:
   exchange numbers in chat, unmasked. A stored number would need its own
   release rule and nothing needs it (rule 10).
 - **2026-11-22 (owner), accounts choose guest, host or both at setup, and the
-  tabs follow.** Guest: Explore, Saved, Messages, Profile. Host: Explore,
-  Listings, Post, Messages, Profile. Both: Explore, Saved, Post, Messages,
+  tabs follow.** Guest: Explore, Saved, Messages, Profile. Host: Listings,
+  Post, Messages, Profile, opening on Listings (the Explore route redirects
+  there, since it is the tab group's first route). Both: Explore, Saved, Post, Messages,
   Profile. The choice lives in the auth user's own metadata
   (`account_mode`), not on `profiles`, which every signed-in user can read.
   **It arranges the app and is never a permission**: hidden tabs are still

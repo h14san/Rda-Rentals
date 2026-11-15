@@ -134,20 +134,15 @@ export default function CompareScreen() {
               onPress={() => router.push(`/listing/${l.id}`)}
               style={styles.column}
             >
-              <View>
-                {cover ? (
-                  <Image
-                    source={{ uri: imageUrl(cover.storage_path) }}
-                    style={styles.thumb}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View style={styles.thumb} />
-                )}
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{String(data.indexOf(l) + 1)}</Text>
-                </View>
-              </View>
+              {cover ? (
+                <Image
+                  source={{ uri: imageUrl(cover.storage_path) }}
+                  style={styles.thumb}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={styles.thumb} />
+              )}
               <Text style={styles.headTitle} numberOfLines={2}>
                 {l.title}
               </Text>
@@ -161,10 +156,12 @@ export default function CompareScreen() {
           <Text style={styles.label}>{row.label}</Text>
           <View style={styles.values}>
             {data.map((l, i) => (
-              <View key={l.id} style={styles.column}>
-                <Text style={styles.index}>{String(i + 1)}</Text>
-                <Text style={[styles.value, row.best === i && styles.best]}>{row.cell(l)}</Text>
-              </View>
+              <Text
+                key={l.id}
+                style={[styles.value, styles.column, row.best === i && styles.best]}
+              >
+                {row.cell(l)}
+              </Text>
             ))}
           </View>
         </View>
@@ -227,19 +224,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.lightGray,
   },
-  badge: {
-    position: 'absolute',
-    top: 6,
-    left: 6,
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.softBlack,
-  },
-  badgeText: { fontFamily: fontFamily.bold, fontSize: 12, color: colors.white },
-  index: { fontFamily: fontFamily.bold, fontSize: 10, color: colors.muted },
   blockAlt: { backgroundColor: colors.lightGray },
   headTitle: {
     marginTop: spacing.xs,

@@ -65,6 +65,9 @@ export interface DraftInput {
   latitude: number | null;
   longitude: number | null;
   terms: ListingTerms;
+  /** Rule 7. Request-only unless the landlord chose otherwise. */
+  instantBook?: boolean;
+  requestToBook?: boolean;
 }
 
 /** The structured rental terms, edited by the same fields on post and edit. */
@@ -109,6 +112,8 @@ export async function createDraftListing(input: DraftInput): Promise<ListingRow>
       district: input.district,
       sector: input.sector,
       ...input.terms,
+      instant_book_enabled: input.instantBook ?? false,
+      request_to_book_enabled: input.requestToBook ?? true,
       status: 'draft',
       is_featured: false,
     })

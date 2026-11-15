@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, type Href } from 'expo-router';
+import { Redirect, useRouter, type Href } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { StaffOnly, StaffRow } from '@/components/staff';
@@ -12,6 +13,7 @@ import {
   formatShortDate,
 } from '@/features/listings/types';
 import { useStaffStats } from '@/features/staff/queries';
+import { supabase } from '@/lib/supabase';
 import { colors, radius, spacing, type } from '@/theme';
 
 /**
@@ -24,11 +26,25 @@ import { colors, radius, spacing, type } from '@/theme';
 export default function StaffHubScreen() {
   const { isStaff, roles } = useAuth();
   const router = useRouter();
-  const stats = useStaffStats(isStaff);
+  // The staff sign-in step. Null while it is being checked. This is only what
+  // sends staff to /staff/unlock; has_role() is what refuses a session that
+  // skipped it.
+  const [unlocked, setUnlocked] = useState<boolean | null>(null);
+  useEffect(() => {
+    let active = true;
+    void supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data }) => {
+      if (active) setUnlocked(data?.currentLevel === 'aal2');
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+  const stats = useStaffStats(isStaff && unlocked === true);
   const isAdmin = roles.includes('admin');
 
   if (!isStaff) return <StaffOnly />;
-  if (stats.isPending) return <LoadingState label="Loading the console…" />;
+  if (unlocked === false) return <Redirect href="/staff/unlock" />;
+  if (unlocked === null || stats.isPending) return <LoadingState label="Loading the console…" />;
   if (stats.isError)
     return <ErrorState error={stats.error} onRetry={() => void stats.refetch()} />;
 

@@ -30,6 +30,38 @@ export default function BookScreen() {
   const [moveIn, setMoveIn] = useState<string | null>(null);
   const [months, setMonths] = useState<number | null>(null);
   const [message, setMessage] = useState('');
+  // "Another date": most leases start on the 1st, but not all moves do.
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customText, setCustomText] = useState('');
+  const [customError, setCustomError] = useState<string | null>(null);
+
+  /** Reads DD/MM/YYYY into an ISO date, refusing impossible and past days. */
+  function onCustomDate(text: string) {
+    setCustomText(text);
+    const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(text.trim());
+    if (!m) {
+      setMoveIn(null);
+      setCustomError(text.trim() ? 'Write it as day/month/year, for example 15/01/2027.' : null);
+      return;
+    }
+    const [day, month, year] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    const date = new Date(year, month - 1, day);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    // new Date(2027, 1, 31) rolls over to March; a date that did not survive
+    // the round trip was never a real day.
+    if (date.getDate() !== day || date.getMonth() !== month - 1) {
+      setMoveIn(null);
+      setCustomError('That day does not exist.');
+    } else if (date < today) {
+      setMoveIn(null);
+      setCustomError('Choose a date that is not in the past.');
+    } else {
+      const pad = (n: number) => String(n).padStart(2, '0');
+      setCustomError(null);
+      setMoveIn(`${year}-${pad(month)}-${pad(day)}`);
+    }
+  }
 
   if (listing.isPending) return <LoadingState label="Loading…" />;
   if (listing.isError)
@@ -96,11 +128,33 @@ export default function BookScreen() {
             <Chip
               key={d}
               label={formatShortDate(d)}
-              selected={moveIn === d}
-              onPress={() => setMoveIn(d)}
+              selected={!customOpen && moveIn === d}
+              onPress={() => {
+                setCustomOpen(false);
+                setMoveIn(d);
+              }}
             />
           ))}
+          <Chip
+            label="Another date"
+            selected={customOpen}
+            onPress={() => {
+              setCustomOpen(true);
+              onCustomDate(customText);
+            }}
+          />
         </View>
+        {customOpen && (
+          <TextField
+            label="Move-in date"
+            value={customText}
+            onChangeText={onCustomDate}
+            placeholder="15/01/2027"
+            keyboardType="numbers-and-punctuation"
+            error={customError}
+            hint="Day / month / year"
+          />
+        )}
       </View>
 
       <View style={styles.section}>

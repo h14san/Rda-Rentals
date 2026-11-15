@@ -2,13 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useT } from '@/lib/i18n';
 import { colors, spacing, type } from '@/theme';
 
 /** A titled group of MenuRows, with hairlines between the rows only. */
 export function MenuSection({ title, children }: { title?: string; children: ReactNode }) {
+  const t = useT();
   return (
     <View style={styles.section}>
-      {!!title && <Text style={styles.sectionTitle}>{title}</Text>}
+      {!!title && <Text style={styles.sectionTitle}>{t(title)}</Text>}
       <View>{children}</View>
     </View>
   );
@@ -35,6 +37,7 @@ export function MenuRow({
   /** A small dot: something here is waiting for the user. */
   badge?: boolean;
 }) {
+  const t = useT();
   const tint = destructive ? colors.danger : colors.softBlack;
   return (
     <Pressable
@@ -45,7 +48,7 @@ export function MenuRow({
     >
       <Ionicons name={icon} size={22} color={tint} />
       <Text style={[styles.label, destructive && { color: colors.danger }]} numberOfLines={1}>
-        {label}
+        {t(label)}
       </Text>
       {badge && <View style={styles.dot} />}
       {!!detail && (

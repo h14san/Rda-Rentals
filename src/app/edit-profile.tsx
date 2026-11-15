@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -10,12 +11,14 @@ import {
 } from 'react-native';
 
 import { ModePicker } from '@/components/mode-picker';
-import { Button, TextField } from '@/components/ui';
+import { Button, Chip, TextField } from '@/components/ui';
 import { BadgePill } from '@/components/verification-badges';
 import { useAuth } from '@/features/auth/context';
 import { setAccountMode, type AccountMode } from '@/features/auth/mode';
 import { useMyIdentity } from '@/features/verification/queries';
 import { PROFILE_BADGE_LABELS } from '@/features/verification/types';
+import { useDeleteAccount } from '@/features/listings/extras';
+import { LANGUAGES, LANGUAGE_LABELS, setLanguage, useLanguage, useT } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { colors, fontFamily, radius, spacing, type } from '@/theme';
 
@@ -36,8 +39,30 @@ export default function EditProfileScreen() {
   const [name, setName] = useState(profile?.full_name ?? '');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const t = useT();
+  const language = useLanguage();
+  const deleteAccount = useDeleteAccount();
 
   if (!session) return null;
+
+  function confirmDelete() {
+    Alert.alert(
+      'Delete your account?',
+      'Your profile, listings, photos, saved rentals, bookings and conversations are removed for good. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete everything',
+          style: 'destructive',
+          onPress: () =>
+            // The auth gate sends a signed-out user to sign-in by itself.
+            deleteAccount.mutate(undefined, {
+              onError: (e) => Alert.alert('Not deleted', e.message),
+            }),
+        },
+      ],
+    );
+  }
 
   const signIn = session.user.email ?? session.user.phone ?? null;
   const initial = (name.trim().charAt(0) || '?').toUpperCase();
@@ -119,6 +144,42 @@ export default function EditProfileScreen() {
           loading={saving}
           disabled={!changed}
         />
+
+        <View style={styles.group}>
+          <Text style={styles.label}>{t('Language')}</Text>
+          <View style={styles.languages}>
+            {LANGUAGES.map((l) => (
+              <Chip
+                key={l}
+                label={LANGUAGE_LABELS[l]}
+                selected={language === l}
+                // Applies at once: a language you cannot read is not something
+                // to confirm with a Save button in that language.
+                onPress={() =>
+                  void setLanguage(l).catch((e: Error) => Alert.alert('Not changed', e.message))
+                }
+              />
+            ))}
+          </View>
+          <Text style={styles.caption}>
+            French covers the main screens. Notifications and some details are still
+            in English.
+          </Text>
+        </View>
+
+        <View style={styles.danger}>
+          <Text style={styles.label}>{t('Delete account')}</Text>
+          <Text style={styles.caption}>
+            Removes your profile, listings, photos, saved rentals, bookings and
+            conversations permanently. It is refused while a booking is in progress.
+          </Text>
+          <Button
+            label="Delete account"
+            variant="danger"
+            loading={deleteAccount.isPending}
+            onPress={confirmDelete}
+          />
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -138,6 +199,14 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontFamily: fontFamily.bold, fontSize: 40, color: colors.white },
   group: { gap: spacing.sm },
+  languages: { flexDirection: 'row', gap: spacing.sm },
+  danger: {
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
   readOnly: {
     gap: 2,
     padding: spacing.md,

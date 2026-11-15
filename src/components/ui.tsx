@@ -10,6 +10,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { useT } from '@/lib/i18n';
 import { colors, fontFamily, fontSize, radius, spacing, type } from '@/theme';
 
 /* -------------------------------------------------------------------------- */
@@ -47,6 +48,7 @@ export function Button({
   style,
   icon,
 }: ButtonProps) {
+  const t = useT();
   const palette = BUTTON_COLORS[variant];
   const inactive = disabled || loading;
 
@@ -72,7 +74,7 @@ export function Button({
       ) : (
         <View style={styles.buttonInner}>
           {icon}
-          <Text style={[styles.buttonLabel, { color: palette.fg }]}>{label}</Text>
+          <Text style={[styles.buttonLabel, { color: palette.fg }]}>{t(label)}</Text>
         </View>
       )}
     </Pressable>
@@ -92,6 +94,7 @@ export function Chip({
   selected?: boolean;
   onPress?: () => void;
 }) {
+  const t = useT();
   return (
     <Pressable
       accessibilityRole="button"
@@ -104,7 +107,7 @@ export function Chip({
       ]}
     >
       <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
-        {label}
+        {t(label)}
       </Text>
     </Pressable>
   );
@@ -133,21 +136,24 @@ export function TextField({
   hint,
   style,
   accessory,
+  placeholder,
   ...rest
 }: TextFieldProps) {
+  const t = useT();
   return (
     <View style={styles.fieldWrap}>
       <View style={styles.fieldLabelRow}>
-        <Text style={styles.fieldLabel}>{label}</Text>
+        <Text style={styles.fieldLabel}>{t(label)}</Text>
         {accessory}
       </View>
       <TextInput
         placeholderTextColor={colors.muted}
+        placeholder={placeholder ? t(placeholder) : undefined}
         style={[styles.input, !!error && styles.inputError, style]}
         {...rest}
       />
       {!!error && <Text style={styles.fieldError}>{error}</Text>}
-      {!error && !!hint && <Text style={styles.fieldHint}>{hint}</Text>}
+      {!error && !!hint && <Text style={styles.fieldHint}>{t(hint)}</Text>}
     </View>
   );
 }
@@ -157,7 +163,12 @@ export function TextField({
 /* -------------------------------------------------------------------------- */
 
 export function SectionTitle({ children }: { children: ReactNode }) {
-  return <Text style={styles.sectionTitle}>{children}</Text>;
+  const t = useT();
+  return (
+    <Text style={styles.sectionTitle}>
+      {typeof children === 'string' ? t(children) : children}
+    </Text>
+  );
 }
 
 const styles = StyleSheet.create({

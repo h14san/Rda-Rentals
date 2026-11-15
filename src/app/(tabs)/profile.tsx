@@ -145,6 +145,13 @@ function SignedInProfile({ userId }: { userId: string }) {
             onPress={() => router.push('/edit-profile')}
           />
         )}
+        {mode !== 'host' && (
+          <MenuRow
+            icon="search-outline"
+            label="Saved searches"
+            onPress={() => router.push('/saved-searches')}
+          />
+        )}
         <MenuRow
           icon="calendar-outline"
           label="Bookings"

@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
+import { BookingModeFields } from '@/components/booking-mode-fields';
 import { EmptyState } from '@/components/states';
 import { Button, Chip, SectionTitle, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
@@ -105,6 +106,7 @@ function SignedInPostListing({ userId }: { userId: string }) {
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [furnished, setFurnished] = useState(false);
   const [terms, setTerms] = useState<ListingTerms>(EMPTY_TERMS);
+  const [booking, setBooking] = useState({ instantBook: false, requestToBook: true });
 
   const [district, setDistrict] = useState<string | null>(null);
   const [sector, setSector] = useState<string | null>(null);
@@ -138,6 +140,7 @@ function SignedInPostListing({ userId }: { userId: string }) {
     setBedrooms(null);
     setFurnished(false);
     setTerms(EMPTY_TERMS);
+    setBooking({ instantBook: false, requestToBook: true });
     setDistrict(null);
     setSector(null);
     setAddress('');
@@ -269,6 +272,7 @@ function SignedInPostListing({ userId }: { userId: string }) {
     try {
       const draft = await createDraftListing({
         ownerId: userId,
+        ...booking,
         title: title.trim(),
         description: description.trim() || null,
         priceRwf: priceValue,
@@ -507,7 +511,10 @@ function SignedInPostListing({ userId }: { userId: string }) {
         )}
 
         {step === 'terms' && (
-          <ListingTermsFields terms={terms} onChange={setTerms} errors={errors} />
+          <>
+            <ListingTermsFields terms={terms} onChange={setTerms} errors={errors} />
+            <BookingModeFields {...booking} onChange={setBooking} />
+          </>
         )}
 
         {step === 'location' && (

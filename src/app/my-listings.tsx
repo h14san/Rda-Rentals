@@ -8,6 +8,8 @@ import { ActionSheet, type SheetAction } from '@/components/action-sheet';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Button, Chip } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
+import { useMyBookings } from '@/features/bookings/queries';
+import { useUnreadCount } from '@/features/messaging/queries';
 import {
   useConfirmAvailability,
   useDeleteListing,
@@ -84,7 +86,12 @@ function MyListings({ userId }: { userId: string }) {
   const resubmit = useResubmitListing(userId);
   const deleteListing = useDeleteListing(userId);
 
+  const bookings = useMyBookings(userId);
+  const unreadMessages = useUnreadCount(userId);
   const [group, setGroup] = useState<Group>('all');
+  // Read once when the screen opens. "Two weeks ago" does not need to tick,
+  // and a clock read during render is not allowed to.
+  const [openedAt] = useState(() => Date.now());
   const [menuFor, setMenuFor] = useState<ListingWithImages | null>(null);
 
   const postButton = (
@@ -230,6 +237,51 @@ function MyListings({ userId }: { userId: string }) {
         }
         ListHeaderComponent={
           listings.data.length > 0 ? (
+            <View style={styles.headerBlock}>
+              {/* What is waiting for the host, in one line, each a way to it. */}
+              <View style={styles.dashboard}>
+                {[
+                  {
+                    n: bookings.data?.filter(
+                      (b) => b.landlord_id === userId && b.status === 'requested',
+                    ).length,
+                    label: 'Requests to answer',
+                    go: () => router.push('/bookings'),
+                  },
+                  {
+                    n: unreadMessages,
+                    label: 'Unread messages',
+                    go: () => router.push('/messages'),
+                  },
+                  {
+                    // Live, and not confirmed in the last two weeks.
+                    n: listings.data.filter(
+                      (l) =>
+                        l.status === 'published' &&
+                        (!l.availability_confirmed_at ||
+                          openedAt - new Date(l.availability_confirmed_at).getTime() >
+                            14 * 86_400_000),
+                    ).length,
+                    label: 'To confirm available',
+                    go: () => setGroup('live'),
+                  },
+                ].map((tile) => (
+                  <Pressable
+                    key={tile.label}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${tile.n ?? 0} ${tile.label}`}
+                    onPress={tile.go}
+                    style={({ pressed }) => [
+                      styles.tile,
+                      !!tile.n && styles.tileActive,
+                      pressed && { opacity: 0.8 },
+                    ]}
+                  >
+                    <Text style={styles.tileNumber}>{tile.n ?? '–'}</Text>
+                    <Text style={styles.tileLabel}>{tile.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
             <View style={styles.filters}>
               {(['all', 'live', 'waiting', 'off'] as const).map((g) => (
                 <Chip
@@ -239,6 +291,7 @@ function MyListings({ userId }: { userId: string }) {
                   onPress={() => setGroup(g)}
                 />
               ))}
+            </View>
             </View>
           ) : null
         }
@@ -336,6 +389,18 @@ function MyListings({ userId }: { userId: string }) {
 const styles = StyleSheet.create({
   content: { padding: spacing.md, gap: spacing.md, flexGrow: 1 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  headerBlock: { gap: spacing.md },
+  dashboard: { flexDirection: 'row', gap: spacing.sm },
+  tile: {
+    flex: 1,
+    gap: 2,
+    padding: spacing.sm + 2,
+    borderRadius: radius.md,
+    backgroundColor: colors.lightGray,
+  },
+  tileActive: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.softBlack },
+  tileNumber: type.h2,
+  tileLabel: type.caption,
   card: {
     gap: spacing.sm,
     padding: spacing.md,

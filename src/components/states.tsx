@@ -1,6 +1,7 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { colors, radius, spacing, type } from '@/theme';
 
 /**
@@ -13,10 +14,11 @@ import { colors, radius, spacing, type } from '@/theme';
  */
 
 export function LoadingState({ label = 'Loading…' }: { label?: string }) {
+  const t = useT();
   return (
     <View style={styles.center}>
       <ActivityIndicator color={colors.charcoal} />
-      <Text style={styles.muted}>{label}</Text>
+      <Text style={styles.muted}>{t(label)}</Text>
     </View>
   );
 }
@@ -32,10 +34,11 @@ export function EmptyState({
   actionLabel?: string;
   onAction?: () => void;
 }) {
+  const t = useT();
   return (
     <View style={styles.center}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.muted}>{message}</Text>
+      <Text style={styles.title}>{t(title)}</Text>
+      <Text style={styles.muted}>{t(message)}</Text>
       {actionLabel && onAction && (
         <Button label={actionLabel} onPress={onAction} variant="secondary" />
       )}
@@ -50,12 +53,13 @@ export function ErrorState({
   error: unknown;
   onRetry?: () => void;
 }) {
+  const t = useT();
   const message =
-    error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+    error instanceof Error ? error.message : t('Something went wrong. Please try again.');
 
   return (
     <View style={styles.center}>
-      <Text style={styles.title}>Could not load</Text>
+      <Text style={styles.title}>{t('Could not load')}</Text>
       <Text style={styles.muted}>{message}</Text>
       {onRetry && <Button label="Try again" onPress={onRetry} variant="secondary" />}
     </View>

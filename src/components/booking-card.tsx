@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui';
@@ -8,6 +9,7 @@ import {
   type BookingWithPeople,
 } from '@/features/bookings/queries';
 import { BOOKING_STATUS_LABELS, isActiveBooking } from '@/features/bookings/types';
+import { useMyReviewedBookings } from '@/features/listings/extras';
 import { formatShortDate } from '@/features/listings/types';
 import { colors, radius, spacing, type } from '@/theme';
 
@@ -32,6 +34,8 @@ export function BookingCard({
   const respond = useRespondBooking();
   const confirm = useConfirmBooking();
   const cancel = useCancelBooking();
+  const router = useRouter();
+  const reviewed = useMyReviewedBookings(userId);
   const busy = respond.isPending || confirm.isPending || cancel.isPending;
 
   const isRenter = b.renter_id === userId;
@@ -136,6 +140,15 @@ export function BookingCard({
               () => confirm.mutate(b.id, { onError: failed }),
             )
           }
+        />
+      )}
+
+      {/* Rule 13: a review exists only on the far side of a completed rental. */}
+      {isRenter && b.status === 'completed' && reviewed.data && !reviewed.data.has(b.id) && (
+        <Button
+          label="Write a review"
+          variant="secondary"
+          onPress={() => router.push(`/rate/${b.id}`)}
         />
       )}
 

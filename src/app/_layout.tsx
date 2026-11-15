@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LoadingState } from '@/components/states';
 import { AuthProvider, useAuth } from '@/features/auth/context';
 import { FiltersProvider } from '@/features/listings/filters-context';
+import { useT } from '@/lib/i18n';
 import { colors, fontAssets, type } from '@/theme';
 
 void SplashScreen.preventAutoHideAsync();
@@ -40,6 +41,7 @@ function AuthGate() {
   const segments = useSegments() as string[];
   const router = useRouter();
   const splashHidden = useRef(false);
+  const t = useT();
 
   // A signed-in user whose profile row has not arrived yet is in neither state,
   // so hold rather than bounce them through the wrong screen.
@@ -87,42 +89,45 @@ function AuthGate() {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="listing/[id]" options={{ title: '' }} />
-      <Stack.Screen name="compare" options={{ title: 'Compare' }} />
-      <Stack.Screen name="verify-identity" options={{ title: 'Verify your ID' }} />
-      <Stack.Screen name="review/index" options={{ title: 'Review queue' }} />
-      <Stack.Screen name="review/[caseId]" options={{ title: 'Review' }} />
-      <Stack.Screen name="staff/index" options={{ title: 'Staff console' }} />
-      <Stack.Screen name="staff/users/index" options={{ title: 'Users' }} />
-      <Stack.Screen name="staff/users/[id]" options={{ title: 'Account' }} />
-      <Stack.Screen name="staff/listings/index" options={{ title: 'Listings' }} />
-      <Stack.Screen name="staff/listings/[id]" options={{ title: 'Listing' }} />
-      <Stack.Screen name="staff/audit" options={{ title: 'Audit log' }} />
-      <Stack.Screen name="staff/roles" options={{ title: 'Staff roles' }} />
-      <Stack.Screen name="staff/reports/index" options={{ title: 'Reports' }} />
-      <Stack.Screen name="staff/reports/[id]" options={{ title: 'Report' }} />
+      <Stack.Screen name="compare" options={{ title: t('Compare') }} />
+      <Stack.Screen name="verify-identity" options={{ title: t('Verify your ID') }} />
+      <Stack.Screen name="review/index" options={{ title: t('Review queue') }} />
+      <Stack.Screen name="review/[caseId]" options={{ title: t('Review') }} />
+      <Stack.Screen name="staff/index" options={{ title: t('Staff console') }} />
+      <Stack.Screen name="staff/users/index" options={{ title: t('Users') }} />
+      <Stack.Screen name="staff/users/[id]" options={{ title: t('Account') }} />
+      <Stack.Screen name="staff/listings/index" options={{ title: t('Listings') }} />
+      <Stack.Screen name="staff/listings/[id]" options={{ title: t('Listing') }} />
+      <Stack.Screen name="staff/audit" options={{ title: t('Audit log') }} />
+      <Stack.Screen name="staff/roles" options={{ title: t('Staff roles') }} />
+      <Stack.Screen name="staff/reports/index" options={{ title: t('Reports') }} />
+      <Stack.Screen name="staff/reports/[id]" options={{ title: t('Report') }} />
       <Stack.Screen
         name="staff/conversation/[reportId]"
-        options={{ title: 'Reported conversation' }}
+        options={{ title: t('Reported conversation') }}
       />
       <Stack.Screen name="conversation/[id]" options={{ title: '' }} />
-      <Stack.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
-      <Stack.Screen name="my-listings" options={{ title: 'Your listings' }} />
-      <Stack.Screen name="bookings" options={{ title: 'Bookings' }} />
-      <Stack.Screen name="book/[listingId]" options={{ title: 'Book' }} />
-      <Stack.Screen name="staff/bookings" options={{ title: 'Bookings' }} />
-      <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
-      <Stack.Screen name="help/index" options={{ title: 'Safety and help' }} />
+      <Stack.Screen name="edit-profile" options={{ title: t('Edit profile') }} />
+      <Stack.Screen name="my-listings" options={{ title: t('Your listings') }} />
+      <Stack.Screen name="bookings" options={{ title: t('Bookings') }} />
+      <Stack.Screen name="saved-searches" options={{ title: t('Saved searches') }} />
+      <Stack.Screen name="rate/[bookingId]" options={{ title: t('Write a review') }} />
+      <Stack.Screen name="staff/unlock" options={{ title: t('Staff console') }} />
+      <Stack.Screen name="book/[listingId]" options={{ title: t('Book') }} />
+      <Stack.Screen name="staff/bookings" options={{ title: t('Bookings') }} />
+      <Stack.Screen name="notifications" options={{ title: t('Notifications') }} />
+      <Stack.Screen name="help/index" options={{ title: t('Safety and help') }} />
       <Stack.Screen name="help/[topic]" options={{ title: '' }} />
       <Stack.Screen
         name="notification-settings"
-        options={{ title: 'Notification settings' }}
+        options={{ title: t('Notification settings') }}
       />
       <Stack.Screen name="user/[id]" options={{ title: '' }} />
-      <Stack.Screen name="my-reports" options={{ title: 'Your reports' }} />
-      <Stack.Screen name="report" options={{ presentation: 'modal', title: 'Report' }} />
+      <Stack.Screen name="my-reports" options={{ title: t('Your reports') }} />
+      <Stack.Screen name="report" options={{ presentation: 'modal', title: t('Report') }} />
       <Stack.Screen
         name="filters"
-        options={{ presentation: 'modal', title: 'Filters' }}
+        options={{ presentation: 'modal', title: t('Filters') }}
       />
     </Stack>
   );

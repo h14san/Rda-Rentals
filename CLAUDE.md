@@ -30,13 +30,15 @@ Authoritative, as of 2026-10-24:
 
 Historical, for context only:
 
-- `docs/Rwanda_Rentals_Brief.docx` was the original MVP spec, and the build up
+(All three are now in `docs/archive/`.)
+
+- `docs/archive/Rwanda_Rentals_Brief.docx` was the original MVP spec, and the build up
   to Phase 0 followed it.
-- `docs/RWANDA RENTALS.pdf` is the 16-item backlog the Blueprint was built
+- `docs/archive/RWANDA RENTALS.pdf` is the 16-item backlog the Blueprint was built
   from. Its "Viewing Requests & Scheduling" is **explicitly rejected** by the
   Blueprint (§29) and the Features doc (#30): viewings are arranged in chat, so
   don't build a scheduler.
-- `docs/Rwanda Rentals App – Developer Framework.docx` is the original Flutter +
+- `docs/archive/Rwanda Rentals App – Developer Framework.docx` is the original Flutter +
   Firebase spec. Use it only for UI direction and the palette. If a request
   assumes Flutter or Firestore, that is this doc talking, so say so rather than
   switching stacks.
@@ -175,6 +177,15 @@ overturn any of them:
   setup now asks for a name only. Once a booking is confirmed the two people
   exchange numbers in chat, unmasked. A stored number would need its own
   release rule and nothing needs it (rule 10).
+- **2026-11-23 (owner), a batch of launch gaps**, each detailed below under
+  "Launch gaps": account deletion, saved searches with alerts, reviews,
+  French, stale listings pausing after 30 days, any move-in date, a second
+  sign-in factor for staff, booking settings and "Write it for me" on both
+  post and edit, a cover-photo control, and a host dashboard line.
+- **2026-11-23 (owner), the Ask assistant is deleted**, screen and `chat`
+  function both. `ask-listing` (one listing) and `smart-search` remain.
+- **2026-11-23 (owner), Featured is neither shown nor ordered on.** The
+  `is_featured` column stays for when paid placement is a product.
 - **2026-11-22 (owner), accounts choose guest, host or both at setup, and the
   tabs follow.** Guest: Explore, Saved, Messages, Profile. Host: Listings,
   Post, Messages, Profile, opening on Listings (the Explore route redirects
@@ -232,10 +243,10 @@ npm run db:push        # apply supabase/migrations
 npm run db:seed        # demo data — NON-PRODUCTION ONLY
 npm run db:rls-check   # asserts the RLS policies hold (passes --yes; always rolls back)
 
-npx supabase functions deploy chat           # the three AI functions;
-npx supabase functions deploy smart-search   # no Docker needed to deploy
+npx supabase functions deploy smart-search   # the AI functions;
+npx supabase functions deploy ask-listing    # no Docker needed to deploy
 npx supabase functions deploy auto-describe
-npx supabase functions deploy ask-listing
+npx supabase functions deploy delete-account
 npx supabase functions deploy send-push --no-verify-jwt   # called by Postgres
 ```
 
@@ -768,6 +779,66 @@ use `src/components/action-sheet.tsx`.
 the `chat` Edge Function are the AI assistant, and the Ask tab's file is
 `(tabs)/chat.tsx`.
 
+## Launch gaps (2026-11-23)
+
+**Account deletion is an Edge Function, `delete-account`.** It needs the
+service role to remove the auth user, and Storage files must go through the
+Storage API. It deletes only the account whose token called it; there is no id
+in the body. Files first, user last, so a failure halfway leaves an account
+that can retry rather than files belonging to nobody. It refuses while a
+booking is in progress (`account_deletion_blocker()`), and for the last admin.
+Deleting cascades from `profiles`: the other person in a conversation loses
+that conversation. **This also deletes identity documents**, which is ahead of
+the still-open evidence-retention decision.
+
+**Saved searches store the app's `Filters` object as JSON**, and
+`listing_matches_filters()` in SQL decides alerts. That is a third statement
+of the filter rules, after `useListingsFeed` and `_shared/filters.ts`. It
+has to exist, because alerts fire with no app running. Change the three
+together. Alerts fire only when a listing arrives from review or becomes
+available again after being rented, never on pause/unpause. Ten per user.
+
+**Reviews are written only by `submit_review()`**, from the renter of a
+`completed` booking, once (rule 13). There is no insert policy. The body is
+passed through `mask_contact_details`. They are public. The listing page
+shows nothing at all until there is one. Landlord-reviews-tenant, replies and
+staff removal of a review are not built.
+
+**A live listing unconfirmed for 30 days is paused**, with a warning at 23
+(`expire_stale_listings()`, daily by `pg_cron`). Listings live before the
+rule get their 30 days from 2026-11-23, a constant in the function, so the
+demo data was not mass-paused on the first night.
+
+**Staff need a second factor, and `has_role()` enforces it.** Once a staff
+member has a verified TOTP factor, their role counts only in an `aal2`
+session. Every staff policy and function goes through `has_role`, so this is
+real, not a screen. `/staff` redirects to `/staff/unlock`, which enrols on
+the first visit and asks for the code after. An account with no factor yet is
+deliberately not locked out, or the first admin (inserted from the SQL
+editor) could never enrol. That window is the gap: staff are only as
+protected as their having opened the console once.
+
+**French is a dictionary keyed by the English string** (`src/lib/i18n-fr.ts`,
+`useT()`). A missing line shows English instead of a key. The shared
+components (Button, Chip, TextField, SectionTitle, the menu rows, the states,
+the action sheet) and the tab and stack titles translate what they are given,
+which covers most screens without edits. **Not translated:** text built from
+numbers or names, the help pages, the staff console, and everything composed
+in the database (notifications, system messages). The language is in the
+user's auth metadata, like the account mode, and defaults to the phone's.
+
+**The cover photo is the lowest `position`.** "Make cover" gives that photo
+a position below all the others: one update, no renumbering, no collision.
+Positions can be negative. It is staged until Save like other photo changes,
+and is not a material edit (no re-review).
+
+**"Write it for me" on the edit screen reads the listing's own public photo
+URLs on the phone** and sends them like fresh photos. No server change. Not
+tried on a device: it depends on the image compressor accepting remote URLs.
+
+**Booking's move-in date accepts any day** typed as day/month/year, beside
+the 1st-of-the-month chips.
+
 ## UI direction (owner feedback, 2026-11-21): take cues from Airbnb
 
 - **Explore** is one raised search pill, a round filter button with a count,
@@ -812,7 +883,7 @@ the `chat` Edge Function are the AI assistant, and the Ask tab's file is
   worth doing now (`primaryFor`). Everything else is behind the "⋯" menu.
   Five buttons under every listing made three listings a wall of buttons.
 
-## AI features (four built)
+## AI features (three built; the Ask assistant was removed 2026-11-23)
 
 **`ask-listing` answers a question about one listing, from that listing's
 own details.** It is the opposite arrangement to the search assistant below,
@@ -956,7 +1027,10 @@ src/
                             post, messages, profile. Which show depends on the
                             account mode. chat (the Ask assistant) is hidden
     (tabs)/messages.tsx     inbox, with archived filter and unread state
-    edit-profile.tsx        name, and the private sign-in email shown read-only
+    edit-profile.tsx        name, mode, language, delete account
+    saved-searches.tsx      searches with alerts; tap runs one on Explore
+    rate/[bookingId].tsx    review a completed rental
+    staff/unlock.tsx        staff second factor: enrol, then the code
     my-listings.tsx         the landlord's listings: groups, one action, "⋯" menu
     conversation/[id].tsx   one conversation: bubbles, composer, block/report menu
     book/[listingId].tsx    request or instant-book form: date, length, note
@@ -1004,6 +1078,7 @@ supabase/
   functions/chat/                     conversation -> reply + Filters
   functions/auto-describe/            photos -> description
   functions/ask-listing/              one listing + a question -> answer, known
+  functions/delete-account/           deletes the caller's files, then the user
   functions/send-push/                notification id -> Expo Push (no JWT; see
                                       its header for why that is safe)
   migrations/20260910120000_init.sql  schema, indexes, RLS, storage policies
@@ -1026,6 +1101,8 @@ supabase/
                                       material-edit triggers, guard update
   migrations/20261120120000_booking.sql  booking settings, bookings + guard,
                                       location release, masking end, expiry cron
+  migrations/20261123120000_launch_gaps.sql  saved searches + alerts, reviews,
+                                      stale expiry, staff aal2, deletion check
   seed.sql                  15 demo Kigali listings (no photos — nothing in
                             the storage bucket to point at until a real upload)
   rls_check.sql             security assertions

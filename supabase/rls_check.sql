@@ -122,6 +122,7 @@ declare
   transcript jsonb;
   user_d uuid := 'aaaaaaaa-0000-4000-8000-0000000000d4';
   booking uuid;
+  completed_booking uuid;
   a_active_listing uuid;
   a_draft_listing uuid;
   visible int;
@@ -1977,6 +1978,155 @@ begin
     select 1 from public.bookings where id = booking and cancelled_by = 'staff'
   ) then
     raise exception 'FAIL: a staff cancellation was not recorded as one.';
+  end if;
+
+  -- 23. Saved searches, reviews, account deletion check, staff second factor.
+  --     Still C from step 21. First A: a saved search, private to A.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+
+  insert into public.saved_searches (user_id, name, filters)
+  values (user_a, 'Cheap studios', '{"maxPrice": 100000000, "propertyType": "studio"}');
+
+  begin
+    insert into public.saved_searches (user_id, name, filters)
+    values (user_b, 'Forged', '{}');
+    raise exception 'FAIL: user A saved a search for user B.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- The matcher agrees with the feed's rules: unstated terms match, bounds bind.
+  if not public.listing_matches_filters(
+       (select l from public.listings l where l.id = b_listing),
+       '{"maxPrice": 100000000, "propertyType": "studio", "maxMinRentalMonths": 1, "amenities": []}') then
+    raise exception 'FAIL: a listing with no stated minimum stay did not match a lease filter.';
+  end if;
+  if public.listing_matches_filters(
+       (select l from public.listings l where l.id = b_listing), '{"maxPrice": 1}') then
+    raise exception 'FAIL: a listing matched a price cap far below its rent.';
+  end if;
+
+  -- A review needs a completed booking, and the reviewer must be its renter.
+  -- A's booking on b_listing was completed in step 21; `booking` now holds a
+  -- cancelled one on A's own listing.
+  begin
+    perform public.submit_review(booking, 5, 'Great');
+    raise exception 'FAIL: a landlord reviewed a cancelled booking on their own listing.';
+  exception
+    when insufficient_privilege then null;
+    when object_not_in_prerequisite_state then null;
+  end;
+
+  select id into completed_booking from public.bookings
+  where renter_id = user_a and listing_id = b_listing and status = 'completed';
+
+  begin
+    perform public.submit_review(completed_booking, 9, 'Great');
+    raise exception 'FAIL: a nine-star review was accepted.';
+  exception
+    when invalid_parameter_value then null;
+  end;
+
+  perform public.submit_review(completed_booking, 4, 'Good place. Call 0788 123 456 for the caretaker.');
+  if not exists (
+    select 1 from public.reviews
+    where booking_id = completed_booking and rating = 4 and body not like '%0788%'
+  ) then
+    raise exception 'FAIL: a review was not stored, or kept a phone number.';
+  end if;
+
+  begin
+    perform public.submit_review(completed_booking, 1, 'Changed my mind');
+    raise exception 'FAIL: one rental was reviewed twice.';
+  exception
+    when object_not_in_prerequisite_state then null;
+  end;
+
+  begin
+    insert into public.reviews (booking_id, landlord_id, author_id, rating)
+    values (booking, user_b, user_a, 1);
+    raise exception 'FAIL: a review was written without going through a completed rental.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  if public.account_deletion_blocker() is not null then
+    raise exception 'FAIL: user A has no live booking but cannot delete their account: %',
+      public.account_deletion_blocker();
+  end if;
+
+  --     As B: cannot read A's saved search, cannot review A's rental, and gets
+  --     the alert when a matching listing of theirs... is not theirs to get:
+  --     owners are not alerted about their own listings.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+
+  select count(*) into visible from public.saved_searches;
+  if visible <> 0 then
+    raise exception 'FAIL: user B can read user A''s saved searches.';
+  end if;
+
+  begin
+    perform public.submit_review(completed_booking, 5, 'I am a wonderful landlord');
+    raise exception 'FAIL: a landlord reviewed their own rental.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.expire_stale_listings();
+    raise exception 'FAIL: a client ran the stale-listing job.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- B makes the rented studio available again; A's saved search matches it.
+  update public.listings set status = 'published' where id = b_listing;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+  select count(*) into visible from public.notifications where kind = 'saved_search_match';
+  if visible <> 1 then
+    raise exception 'FAIL: a matching listing raised % saved-search alerts, expected 1.', visible;
+  end if;
+
+  --     Staff second factor. Once C has an authenticator enrolled, the role
+  --     counts only in a session that passed it.
+  execute 'reset role';
+  insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at, secret)
+  values (gen_random_uuid(), user_c, 'rls-check', 'totp', 'verified', now(), now(), 'rls-check-secret');
+  execute 'set local role authenticated';
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal1')::text,
+    true
+  );
+  if public.has_role('verifier') then
+    raise exception 'FAIL: enrolled staff kept their role in a session without the second factor.';
+  end if;
+  select count(*) into visible from public.reports;
+  if visible <> 0 then
+    raise exception 'FAIL: staff without the second factor can read the reports queue.';
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_c, 'role', 'authenticated', 'aal', 'aal2')::text,
+    true
+  );
+  if not public.has_role('verifier') then
+    raise exception 'FAIL: staff who passed the second factor lost their role.';
   end if;
 
   -- 8. Anonymous users see published listings only.

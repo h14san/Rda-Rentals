@@ -19,6 +19,7 @@ import { FeedMap } from '@/components/feed-map';
 import { ListingCard } from '@/components/listing-card';
 import { EmptyState, ErrorState, ListingCardSkeleton } from '@/components/states';
 import { useAuth } from '@/features/auth/context';
+import { useSaveSearch } from '@/features/listings/extras';
 import { useFavoriteControl } from '@/features/listings/favorites';
 import { useFilters } from '@/features/listings/filters-context';
 import {
@@ -74,6 +75,7 @@ function FeedScreen() {
   const smartSearch = useSmartSearch();
   const { session } = useAuth();
   const favorites = useFavoriteControl(session?.user.id ?? null);
+  const saveSearch = useSaveSearch(session?.user.id ?? '');
 
   function runSmartSearch() {
     const query = searchText.trim();
@@ -202,6 +204,29 @@ function FeedScreen() {
                 <Text style={styles.activeChipText}>{chip}</Text>
               </View>
             ))}
+            {/* Named after its own chips, so there is nothing to type. */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Save this search and get alerts"
+              disabled={saveSearch.isPending}
+              onPress={() =>
+                saveSearch.mutate(
+                  { name: chips.join(', '), filters },
+                  {
+                    onSuccess: () =>
+                      Alert.alert(
+                        'Search saved',
+                        'We will notify you when a new rental matches. Find it under Saved searches on your profile.',
+                      ),
+                    onError: (e) => Alert.alert('Not saved', e.message),
+                  },
+                )
+              }
+              style={[styles.activeChip, styles.saveChip]}
+            >
+              <Ionicons name="notifications-outline" size={14} color={colors.softBlack} />
+              <Text style={styles.activeChipText}>Save search</Text>
+            </Pressable>
           </ScrollView>
         )}
 
@@ -399,6 +424,7 @@ const styles = StyleSheet.create({
   },
   activeChipText: type.label,
   clearChip: { backgroundColor: colors.softBlack },
+  saveChip: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.softBlack },
   clearChipText: { color: colors.white },
   resultRow: {
     flexDirection: 'row',

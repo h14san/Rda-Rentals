@@ -108,8 +108,11 @@ export function useListingsFeed(
       // Letting paid placement override an explicit "price: low to high" would
       // make the sort look broken, which costs more trust than the placement
       // is worth.
+      // is_featured is not ordered on or shown. Paid placement is not a
+      // product yet, and a listing floating to the top with no label saying
+      // why is the unlabelled advertising rule 8's spirit is against. The
+      // column stays for when it is one.
       if (sort === 'newest') {
-        query = query.order('is_featured', { ascending: false });
         query = query.order('created_at', { ascending: false });
       } else if (sort === 'confirmed') {
         query = query.order('availability_confirmed_at', {

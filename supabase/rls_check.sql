@@ -120,6 +120,7 @@ declare
   b_message uuid;
   m_report uuid;
   transcript jsonb;
+  user_d uuid := 'aaaaaaaa-0000-4000-8000-0000000000d4';
   a_active_listing uuid;
   a_draft_listing uuid;
   visible int;
@@ -168,6 +169,14 @@ begin
           'authenticated', 'authenticated', 'rls.check.staff@example.com', now(), now())
   on conflict (id) do nothing;
   insert into public.user_roles (user_id, role) values (user_c, 'verifier')
+  on conflict do nothing;
+
+  -- An admin, for the role checks. Rolled back like the verifier.
+  insert into auth.users (instance_id, id, aud, role, email, created_at, updated_at)
+  values ('00000000-0000-0000-0000-000000000000', user_d,
+          'authenticated', 'authenticated', 'rls.check.admin@example.com', now(), now())
+  on conflict (id) do nothing;
+  insert into public.user_roles (user_id, role) values (user_d, 'admin')
   on conflict do nothing;
 
   delete from public.profile_badges where profile_id = user_b;
@@ -1415,6 +1424,109 @@ begin
     raise exception 'FAIL: user B removed user A''s push token.';
   end if;
   perform public.unregister_push_token('ExponentPushToken[rls-check]');
+
+  -- 19. The staff console's functions. B is nobody, C is a verifier, D an admin.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+
+  begin
+    perform public.staff_stats();
+    raise exception 'FAIL: user B read the staff statistics.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform * from public.staff_audit_log();
+    raise exception 'FAIL: user B read the audit log.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.set_staff_role(user_b, 'admin', true);
+    raise exception 'FAIL: user B made itself an admin through set_staff_role.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  --     As C: reads the log and the counts, but roles are an admin's call.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    true
+  );
+
+  if (public.staff_stats() -> 'listings_by_status') is null then
+    raise exception 'FAIL: staff statistics came back empty.';
+  end if;
+
+  select count(*) into visible from public.staff_audit_log(user_c, null, 500)
+  where source = 'moderation' and action = 'listing_suspend';
+  if visible <> 1 then
+    raise exception 'FAIL: the audit log shows % suspensions by C, expected 1.', visible;
+  end if;
+
+  -- A listing's review appears on its owner's timeline.
+  select count(*) into visible from public.staff_audit_log(null, user_b, 500)
+  where source = 'verification' and action = 'approved';
+  if visible <> 2 then
+    raise exception 'FAIL: user B''s timeline shows % approvals, expected 2.', visible;
+  end if;
+
+  begin
+    perform public.set_staff_role(user_b, 'verifier', true);
+    raise exception 'FAIL: a verifier granted a role.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  select count(*) into visible from public.user_roles where user_id = user_d;
+  if visible <> 0 then
+    raise exception 'FAIL: a verifier can see who the admins are.';
+  end if;
+
+  --     As D: grants and revokes, sees the staff list, cannot strand the project.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_d, 'role', 'authenticated')::text,
+    true
+  );
+
+  select count(*) into visible from public.user_roles where user_id = user_c;
+  if visible <> 1 then
+    raise exception 'FAIL: an admin cannot see the staff list.';
+  end if;
+
+  begin
+    perform public.set_staff_role(user_b, 'owner', true);
+    raise exception 'FAIL: an unknown role was granted.';
+  exception
+    when invalid_parameter_value then null;
+  end;
+
+  perform public.set_staff_role(user_b, 'verifier', true);
+  perform public.set_staff_role(user_b, 'verifier', true);  -- twice: one row, one log line
+  select count(*) into visible from public.moderation_events
+  where action = 'role_granted' and subject_id = user_b and actor = user_d;
+  if visible <> 1 then
+    raise exception 'FAIL: granting a role logged % events, expected 1.', visible;
+  end if;
+
+  perform public.set_staff_role(user_b, 'verifier', false);
+  if exists (select 1 from public.user_roles where user_id = user_b) then
+    raise exception 'FAIL: revoking a role left it in place.';
+  end if;
+
+  begin
+    perform public.set_staff_role(user_d, 'admin', false);
+    raise exception 'FAIL: an admin removed their own admin role.';
+  exception
+    when insufficient_privilege then null;
+  end;
 
   -- 8. Anonymous users see published listings only.
   set local role anon;

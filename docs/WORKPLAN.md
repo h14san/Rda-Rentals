@@ -241,7 +241,7 @@ a dev build once credentials exist, or is documented as blocked on them.
 
 ---
 
-## M4: Admin console, in the app (Phase 3e)
+## M4: Admin console, in the app (Phase 3e) — DONE 2026-11-18
 
 Blueprint §40, §62. Features #56, #57, #58. **Owner decision: this is a
 staff-only area inside the app, not a separate web app.** Grow `/review` into

@@ -457,6 +457,17 @@ export type Database = {
         Args: { p_listing_id: string };
         Returns: { address: string | null; latitude: number | null; longitude: number | null }[];
       };
+      set_staff_role: {
+        Args: { p_user_id: string; p_role: StaffRole; p_grant: boolean };
+        Returns: undefined;
+      };
+      // Typed loosely here and narrowed in features/staff/queries.ts, which
+      // owns the shapes; importing them would make this file depend on staff.
+      staff_audit_log: {
+        Args: { p_actor?: string | null; p_subject_id?: string | null; p_limit?: number };
+        Returns: unknown[];
+      };
+      staff_stats: { Args: Record<string, never>; Returns: unknown };
       register_push_token: {
         Args: { p_token: string; p_platform: 'android' | 'ios' };
         Returns: undefined;

@@ -122,7 +122,7 @@ export default function CompareScreen() {
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.page} stickyHeaderIndices={[0]}>
+    <ScrollView contentContainerStyle={styles.page}>
       <View style={styles.head}>
         {data.map((l) => {
           const cover = l.listing_images[0];
@@ -134,15 +134,20 @@ export default function CompareScreen() {
               onPress={() => router.push(`/listing/${l.id}`)}
               style={styles.column}
             >
-              {cover ? (
-                <Image
-                  source={{ uri: imageUrl(cover.storage_path) }}
-                  style={styles.thumb}
-                  contentFit="cover"
-                />
-              ) : (
-                <View style={styles.thumb} />
-              )}
+              <View>
+                {cover ? (
+                  <Image
+                    source={{ uri: imageUrl(cover.storage_path) }}
+                    style={styles.thumb}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <View style={styles.thumb} />
+                )}
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{String(data.indexOf(l) + 1)}</Text>
+                </View>
+              </View>
               <Text style={styles.headTitle} numberOfLines={2}>
                 {l.title}
               </Text>
@@ -151,17 +156,15 @@ export default function CompareScreen() {
         })}
       </View>
 
-      {rows.map((row) => (
-        <View key={row.label} style={styles.block}>
+      {rows.map((row, r) => (
+        <View key={row.label} style={[styles.block, r % 2 === 1 && styles.blockAlt]}>
           <Text style={styles.label}>{row.label}</Text>
           <View style={styles.values}>
             {data.map((l, i) => (
-              <Text
-                key={l.id}
-                style={[styles.value, styles.column, row.best === i && styles.best]}
-              >
-                {row.cell(l)}
-              </Text>
+              <View key={l.id} style={styles.column}>
+                <Text style={styles.index}>{String(i + 1)}</Text>
+                <Text style={[styles.value, row.best === i && styles.best]}>{row.cell(l)}</Text>
+              </View>
             ))}
           </View>
         </View>
@@ -213,18 +216,31 @@ const styles = StyleSheet.create({
   head: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md - spacing.xs,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.white,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
+  // A fixed height, not a ratio: with two listings a ratio made each photo
+  // half the screen wide and as tall as that implies.
   thumb: {
     width: '100%',
-    aspectRatio: 4 / 3,
-    borderRadius: radius.sm,
+    height: 92,
+    borderRadius: radius.md,
     backgroundColor: colors.lightGray,
   },
+  badge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.softBlack,
+  },
+  badgeText: { fontFamily: fontFamily.bold, fontSize: 12, color: colors.white },
+  index: { fontFamily: fontFamily.bold, fontSize: 10, color: colors.muted },
+  blockAlt: { backgroundColor: colors.lightGray },
   headTitle: {
     marginTop: spacing.xs,
     fontFamily: fontFamily.semibold,
@@ -234,10 +250,8 @@ const styles = StyleSheet.create({
   },
   block: {
     paddingHorizontal: spacing.md - spacing.xs,
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: spacing.sm + 4,
     gap: spacing.xs,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
   },
   label: { ...type.caption, paddingHorizontal: spacing.xs },
   values: { flexDirection: 'row', alignItems: 'flex-start' },

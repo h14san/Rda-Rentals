@@ -165,6 +165,7 @@ export const HELP: Record<HelpTopic, { title: string; summary: string; sections:
           'If you verify as a landlord: photos of your identity document.',
           'Messages you send, rentals you save, and reports you make.',
           'A push token for your phone, if you turn notifications on.',
+          'Not your location. If you let the map use it, it stays on your phone and is not saved. To find places, the app sends the area shown on the map, rounded to about a kilometre.',
         ],
       },
       {

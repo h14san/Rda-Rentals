@@ -1528,6 +1528,120 @@ begin
     when insufficient_privilege then null;
   end;
 
+  -- 20. Re-review after edits. b_listing is published with two badges
+  --     (existence, authorization) from step 11.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+
+  -- Rent and description do not send it back.
+  update public.listings set price_rwf = price_rwf + 5000, description = 'Now with a gate.'
+  where id = b_listing;
+  select status into v_status from public.listings where id = b_listing;
+  if v_status <> 'published' then
+    raise exception 'FAIL: a rent or description edit sent the listing to %.', v_status;
+  end if;
+
+  begin
+    perform public.listing_material_edit(b_listing, 'location');
+    raise exception 'FAIL: a client called listing_material_edit.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- A new photo does, and keeps the badges that photos do not invalidate.
+  insert into public.listing_images (listing_id, storage_path, position)
+  values (b_listing, user_b || '/' || b_listing || '/rls-check-new.jpg', 99);
+
+  select status into v_status from public.listings where id = b_listing;
+  if v_status <> 'pending_review' then
+    raise exception 'FAIL: a photo change left the listing %, expected pending_review.', v_status;
+  end if;
+
+  select count(*) into visible from public.verification_cases
+  where listing_id = b_listing and status = 'submitted' and reopen_reason = 'photos';
+  if visible <> 1 then
+    raise exception 'FAIL: a photo change opened % review cases with a reason, expected 1.', visible;
+  end if;
+
+  select count(*) into visible from public.listing_badges where listing_id = b_listing;
+  if visible <> 2 then
+    raise exception 'FAIL: a photo change left % badges, expected the 2 it does not touch.', visible;
+  end if;
+
+  -- The landlord cannot wave the reason away.
+  update public.listings set review_reason = null where id = b_listing;
+  if not exists (
+    select 1 from public.listings where id = b_listing and review_reason = 'photos'
+  ) then
+    raise exception 'FAIL: a landlord cleared the reason their listing is in review.';
+  end if;
+
+  --     As C: approve again. The reason is settled.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    true
+  );
+  perform public.decide_verification(
+    (select id from public.verification_cases
+     where listing_id = b_listing and status = 'submitted'),
+    'approved', null, array['information_checked']);
+
+  if not exists (
+    select 1 from public.listings
+    where id = b_listing and status = 'published' and review_reason is null
+  ) then
+    raise exception 'FAIL: approving did not publish the listing and clear the reason.';
+  end if;
+
+  --     As B: pausing first is not a way around it.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+  update public.listings set status = 'paused' where id = b_listing;
+  update public.listings set sector = 'Somewhere else' where id = b_listing;
+
+  if not exists (
+    select 1 from public.listings
+    where id = b_listing and status = 'paused' and review_reason = 'location'
+  ) then
+    raise exception 'FAIL: moving a paused listing did not mark it for review.';
+  end if;
+
+  select count(*) into visible from public.listing_badges where listing_id = b_listing;
+  if visible <> 0 then
+    raise exception 'FAIL: a moved listing kept % badges.', visible;
+  end if;
+
+  update public.listings set status = 'published' where id = b_listing;
+  select status into v_status from public.listings where id = b_listing;
+  if v_status <> 'pending_review' then
+    raise exception 'FAIL: republishing a moved listing made it %, expected pending_review.', v_status;
+  end if;
+
+  select count(*) into visible from public.verification_cases
+  where listing_id = b_listing and status = 'submitted' and reopen_reason = 'location';
+  if visible <> 1 then
+    raise exception 'FAIL: republishing a moved listing opened % cases, expected 1.', visible;
+  end if;
+
+  --     As C: approve it once more, so the anonymous checks below find
+  --     b_listing published with two badges, as they did before this step.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    true
+  );
+  perform public.decide_verification(
+    (select id from public.verification_cases
+     where listing_id = b_listing and status = 'submitted'),
+    'approved', null, array['existence_checked', 'authorization_checked']);
+
   -- 8. Anonymous users see published listings only.
   set local role anon;
   perform set_config('request.jwt.claims', null, true);

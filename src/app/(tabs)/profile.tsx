@@ -16,6 +16,7 @@ import {
 import {
   LANDLORD_STATUS_ACTIONS,
   LISTING_STATUS_LABELS,
+  REVIEW_REASON_LABELS,
   type ListingWithImages,
 } from '@/features/listings/types';
 import {
@@ -260,6 +261,11 @@ function SignedInProfile({ userId }: { userId: string }) {
                         {review.decision_note ? `: ${review.decision_note}` : ''}
                       </Text>
                     )}
+                    {!!listing.review_reason && !isLive && (
+                      <Text style={styles.listingMeta}>
+                        {REVIEW_REASON_LABELS[listing.review_reason]}
+                      </Text>
+                    )}
                     {listing.status === 'suspended' && suspensions.data?.has(listing.id) && (
                       <Text style={styles.listingMeta}>
                         Suspended by Rwanda Rentals: {suspensions.data.get(listing.id)!.note}
@@ -283,7 +289,13 @@ function SignedInProfile({ userId }: { userId: string }) {
                   {actions.map((action) => (
                     <Button
                       key={action.to}
-                      label={action.label}
+                      // The database turns this republish into a review
+                      // request; the label should not promise otherwise.
+                      label={
+                        action.to === 'published' && listing.review_reason
+                          ? 'Submit for review'
+                          : action.label
+                      }
                       variant="secondary"
                       style={styles.flex}
                       loading={

@@ -81,6 +81,16 @@ export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
  */
 export const PUBLISH_TARGET: ListingStatus = 'pending_review';
 
+/**
+ * What the landlord is told when an edit sends an approved listing back to
+ * review. Mirrors listing_material_edit(): location and photos do, rent, terms
+ * and description do not.
+ */
+export const REVIEW_REASON_LABELS: Record<ReviewReason, string> = {
+  location: 'You changed the location, so it has to be checked again.',
+  photos: 'You changed the photos, so they have to be checked again.',
+};
+
 /** The status changes a landlord is offered, per current status. */
 export const LANDLORD_STATUS_ACTIONS: Partial<
   Record<ListingStatus, { to: ListingStatus; label: string }[]>
@@ -95,6 +105,8 @@ export const LANDLORD_STATUS_ACTIONS: Partial<
   rented: [{ to: 'published', label: 'Available again' }],
   rejected: [{ to: 'draft', label: 'Back to draft' }],
 };
+
+export type ReviewReason = 'location' | 'photos';
 
 export type ProfileRow = {
   id: string;
@@ -131,6 +143,13 @@ export type ListingRow = {
    */
   approx_latitude: number | null;
   approx_longitude: number | null;
+  /**
+   * Why an approved listing must be reviewed again: its location or photos
+   * changed. Set and cleared only by the database; a write from the app is
+   * ignored. Non-null on a paused, unavailable or rented listing means
+   * "republish" will send it to review instead.
+   */
+  review_reason: ReviewReason | null;
   status: ListingStatus;
   is_featured: boolean;
   created_at: string;
@@ -203,6 +222,8 @@ export type VerificationCaseRow = {
   decided_by: string | null;
   decided_at: string | null;
   decision_note: string | null;
+  /** Set when an already-approved listing came back because of an edit. */
+  reopen_reason: ReviewReason | null;
 };
 
 export type VerificationEvidenceRow = {
@@ -248,6 +269,7 @@ export type Database = {
           | 'updated_at'
           | 'approx_latitude'
           | 'approx_longitude'
+          | 'review_reason'
           | 'availability_confirmed_at'
           | 'bathrooms'
           | 'size_sqm'
@@ -270,7 +292,10 @@ export type Database = {
             id?: string;
           };
         Update: Partial<
-          Omit<ListingRow, 'id' | 'owner_id' | 'approx_latitude' | 'approx_longitude'>
+          Omit<
+            ListingRow,
+            'id' | 'owner_id' | 'approx_latitude' | 'approx_longitude' | 'review_reason'
+          >
         >;
         Relationships: [];
       };

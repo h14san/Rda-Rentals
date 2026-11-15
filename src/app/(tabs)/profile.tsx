@@ -174,20 +174,11 @@ function SignedInProfile({ userId }: { userId: string }) {
       </View>
 
       {isStaff && (
-        <View style={styles.row}>
-          <Button
-            label="Review queue"
-            variant="secondary"
-            style={styles.flex}
-            onPress={() => router.push('/review')}
-          />
-          <Button
-            label="Reports"
-            variant="secondary"
-            style={styles.flex}
-            onPress={() => router.push('/staff/reports')}
-          />
-        </View>
+        <Button
+          label="Staff console"
+          variant="secondary"
+          onPress={() => router.push('/staff')}
+        />
       )}
 
       <View style={styles.section}>

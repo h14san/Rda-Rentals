@@ -95,7 +95,9 @@ The plan maps the Blueprint's phases onto what was already built:
   preferences, tap routing) but **cannot deliver until the owner adds the EAS
   project id and FCM credentials**. The steps are in `docs/WORKPLAN.md` under
   "Needs the owner".
-- **Phase 3, rest:** the rest of the admin console.
+- **Phase 3e (done, live 2026-11-18):** the staff console at `/staff`, inside
+  the app: queues, user and listing lookup across every status, one audit
+  timeline, role grants (admin only) and counts. **Phase 3 is complete.**
 - **Phase 4:** booking (Instant Book + Request to Book).
 - **Later:** AI matching and alerts, payments, digital rental, and agencies.
 
@@ -348,11 +350,34 @@ a paused, unavailable or rented listing stays direct, because it was already
 approved, or was live before verification existed.
 
 **Roles are a table, never a column on `profiles`.** `user_roles` holds
-`admin`/`verifier` rows, readable only by their owner, because every signed-in
-user can read `profiles`. Renter and landlord are not roles. There are no write
-policies, so grant roles from the SQL editor until the admin console exists.
-`has_role()` is security definer so policies can call it without recursing,
-and `admin` satisfies every check.
+`admin`/`verifier` rows, readable by their owner and by admins, because every
+signed-in user can read `profiles`. Renter and landlord are not roles. There
+are no write policies: an admin grants and revokes through `set_staff_role()`
+from the account's page in the staff console. It will not remove the caller's
+own admin role or the last admin, so the project cannot be stranded. **The
+first admin still has to be inserted from the SQL editor.** `has_role()` is
+security definer so policies can call it without recursing, and `admin`
+satisfies every check.
+
+**The staff console adds no new read power.** User search reads `profiles`
+(readable by any signed-in user) and listing search uses the existing staff
+select policy. Only three functions are new: `set_staff_role`,
+`staff_audit_log` (verification and moderation events as one list; a
+listing's review also appears on its owner's timeline) and `staff_stats`
+(counts only, §62). `StaffOnly` in the screens is presentation.
+
+**The staff listing search builds its own query on purpose.** "Nothing builds
+its own listings query" protects the public search paths, which must all go
+through `Filters`. The staff search shows drafts and suspended listings and
+is not one of them.
+
+**Staff sign in like everyone else** (one emailed code). Stronger staff
+authentication (Features #63) is a known gap, not built.
+
+**"Flagged messages" is the reports queue with `?flagged=1`**: the reports
+the message trigger files itself, which have no reporter. One table, two
+views, so a flag and a human report about the same conversation sit together
+on the subject's account page.
 
 **Every staff action is a checked security-definer function**
 (`decide_verification`, `staff_listing_location`). Each one checks `has_role`
@@ -748,6 +773,10 @@ src/
     compare.tsx             2–4 listings side by side
     verify-identity.tsx     landlord ID upload (not (auth)/verify, the OTP step)
     review/                 staff queue + case decision
+    staff/index.tsx         staff console: queues, lookups, counts
+    staff/users/, listings/ search + detail with suspend/restore; roles on a user
+    staff/audit.tsx         one timeline; ?subject= narrows to a user or listing
+    staff/roles.tsx         admin only: who the staff are
     staff/reports/          staff reports queue + report detail and actions
     report.tsx              report form (modal): /report?type=listing|user&id=
     my-reports.tsx          the reporter's own reports and their outcome
@@ -761,6 +790,7 @@ src/
                             smart-search, chat, auto-describe
     verification/           badge labels, case queries, evidence upload
     moderation/             report reasons, report + moderation queries
+    staff/                  console queries: stats, lookups, audit, roles
     messaging/              inbox, messages, realtime, blocks (not the AI chat)
     notifications/          list, preferences, realtime, push tap routing
     profile/                public profile query
@@ -789,6 +819,8 @@ supabase/
                                       staff transcript, drops whatsapp_phone
   migrations/20261117120000_notifications.sql  notifications, push tokens,
                                       preferences, notify_user + its triggers
+  migrations/20261118120000_staff_console.sql  set_staff_role, staff_audit_log,
+                                      staff_stats, admin read of user_roles
   seed.sql                  15 demo Kigali listings (no photos — nothing in
                             the storage bucket to point at until a real upload)
   rls_check.sql             security assertions

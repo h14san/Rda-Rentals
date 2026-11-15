@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
@@ -33,6 +33,10 @@ const GROUPS: { status: ReportStatus; label: string }[] = [
 export default function ReportsQueueScreen() {
   const { isStaff } = useAuth();
   const router = useRouter();
+  // ?flagged=1 is the "Flagged messages" queue: the same table, narrowed to
+  // the reports the message trigger files on its own (no reporter).
+  const { flagged } = useLocalSearchParams<{ flagged?: string }>();
+  const onlyFlags = flagged === '1';
   const [status, setStatus] = useState<ReportStatus>('open');
   const queue = useReportsQueue(isStaff);
 
@@ -43,7 +47,8 @@ export default function ReportsQueueScreen() {
   if (queue.isError)
     return <ErrorState error={queue.error} onRetry={() => void queue.refetch()} />;
 
-  const items = queue.data.filter((r) => r.status === status);
+  const scoped = queue.data.filter((r) => (r.reporter_id === null) === onlyFlags);
+  const items = scoped.filter((r) => r.status === status);
 
   return (
     <FlatList
@@ -55,8 +60,9 @@ export default function ReportsQueueScreen() {
       }
       ListHeaderComponent={
         <View style={styles.filters}>
+          <Stack.Screen options={{ title: onlyFlags ? 'Flagged messages' : 'Reports' }} />
           {GROUPS.map((g) => {
-            const count = queue.data.filter((r) => r.status === g.status).length;
+            const count = scoped.filter((r) => r.status === g.status).length;
             return (
               <Chip
                 key={g.status}

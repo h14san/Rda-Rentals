@@ -89,6 +89,13 @@ function AuthGate() {
       <Stack.Screen name="verify-identity" options={{ title: 'Verify your ID' }} />
       <Stack.Screen name="review/index" options={{ title: 'Review queue' }} />
       <Stack.Screen name="review/[caseId]" options={{ title: 'Review' }} />
+      <Stack.Screen name="staff/index" options={{ title: 'Staff console' }} />
+      <Stack.Screen name="staff/users/index" options={{ title: 'Users' }} />
+      <Stack.Screen name="staff/users/[id]" options={{ title: 'Account' }} />
+      <Stack.Screen name="staff/listings/index" options={{ title: 'Listings' }} />
+      <Stack.Screen name="staff/listings/[id]" options={{ title: 'Listing' }} />
+      <Stack.Screen name="staff/audit" options={{ title: 'Audit log' }} />
+      <Stack.Screen name="staff/roles" options={{ title: 'Staff roles' }} />
       <Stack.Screen name="staff/reports/index" options={{ title: 'Reports' }} />
       <Stack.Screen name="staff/reports/[id]" options={{ title: 'Report' }} />
       <Stack.Screen

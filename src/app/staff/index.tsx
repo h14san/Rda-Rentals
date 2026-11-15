@@ -6,9 +6,12 @@ import { StaffOnly, StaffRow } from '@/components/staff';
 import { ErrorState, LoadingState } from '@/components/states';
 import { SectionTitle } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
-import { LISTING_STATUSES, LISTING_STATUS_LABELS } from '@/features/listings/types';
+import {
+  LISTING_STATUSES,
+  LISTING_STATUS_LABELS,
+  formatShortDate,
+} from '@/features/listings/types';
 import { useStaffStats } from '@/features/staff/queries';
-import { formatShortDate } from '@/features/listings/types';
 import { colors, radius, spacing, type } from '@/theme';
 
 /**
@@ -59,12 +62,6 @@ export default function StaffHubScreen() {
           title="Flagged messages"
           meta={waiting(s.open_flags)}
           onPress={go({ pathname: '/staff/reports', params: { flagged: '1' } })}
-          right={chevron}
-        />
-        <StaffRow
-          title="Bookings"
-          meta="Look one up, or cancel one that should not stand"
-          onPress={go('/staff/bookings')}
           right={chevron}
         />
       </View>

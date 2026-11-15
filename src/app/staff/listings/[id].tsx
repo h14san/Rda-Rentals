@@ -14,7 +14,7 @@ import { REPORT_REASON_LABELS, REPORT_STATUS_LABELS } from '@/features/moderatio
 import { useStaffListing } from '@/features/staff/queries';
 import { CASE_STATUS_LABELS } from '@/features/verification/types';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
-import { colors, radius, spacing, type } from '@/theme';
+import { colors, radius, shadow, spacing, type } from '@/theme';
 
 /** One listing, as staff see it: its status, its review, and what was said about it. */
 export default function StaffListingScreen() {
@@ -154,9 +154,9 @@ const styles = StyleSheet.create({
   card: {
     gap: spacing.sm,
     padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radius.lg,
+    backgroundColor: colors.white,
+    ...shadow,
   },
   box: {
     gap: spacing.xs,
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.lightGray,
   },
-  danger: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.danger },
+  danger: { backgroundColor: colors.dangerTint },
   noteInput: { minHeight: 80, textAlignVertical: 'top', paddingTop: spacing.sm },
   h2: type.h2,
   body: type.body,

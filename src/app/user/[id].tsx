@@ -77,9 +77,8 @@ const styles = StyleSheet.create({
   card: {
     gap: spacing.xs,
     padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radius.lg,
+    backgroundColor: colors.lightGray,
   },
   name: type.h2,
   meta: type.meta,

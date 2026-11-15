@@ -90,5 +90,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.lightGray,
   },
-  reported: { borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.white },
+  reported: { backgroundColor: colors.dangerTint },
 });

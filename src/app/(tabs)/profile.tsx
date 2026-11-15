@@ -246,9 +246,8 @@ const styles = StyleSheet.create({
   notice: {
     gap: spacing.xs,
     padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.danger,
+    borderRadius: radius.lg,
+    backgroundColor: colors.dangerTint,
   },
   noticeTitle: { ...type.bodyStrong, color: colors.danger },
   noticeBody: { ...type.meta, color: colors.charcoal },

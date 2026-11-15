@@ -910,9 +910,19 @@ tokens and five shared components**, so a new screen gets it by using them:
 - Still monochrome on purpose. Gold stays reserved for the price rule, green
   for verification. Do not add a brand colour to buttons without the owner.
 
-Screens that style themselves locally (bordered cards in `my-listings`,
-`booking-card`, `saved`, the staff console) only inherited the new tokens;
-they have not each been redrawn.
+As of 2026-11-15 every screen follows it, the staff console included. Lists
+(inbox, saved, your listings, notifications) are boxless rows on hairlines;
+cards are a `lightGray` fill, or white with `shadow` when they hold
+secondary buttons or inner tinted boxes (which would vanish on the tint).
+Rules inside a tinted card are white. Verification is a `successTint`
+fill. A screen that shows one of two lists uses `Segmented` from `ui.tsx`,
+not chips, because chips read as filters that combine. `EmptyState` takes
+an `icon` naming the place.
+
+**Bookings has a shortcut on the Messages header** (calendar, with a dot
+when something is waiting), because a request expires in 72 hours and
+Profile → Bookings was two taps from anywhere. The tab arrangement itself
+is the owner's (2026-11-22) and was not changed.
 
 
 - **Explore** is one raised search pill, a round filter button with a count,

@@ -760,9 +760,8 @@ const styles = StyleSheet.create({
   pickerMap: { width: '100%', height: 240, borderRadius: radius.md },
 
   reviewCard: {
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radius.lg,
+    backgroundColor: colors.lightGray,
     overflow: 'hidden',
   },
   reviewImage: {

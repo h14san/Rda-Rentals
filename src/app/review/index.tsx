@@ -102,9 +102,8 @@ const styles = StyleSheet.create({
   row: {
     gap: 2,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.lightGray,
   },
   kind: type.caption,
   title: type.bodyStrong,

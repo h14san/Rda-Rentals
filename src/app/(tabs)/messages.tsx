@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -5,7 +6,7 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-nat
 import { Text } from '@/components/text';
 
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
-import { Chip } from '@/components/ui';
+import { Segmented } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
 import {
   isUnread,
@@ -47,20 +48,27 @@ export default function MessagesScreen() {
       ListHeaderComponent={
         archivedCount > 0 || showArchived ? (
           <View style={styles.filters}>
-            <Chip label="Inbox" selected={!showArchived} onPress={() => setShowArchived(false)} />
-            <Chip
-              label={translate('Archived ({n})', { n: archivedCount })}
-              selected={showArchived}
-              onPress={() => setShowArchived(true)}
+            <Segmented
+              value={showArchived ? 'archived' : 'inbox'}
+              onChange={(k) => setShowArchived(k === 'archived')}
+              options={[
+                { key: 'inbox', label: 'Inbox' },
+                { key: 'archived', label: 'Archived', count: archivedCount },
+              ]}
             />
           </View>
         ) : null
       }
       ListEmptyComponent={
         showArchived ? (
-          <EmptyState title="Nothing archived" message="Archived conversations appear here." />
+          <EmptyState
+            icon="archive-outline"
+            title="Nothing archived"
+            message="Archived conversations appear here."
+          />
         ) : (
           <EmptyState
+            icon="chatbubbles-outline"
             title="No messages yet"
             message="Open a rental and tap Message landlord to ask about it. Your conversations appear here."
             actionLabel="Browse rentals"
@@ -100,7 +108,7 @@ function Row({
         unread ? ', unread' : ''
       }`}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
     >
       {cover ? (
         <Image
@@ -109,7 +117,9 @@ function Row({
           contentFit="cover"
         />
       ) : (
-        <View style={styles.thumb} />
+        <View style={styles.thumb}>
+          <Ionicons name="home-outline" size={22} color={colors.muted} />
+        </View>
       )}
 
       <View style={styles.text}>
@@ -136,24 +146,28 @@ function Row({
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.md, gap: spacing.sm, flexGrow: 1 },
-  filters: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  content: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl, flexGrow: 1 },
+  filters: { paddingTop: spacing.sm, paddingBottom: spacing.xs },
+  // No box around a conversation: rows separated by a hairline, as in every
+  // inbox people already know. The photo says which place it is about.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
+  rowPressed: { opacity: 0.7 },
   thumb: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.sm,
+    width: 60,
+    height: 60,
+    borderRadius: radius.md,
     backgroundColor: colors.lightGray,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  text: { flex: 1, gap: 2 },
+  text: { flex: 1, gap: 3 },
   topLine: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
   name: { ...type.bodyStrong, flexShrink: 1 },
   time: type.caption,

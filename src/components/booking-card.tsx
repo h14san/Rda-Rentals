@@ -17,7 +17,7 @@ import {
   useTenantReviews,
 } from '@/features/listings/extras';
 import { formatShortDate } from '@/features/listings/types';
-import { colors, radius, spacing, type } from '@/theme';
+import { colors, fontFamily, radius, spacing, type } from '@/theme';
 import { translate } from '@/lib/i18n';
 
 /**
@@ -98,11 +98,26 @@ export function BookingCard({
         </>
       )}
 
-      <Text style={styles.status}>
-        {b.mode === 'instant' && b.status === 'confirmed'
-          ? 'Booked instantly'
-          : BOOKING_STATUS_LABELS[b.status]}
-      </Text>
+      <View style={styles.statusPill}>
+        <View
+          style={[
+            styles.statusDot,
+            {
+              backgroundColor:
+                b.status === 'confirmed' || b.status === 'completed'
+                  ? colors.success
+                  : isActiveBooking(b.status)
+                    ? colors.softBlack
+                    : colors.muted,
+            },
+          ]}
+        />
+        <Text style={styles.status}>
+          {b.mode === 'instant' && b.status === 'confirmed'
+            ? 'Booked instantly'
+            : BOOKING_STATUS_LABELS[b.status]}
+        </Text>
+      </View>
       <Text style={styles.meta}>{terms}</Text>
       {!!hint && <Text style={styles.meta}>{hint}</Text>}
 
@@ -125,7 +140,7 @@ export function BookingCard({
           <Button
             label="Decline"
             variant="secondary"
-            style={styles.flex}
+            style={[styles.flex, styles.onTint]}
             disabled={busy}
             onPress={() =>
               ask(
@@ -168,6 +183,7 @@ export function BookingCard({
         <Button
           label="Review this renter"
           variant="secondary"
+          style={styles.onTint}
           onPress={() =>
             router.push({ pathname: '/rate/[bookingId]', params: { bookingId: b.id, about: 'renter' } })
           }
@@ -179,6 +195,7 @@ export function BookingCard({
         <Button
           label="Write a review"
           variant="secondary"
+          style={styles.onTint}
           onPress={() => router.push(`/rate/${b.id}`)}
         />
       )}
@@ -208,21 +225,29 @@ export function BookingCard({
 }
 
 const styles = StyleSheet.create({
+  // A tinted card, no border. Secondary buttons inside it are white so they
+  // still read as buttons on the tint.
   card: {
-    gap: spacing.xs,
+    gap: spacing.sm,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-  },
-  compact: {
-    borderWidth: 0,
-    borderRadius: 0,
-    borderBottomWidth: 1,
+    borderRadius: radius.lg,
     backgroundColor: colors.lightGray,
   },
+  compact: { borderRadius: 0 },
   title: type.bodyStrong,
-  status: type.label,
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.white,
+  },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  status: { ...type.caption, fontFamily: fontFamily.semibold, color: colors.softBlack },
+  onTint: { backgroundColor: colors.white },
   meta: type.meta,
   row: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   flex: { flex: 1 },

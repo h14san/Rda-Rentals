@@ -42,6 +42,7 @@ function SignedInSaved({ userId }: { userId: string }) {
   if (data.length === 0) {
     return (
       <EmptyState
+        icon="heart-outline"
         title="Nothing saved yet"
         message="Tap the heart on a rental to keep it here. You will see if it gets rented or the price changes."
         actionLabel="Browse rentals"
@@ -96,9 +97,10 @@ function SignedInSaved({ userId }: { userId: string }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.list}>
-        {data.map((saved) => (
+        {data.map((saved, i) => (
+          <View key={saved.listing_id}>
+          {i > 0 && <View style={styles.rule} />}
           <SavedRow
-            key={saved.listing_id}
             saved={saved}
             selecting={selecting}
             selected={selected.includes(saved.listing_id)}
@@ -111,6 +113,7 @@ function SignedInSaved({ userId }: { userId: string }) {
             }}
             onRemove={() => toggle.mutate({ listingId: saved.listing_id, save: false })}
           />
+          </View>
         ))}
       </ScrollView>
 
@@ -244,20 +247,26 @@ const styles = StyleSheet.create({
   comparePillQuiet: { backgroundColor: colors.lightGray },
   compareText: { ...type.label, color: colors.white },
   compareTextQuiet: { color: colors.charcoal },
-  list: { padding: spacing.md, paddingTop: 0, gap: spacing.md },
+  list: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
+  // Boxless rows on a hairline, like the inbox. Choosing for compare tints the
+  // row instead of drawing a border round it.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    marginHorizontal: -spacing.sm,
     borderRadius: radius.lg,
   },
-  rowSelected: { borderColor: colors.softBlack },
+  rowSelected: { backgroundColor: colors.lightGray },
+  rule: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+  },
   thumb: {
-    width: 72,
-    height: 72,
+    width: 88,
+    height: 88,
     borderRadius: radius.md,
     backgroundColor: colors.lightGray,
   },
@@ -293,7 +302,8 @@ const styles = StyleSheet.create({
   badgeTextNeutral: { color: colors.charcoal },
   footer: {
     padding: spacing.md,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
+    backgroundColor: colors.white,
   },
 });

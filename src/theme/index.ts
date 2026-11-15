@@ -32,6 +32,8 @@ export const colors = {
   /** Behind danger text: a destructive button or a failed state. */
   dangerTint: '#FEECEB',
   success: '#059669',
+  /** Behind green verification text: a badge is a soft green fill, never an outline. */
+  successTint: '#E7F5EF',
 } as const;
 
 /**

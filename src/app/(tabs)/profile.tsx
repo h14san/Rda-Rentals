@@ -26,6 +26,7 @@ import {
 import { useMyListingSuspensions, useMyRestriction } from '@/features/moderation/queries';
 import { CASE_STATUS_LABELS, PROFILE_BADGE_LABELS } from '@/features/verification/types';
 import { signOut } from '@/lib/auth';
+import { unregisterPush } from '@/lib/push';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { imageUrl, supabase } from '@/lib/supabase';
 import { colors, fontFamily, fontSize, radius, spacing } from '@/theme';
@@ -367,7 +368,10 @@ function SignedInProfile({ userId }: { userId: string }) {
             {
               text: 'Sign out',
               style: 'destructive',
-              onPress: () => void signOut(),
+              // Unregister first, while there is still a session to
+              // authorise it; otherwise this phone keeps getting the
+              // account's notifications after sign-out.
+              onPress: () => void unregisterPush().then(signOut),
             },
           ])
         }

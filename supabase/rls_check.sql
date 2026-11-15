@@ -1243,6 +1243,179 @@ begin
   );
   perform public.restrict_account(user_a, 'restore', 'Lifted for the rest of the check.');
 
+  -- 17. Notifications. Everything above already caused some; this checks they
+  --     reached the right person and nobody else, and that no client can write
+  --     one. First one more source: a price drop on a saved listing.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+  insert into public.favorites (user_id, listing_id) values (user_a, b_listing);
+
+  select count(*) into visible from public.notifications
+  where kind = 'message_new' and payload ->> 'conversation_id' = conv::text;
+  if visible <> 1 then
+    raise exception 'FAIL: user A has % message notifications for the conversation, expected 1.', visible;
+  end if;
+
+  select count(*) into visible from public.notifications
+  where kind in ('listing_suspended', 'listing_restored', 'account_suspended', 'account_restored');
+  if visible <> 4 then
+    raise exception 'FAIL: user A has % moderation notifications, expected 4.', visible;
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+  update public.listings set price_rwf = price_rwf - 10000 where id = b_listing;
+
+  -- Three messages from A collapsed into one unread row, and the masked number
+  -- stayed masked in the text a lock screen would show.
+  select count(*) into visible from public.notifications
+  where kind = 'message_new' and payload ->> 'conversation_id' = conv::text;
+  if visible <> 1 then
+    raise exception 'FAIL: user B has % message notifications for the conversation, expected 1.', visible;
+  end if;
+
+  if exists (select 1 from public.notifications where body like '%0788%') then
+    raise exception 'FAIL: a notification carries an unmasked phone number.';
+  end if;
+
+  select count(*) into visible from public.notifications where kind = 'saved_unavailable';
+  if visible <> 1 then
+    raise exception 'FAIL: user B was not told a saved listing was rented (% rows).', visible;
+  end if;
+
+  select count(*) into visible from public.notifications
+  where kind in ('verification_decided', 'listing_review');
+  if visible <> 2 then
+    raise exception 'FAIL: user B has % verification notifications, expected 2.', visible;
+  end if;
+
+  select count(*) into visible from public.notifications where kind = 'report_resolved';
+  if visible <> 2 then
+    raise exception 'FAIL: user B has % report notifications, expected 2.', visible;
+  end if;
+
+  select count(*) into visible from public.notifications where user_id <> user_b;
+  if visible <> 0 then
+    raise exception 'FAIL: user B can read someone else''s notifications.';
+  end if;
+
+  begin
+    insert into public.notifications (user_id, kind, category, title)
+    values (user_a, 'account_suspended', 'account', 'Forged');
+    raise exception 'FAIL: user B wrote a notification.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.notify_user(user_a, 'account_suspended', 'Forged', 'by B');
+    raise exception 'FAIL: user B called notify_user.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  update public.notifications set read_at = '2100-01-01' where kind = 'saved_unavailable';
+  if exists (
+    select 1 from public.notifications
+    where kind = 'saved_unavailable'
+      and (read_at is null or read_at > now() + interval '1 minute')
+  ) then
+    raise exception 'FAIL: marking read did not use the server clock.';
+  end if;
+
+  begin
+    update public.notifications set title = 'edited' where kind = 'saved_unavailable';
+    raise exception 'FAIL: user B edited a notification.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  select count(*) into visible from public.push_config;
+  if visible <> 0 then
+    raise exception 'FAIL: a client can read the push configuration.';
+  end if;
+
+  begin
+    insert into public.notification_preferences (user_id, messages) values (user_a, false);
+    raise exception 'FAIL: user B set user A''s notification preferences.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  insert into public.notification_preferences (user_id, messages) values (user_b, false);
+
+  --     Push tokens. Kept last, so nothing after this could queue a real push.
+  begin
+    insert into public.push_tokens (token, user_id, platform)
+    values ('ExponentPushToken[rls-check-direct]', user_b, 'android');
+    raise exception 'FAIL: user B inserted a push token directly.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.register_push_token('not-a-token', 'android');
+    raise exception 'FAIL: a malformed push token was accepted.';
+  exception
+    when check_violation then null;
+  end;
+
+  perform public.register_push_token('ExponentPushToken[rls-check]', 'android');
+  select count(*) into visible from public.push_tokens;
+  if visible <> 1 then
+    raise exception 'FAIL: user B cannot see its own push token.';
+  end if;
+
+  --     As A: got the price drop, and signing in on the same phone moves the
+  --     token, so B stops receiving on it.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+
+  select count(*) into visible from public.notifications where kind = 'saved_price_drop';
+  if visible <> 1 then
+    raise exception 'FAIL: user A was not told about a price drop (% rows).', visible;
+  end if;
+
+  select count(*) into visible from public.push_tokens;
+  if visible <> 0 then
+    raise exception 'FAIL: user A can read user B''s push token.';
+  end if;
+
+  perform public.register_push_token('ExponentPushToken[rls-check]', 'android');
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+  select count(*) into visible from public.push_tokens;
+  if visible <> 0 then
+    raise exception 'FAIL: a push token stayed with the account that signed out.';
+  end if;
+
+  -- Unregistering someone else's token does nothing.
+  perform public.unregister_push_token('ExponentPushToken[rls-check]');
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+  select count(*) into visible from public.push_tokens;
+  if visible <> 1 then
+    raise exception 'FAIL: user B removed user A''s push token.';
+  end if;
+  perform public.unregister_push_token('ExponentPushToken[rls-check]');
+
   -- 8. Anonymous users see published listings only.
   set local role anon;
   perform set_config('request.jwt.claims', null, true);
@@ -1337,6 +1510,23 @@ begin
   begin
     perform public.start_conversation(b_listing);
     raise exception 'FAIL: anonymous user started a conversation.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- 18. Anonymous users see no notifications and register no tokens.
+  begin
+    select count(*) into visible from public.notifications;
+    if visible <> 0 then
+      raise exception 'FAIL: anonymous user can read notifications.';
+    end if;
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.register_push_token('ExponentPushToken[anon]', 'android');
+    raise exception 'FAIL: anonymous user registered a push token.';
   exception
     when insufficient_privilege then null;
   end;

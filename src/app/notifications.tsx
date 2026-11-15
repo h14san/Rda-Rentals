@@ -1,0 +1,153 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useRouter, type Href } from 'expo-router';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+
+import { EmptyState, ErrorState, LoadingState } from '@/components/states';
+import { useAuth } from '@/features/auth/context';
+import {
+  useMarkNotificationsRead,
+  useNotifications,
+} from '@/features/notifications/queries';
+import type { NotificationRow } from '@/features/notifications/types';
+import { timeAgo } from '@/lib/format';
+import { routeForNotification } from '@/lib/push';
+import { colors, fontFamily, radius, spacing, type } from '@/theme';
+
+const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  messages: 'chatbubble-outline',
+  listings: 'home-outline',
+  saved: 'heart-outline',
+  bookings: 'calendar-outline',
+  account: 'shield-outline',
+};
+
+/** Everything the app has told this user, newest first. Works with push off. */
+export default function NotificationsScreen() {
+  const { session } = useAuth();
+  const router = useRouter();
+  const userId = session?.user.id ?? null;
+  const list = useNotifications(userId);
+  const markRead = useMarkNotificationsRead(userId ?? '');
+
+  if (!userId) return null;
+
+  const settingsButton = (
+    <Stack.Screen
+      options={{
+        headerRight: () => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Notification settings"
+            hitSlop={8}
+            onPress={() => router.push('/notification-settings')}
+          >
+            <Ionicons name="settings-outline" size={22} color={colors.softBlack} />
+          </Pressable>
+        ),
+      }}
+    />
+  );
+
+  if (list.isPending)
+    return (
+      <>
+        {settingsButton}
+        <LoadingState label="Loading notifications…" />
+      </>
+    );
+  if (list.isError)
+    return (
+      <>
+        {settingsButton}
+        <ErrorState error={list.error} onRetry={() => void list.refetch()} />
+      </>
+    );
+
+  const anyUnread = list.data.some((n) => !n.read_at);
+
+  function open(n: NotificationRow) {
+    if (!n.read_at) markRead.mutate(n.id);
+    const route = routeForNotification(n.kind, n.payload);
+    if (route) router.push(route as Href);
+  }
+
+  return (
+    <>
+      {settingsButton}
+      <FlatList
+        data={list.data}
+        keyExtractor={(n) => n.id}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={list.isRefetching} onRefresh={() => void list.refetch()} />
+        }
+        ListHeaderComponent={
+          anyUnread ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => markRead.mutate('all')}
+              style={styles.markAll}
+            >
+              <Text style={styles.markAllText}>Mark all as read</Text>
+            </Pressable>
+          ) : null
+        }
+        ListEmptyComponent={
+          <EmptyState
+            title="Nothing yet"
+            message="Replies, decisions on your listings and changes to rentals you saved will appear here."
+          />
+        }
+        renderItem={({ item }) => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${item.title}${item.read_at ? '' : ', unread'}`}
+            onPress={() => open(item)}
+            style={({ pressed }) => [
+              styles.row,
+              !item.read_at && styles.rowUnread,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Ionicons
+              name={ICONS[item.category] ?? 'notifications-outline'}
+              size={20}
+              color={colors.charcoal}
+            />
+            <View style={styles.text}>
+              <Text style={[styles.title, !item.read_at && styles.titleUnread]}>
+                {item.title}
+              </Text>
+              {!!item.body && (
+                <Text style={styles.body} numberOfLines={3}>
+                  {item.body}
+                </Text>
+              )}
+              <Text style={styles.time}>{timeAgo(item.created_at)}</Text>
+            </View>
+          </Pressable>
+        )}
+      />
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { padding: spacing.md, gap: spacing.sm, flexGrow: 1 },
+  markAll: { alignSelf: 'flex-end', paddingVertical: spacing.xs },
+  markAllText: { ...type.label, textDecorationLine: 'underline' },
+  row: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  rowUnread: { backgroundColor: colors.lightGray, borderColor: colors.lightGray },
+  text: { flex: 1, gap: 2 },
+  title: type.body,
+  titleUnread: { fontFamily: fontFamily.semibold, color: colors.softBlack },
+  body: type.meta,
+  time: type.caption,
+});

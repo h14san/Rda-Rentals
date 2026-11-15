@@ -90,7 +90,12 @@ The plan maps the Blueprint's phases onto what was already built:
 - **Phase 3c (done, live 2026-11-16):** in-app chat with server-side contact
   masking, blocks, message and conversation reports, and a logged staff read
   path. WhatsApp and the contact number are gone.
-- **Phase 3, rest:** notifications and push, and the rest of the admin console.
+- **Phase 3d (done, live 2026-11-17):** notifications. The in-app list fills
+  from real events. Push is built end to end (`send-push` deployed, tokens,
+  preferences, tap routing) but **cannot deliver until the owner adds the EAS
+  project id and FCM credentials**. The steps are in `docs/WORKPLAN.md` under
+  "Needs the owner".
+- **Phase 3, rest:** the rest of the admin console.
 - **Phase 4:** booking (Instant Book + Request to Book).
 - **Later:** AI matching and alerts, payments, digital rental, and agencies.
 
@@ -119,6 +124,15 @@ overturn any of them:
   reporter, and the reverse.
 - **2026-11-15, at most 10 reports per account per 24 hours**, on top of one
   live report per target.
+- **2026-11-17, preferences switch push only.** The in-app list always
+  records everything, so turning a category off never loses information.
+- **2026-11-17, account and safety notifications cannot be turned off**
+  (§37): ID decisions, suspensions and restores, and the result of a report.
+- **2026-11-17, push permission is asked after the first message is sent**,
+  or from the settings screen, never at launch.
+- **2026-11-17, a suspended saved listing is not announced.** It leaves the
+  saved list silently, as moderation intends. Price drops and "rented or
+  unavailable" are announced.
 - **2026-11-16, `profiles.whatsapp_phone` was dropped, not hidden.** Profile
   setup now asks for a name only. Once a booking is confirmed the two people
   exchange numbers in chat, unmasked. A stored number would need its own
@@ -175,6 +189,7 @@ npm run db:rls-check   # asserts the RLS policies hold (passes --yes; always rol
 npx supabase functions deploy chat           # the three AI functions;
 npx supabase functions deploy smart-search   # no Docker needed to deploy
 npx supabase functions deploy auto-describe
+npx supabase functions deploy send-push --no-verify-jwt   # called by Postgres
 ```
 
 Install native deps with `npx expo install <pkg>`, never plain `npm install` —
@@ -526,6 +541,64 @@ the unfiltered inbox subscription only receives the caller's own
 conversations. `rls-check` cannot exercise Realtime: a non-participant
 subscribing and receiving nothing is a manual test.
 
+## Notifications
+
+**`notify_user()` is the only writer of `notifications`, and it is internal.**
+Execute is revoked from `anon` *and* `authenticated`. Supabase grants execute
+on every new function to both by default, so "internal" has to be said in the
+migration. It is reached only from security-definer triggers on the tables
+where things happen (messages, verification cases, reports, suspensions,
+restrictions, listings). The staff functions were not edited to call it, so a
+new staff function gets its notification for free by writing its row.
+
+**The words are composed in SQL, once** (`title`, `body`), so the in-app list
+and the push banner cannot disagree, and an older app can render a kind it has
+never heard of. `payload` carries ids for navigation only.
+
+**Repeats collapse.** With a `collapse_key`, a repeat updates the one unread
+row for that key instead of inserting (ten messages in a conversation are one
+line). The update clears `pushed_at`, so the phone still buzzes each time.
+
+**A message notification carries the stored body**, so a masked number is
+masked on the lock screen too.
+
+**`send-push` runs without JWT verification and is safe anyway.** Postgres
+calls it through `pg_net` and has no user token. The request carries a
+notification id and nothing else; recipient, words and tokens are read
+server-side with the service role. A row is claimed by setting `pushed_at`
+where it is null, so a second call sends nothing. When push is not wanted
+(preference off, conversation muted, no device), `notify_user` sets
+`pushed_at` itself, which is what makes the function refuse. It is the only
+function with a `[functions.*]` block in `config.toml`; the three AI functions
+still require a JWT. Deploy it with `--no-verify-jwt`.
+
+**`pg_net` is asynchronous and transactional.** The request is queued in the
+transaction and sent after commit, so a rolled-back action sends no push, and
+`rls-check` (always rolled back) cannot send one. The queueing is wrapped in
+an exception handler: a failed push must never undo the message or decision
+that caused it.
+
+**The send-push URL is a row in `push_config`**, not a literal in the
+function. It names this project's ref. Another project needs one `update`.
+
+**The push token is the primary key of `push_tokens`.** One device, one row,
+whoever is signed in. `register_push_token()` moves the row when another
+account signs in on the same phone, which is why it is a function and not an
+insert policy. Sign-out unregisters first, while a session still exists.
+
+**Everything in `src/lib/push.ts` returns quietly when push is impossible**:
+Expo Go (no remote push on Android since SDK 53), a simulator, web, or a build
+with no EAS project id. The notifications list does not depend on any of it.
+
+**The Android channel id `default` exists in two places**: `src/lib/push.ts`
+creates it and `send-push` addresses it. Android silently drops a notification
+sent to a channel the device does not have.
+
+**The CLI refuses hosted mutations from an agent without `--yes`**
+("HostedMutationConsentRequiredError"). `functions deploy` and `db push` both
+need it. The owner's standing authorization in the work plan is what makes
+passing it legitimate; it does not extend to `config push` or `db:seed`.
+
 **"Read" is the server's clock**, like availability: any change to
 `last_read_at` is overwritten with `now()`. Only `last_read_at`, `archived`
 and `muted` are updatable (column grants), so a participant row cannot be
@@ -668,6 +741,8 @@ src/
                             profile; post is a hidden tab reached from profile
     (tabs)/messages.tsx     inbox, with archived filter and unread state
     conversation/[id].tsx   one conversation: bubbles, composer, block/report menu
+    notifications.tsx       the in-app list; tap opens the screen it is about
+    notification-settings.tsx  push state + per-category switches
     staff/conversation/[reportId].tsx  logged staff read of a reported conversation
     (tabs)/saved.tsx        favorites, with select-to-compare
     compare.tsx             2–4 listings side by side
@@ -687,8 +762,9 @@ src/
     verification/           badge labels, case queries, evidence upload
     moderation/             report reasons, report + moderation queries
     messaging/              inbox, messages, realtime, blocks (not the AI chat)
+    notifications/          list, preferences, realtime, push tap routing
     profile/                public profile query
-  lib/                      supabase, auth, format, locations,
+  lib/                      supabase, auth, format, locations, push,
                             edge-functions, images (pick + compress)
   theme/                    colour, spacing, radius, shadow tokens
 supabase/
@@ -697,6 +773,8 @@ supabase/
   functions/smart-search/             query -> Filters
   functions/chat/                     conversation -> reply + Filters
   functions/auto-describe/            photos -> description
+  functions/send-push/                notification id -> Expo Push (no JWT; see
+                                      its header for why that is safe)
   migrations/20260910120000_init.sql  schema, indexes, RLS, storage policies
   migrations/20261024120000_private_location.sql  listing_locations, approx point,
                                                   drops profiles.phone
@@ -709,6 +787,8 @@ supabase/
                                                   suspensions, moderation log
   migrations/20261116120000_chat.sql  conversations, messages, masking, blocks,
                                       staff transcript, drops whatsapp_phone
+  migrations/20261117120000_notifications.sql  notifications, push tokens,
+                                      preferences, notify_user + its triggers
   seed.sql                  15 demo Kigali listings (no photos — nothing in
                             the storage bucket to point at until a real upload)
   rls_check.sql             security assertions

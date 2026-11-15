@@ -89,6 +89,9 @@ function MyListings({ userId }: { userId: string }) {
   const bookings = useMyBookings(userId);
   const unreadMessages = useUnreadCount(userId);
   const [group, setGroup] = useState<Group>('all');
+  // Read once when the screen opens. "Two weeks ago" does not need to tick,
+  // and a clock read during render is not allowed to.
+  const [openedAt] = useState(() => Date.now());
   const [menuFor, setMenuFor] = useState<ListingWithImages | null>(null);
 
   const postButton = (
@@ -256,7 +259,7 @@ function MyListings({ userId }: { userId: string }) {
                       (l) =>
                         l.status === 'published' &&
                         (!l.availability_confirmed_at ||
-                          Date.now() - new Date(l.availability_confirmed_at).getTime() >
+                          openedAt - new Date(l.availability_confirmed_at).getTime() >
                             14 * 86_400_000),
                     ).length,
                     label: 'To confirm available',

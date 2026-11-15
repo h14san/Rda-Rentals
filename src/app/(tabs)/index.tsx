@@ -29,6 +29,7 @@ import {
 } from '@/features/listings/queries';
 import { isEmptyResult, useSmartSearch } from '@/features/listings/smart-search';
 import { activeFilterCount, filterSummary } from '@/features/listings/types';
+import { useT } from '@/lib/i18n';
 import { colors, fontFamily, radius, shadow, spacing, type } from '@/theme';
 
 const SORT_OPTIONS: SortOrder[] = ['newest', 'price_asc', 'price_desc', 'confirmed'];
@@ -72,6 +73,7 @@ function FeedScreen() {
   const [searchText, setSearchText] = useState('');
   const [layout, setLayout] = useState<Layout>('grid');
   const [sortOpen, setSortOpen] = useState(false);
+  const t = useT();
   const smartSearch = useSmartSearch();
   const { session } = useAuth();
   const favorites = useFavoriteControl(session?.user.id ?? null);
@@ -136,7 +138,7 @@ function FeedScreen() {
               style={styles.searchInput}
               value={searchText}
               onChangeText={setSearchText}
-              placeholder="Try: cheap studio near Kimironko"
+              placeholder={t('Try: cheap studio near Kimironko')}
               placeholderTextColor={colors.muted}
               returnKeyType="search"
               onSubmitEditing={runSmartSearch}
@@ -197,7 +199,7 @@ function FeedScreen() {
               style={[styles.activeChip, styles.clearChip]}
             >
               <Ionicons name="close" size={14} color={colors.white} />
-              <Text style={[styles.activeChipText, styles.clearChipText]}>Clear</Text>
+              <Text style={[styles.activeChipText, styles.clearChipText]}>{t('Clear')}</Text>
             </Pressable>
             {chips.map((chip) => (
               <View key={chip} style={styles.activeChip}>
@@ -225,7 +227,7 @@ function FeedScreen() {
               style={[styles.activeChip, styles.saveChip]}
             >
               <Ionicons name="notifications-outline" size={14} color={colors.softBlack} />
-              <Text style={styles.activeChipText}>Save search</Text>
+              <Text style={styles.activeChipText}>{t('Save search')}</Text>
             </Pressable>
           </ScrollView>
         )}
@@ -233,7 +235,11 @@ function FeedScreen() {
         {!isPending && !isError && (
           <View style={styles.resultRow}>
             <Text style={styles.resultCount}>
-              {total === 0 ? 'No rentals' : `${total} rental${total === 1 ? '' : 's'}`}
+              {total === 0
+                ? t('No rentals')
+                : total === 1
+                  ? t('1 rental')
+                  : t('{n} rentals', { n: total })}
             </Text>
 
             <View style={styles.resultActions}>
@@ -243,7 +249,7 @@ function FeedScreen() {
                 onPress={() => setSortOpen(true)}
                 style={({ pressed }) => [styles.pillButton, pressed && { opacity: 0.7 }]}
               >
-                <Text style={styles.pillLabel}>{SORT_LABELS[sort]}</Text>
+                <Text style={styles.pillLabel}>{t(SORT_LABELS[sort])}</Text>
                 <Ionicons name="chevron-down" size={14} color={colors.charcoal} />
               </Pressable>
 

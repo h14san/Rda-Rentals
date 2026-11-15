@@ -10,7 +10,10 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { ZoomableImage } from '@/components/zoomable-image';
 
 import { imageUrl } from '@/lib/supabase';
 import { colors, spacing, type } from '@/theme';
@@ -94,7 +97,7 @@ export function PhotoGallery({
           />
         </View>
       ) : (
-        <View style={styles.viewer}>
+        <GestureHandlerRootView style={styles.viewer}>
           <FlatList
             data={paths}
             keyExtractor={(p) => p}
@@ -109,13 +112,7 @@ export function PhotoGallery({
               setIndex(Math.round(e.nativeEvent.contentOffset.x / width))
             }
             renderItem={({ item }) => (
-              <Image
-                source={{ uri: imageUrl(item) }}
-                style={{ width, height }}
-                // The whole photo, never cropped: this is where someone looks
-                // closely at a room.
-                contentFit="contain"
-              />
+              <ZoomableImage uri={imageUrl(item)} width={width} height={height} />
             )}
           />
 
@@ -134,7 +131,7 @@ export function PhotoGallery({
             </Text>
             <View style={styles.barSpacer} />
           </View>
-        </View>
+        </GestureHandlerRootView>
       )}
     </Modal>
   );

@@ -9,7 +9,11 @@ import {
   type BookingWithPeople,
 } from '@/features/bookings/queries';
 import { BOOKING_STATUS_LABELS, isActiveBooking } from '@/features/bookings/types';
-import { useMyReviewedBookings } from '@/features/listings/extras';
+import {
+  reviewSummary,
+  useMyReviewedBookings,
+  useTenantReviews,
+} from '@/features/listings/extras';
 import { formatShortDate } from '@/features/listings/types';
 import { colors, radius, spacing, type } from '@/theme';
 
@@ -36,6 +40,12 @@ export function BookingCard({
   const cancel = useCancelBooking();
   const router = useRouter();
   const reviewed = useMyReviewedBookings(userId);
+  // Only fetched by the landlord, and RLS only answers while this renter has
+  // a live booking with them, or for reviews the landlord wrote.
+  const isLandlordHere = b.landlord_id === userId;
+  const standing = useTenantReviews(isLandlordHere ? b.renter_id : null);
+  const standingSummary = standing.data ? reviewSummary(standing.data) : null;
+  const iReviewedRenter = !!standing.data?.some((r) => r.booking_id === b.id);
   const busy = respond.isPending || confirm.isPending || cancel.isPending;
 
   const isRenter = b.renter_id === userId;
@@ -139,6 +149,24 @@ export function BookingCard({
               'Confirm',
               () => confirm.mutate(b.id, { onError: failed }),
             )
+          }
+        />
+      )}
+
+      {isLandlord && isActiveBooking(b.status) && standing.isSuccess && (
+        <Text style={styles.meta}>
+          {standingSummary
+            ? `Other landlords rated this renter ${standingSummary.average} of 5 (${standingSummary.count}).`
+            : 'No landlord has reviewed this renter yet.'}
+        </Text>
+      )}
+
+      {isLandlord && b.status === 'completed' && standing.isSuccess && !iReviewedRenter && (
+        <Button
+          label="Review this renter"
+          variant="secondary"
+          onPress={() =>
+            router.push({ pathname: '/rate/[bookingId]', params: { bookingId: b.id, about: 'renter' } })
           }
         />
       )}

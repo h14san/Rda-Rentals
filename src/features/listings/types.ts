@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import type { BookingRow } from '@/features/bookings/types';
-import type { ReviewRow, SavedSearchRow } from '@/features/listings/extras';
+import type { ReviewRow, SavedSearchRow, TenantReviewRow } from '@/features/listings/extras';
 import type {
   ConversationParticipantRow,
   ConversationRow,
@@ -482,6 +482,13 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // Written only by submit_tenant_review(), by the landlord of a completed booking.
+      tenant_reviews: {
+        Row: TenantReviewRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       // Changed only through the booking functions; there is no write policy.
       bookings: {
         Row: BookingRow;
@@ -531,6 +538,12 @@ export type Database = {
         Args: { p_booking_id: string; p_rating: number; p_body?: string | null };
         Returns: string;
       };
+      submit_tenant_review: {
+        Args: { p_booking_id: string; p_rating: number; p_body?: string | null };
+        Returns: string;
+      };
+      reply_to_review: { Args: { p_review_id: string; p_body: string }; Returns: undefined };
+      remove_review: { Args: { p_review_id: string; p_note: string }; Returns: undefined };
       account_deletion_blocker: { Args: Record<string, never>; Returns: string | null };
       request_booking: {
         Args: {

@@ -10,6 +10,7 @@ import {
 } from '@/features/notifications/queries';
 import type { NotificationRow } from '@/features/notifications/types';
 import { timeAgo } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { routeForNotification } from '@/lib/push';
 import { colors, fontFamily, radius, spacing, type } from '@/theme';
 
@@ -28,6 +29,7 @@ export default function NotificationsScreen() {
   const userId = session?.user.id ?? null;
   const list = useNotifications(userId);
   const markRead = useMarkNotificationsRead(userId ?? '');
+  const t = useT();
 
   if (!userId) return null;
 
@@ -88,7 +90,7 @@ export default function NotificationsScreen() {
               onPress={() => markRead.mutate('all')}
               style={styles.markAll}
             >
-              <Text style={styles.markAllText}>Mark all as read</Text>
+              <Text style={styles.markAllText}>{t('Mark all as read')}</Text>
             </Pressable>
           ) : null
         }
@@ -116,7 +118,7 @@ export default function NotificationsScreen() {
             />
             <View style={styles.text}>
               <Text style={[styles.title, !item.read_at && styles.titleUnread]}>
-                {item.title}
+                {t(item.title)}
               </Text>
               {!!item.body && (
                 <Text style={styles.body} numberOfLines={3}>

@@ -268,7 +268,7 @@ export default function ListingDetailScreen() {
             </View>
           )}
 
-          <ListingReviews listingId={listing.id} />
+          <ListingReviews listingId={listing.id} ownerId={listing.owner_id} />
 
           {!!listing.profiles && (
             <View style={styles.section}>

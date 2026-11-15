@@ -267,7 +267,7 @@ checked functions remain the real boundary.
 
 ---
 
-## M5: Safety and help content (small)
+## M5: Safety and help content (small) — DONE 2026-11-18
 
 Features #25, #49, Blueprint §39. Add static in-app screens: what each badge
 means and what it doesn't guarantee, payment safety ("never pay before
@@ -354,6 +354,7 @@ make.
 |---|---|---|
 | FCM `google-services.json` + EAS project, APNs key | Push delivery (M3) | `eas.json` and the client are in place. Steps below |
 | Pindo account, API token, sender ID | Phone OTP | Decided, not started |
+| A monitored support inbox | Appeals and deletion requests (M5) | Set `EXPO_PUBLIC_SUPPORT_EMAIL`; until then the help screens say support is being set up |
 | Data residency (Rwanda DPP law, §50) | Any real user data, especially IDs | Legal question |
 | Evidence retention period | Purge job for ID photos | Undecided |
 | Device testing on a dev build | Map, push, realtime on real networks | Manual |

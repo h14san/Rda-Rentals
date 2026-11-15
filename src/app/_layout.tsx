@@ -104,6 +104,8 @@ function AuthGate() {
       />
       <Stack.Screen name="conversation/[id]" options={{ title: '' }} />
       <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
+      <Stack.Screen name="help/index" options={{ title: 'Safety and help' }} />
+      <Stack.Screen name="help/[topic]" options={{ title: '' }} />
       <Stack.Screen
         name="notification-settings"
         options={{ title: 'Notification settings' }}

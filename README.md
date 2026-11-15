@@ -31,7 +31,9 @@ it: viewings are arranged in chat.
 | 1: Privacy | Done, live: the exact address and pin are owner-only; tenants see a 500 m area |
 | 2: Marketplace | Done, live: rental terms, the full status model, favorites, comparison, map view |
 | 3: Trust and communication | Done, live: roles, verification, reports and moderation, in-app chat with contact masking. Next: notifications and the admin console |
-| Later | Booking, AI matching and alerts, payments, digital rental, agencies |
+| 3 (rest) | Done, live: notifications (push waits on FCM credentials), the in-app staff console, safety and help screens |
+| 4: Booking | Done, live: Instant Book and Request to Book; a confirmed booking releases the exact address |
+| Later | AI matching and alerts, payments, digital rental, agencies |
 
 The app has no unit tests and has not been through a beta. CI typechecks and
 lints every push, and `npm run db:rls-check` asserts the security rules

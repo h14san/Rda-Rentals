@@ -359,6 +359,8 @@ function SignedInProfile({ userId }: { userId: string }) {
         )}
       </View>
 
+      <Button label="Bookings" variant="secondary" onPress={() => router.push('/bookings')} />
+
       <Button
         label="Your reports"
         variant="secondary"

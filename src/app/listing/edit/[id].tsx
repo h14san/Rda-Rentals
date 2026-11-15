@@ -29,6 +29,7 @@ import {
   type ListingTerms,
   type PickedImage,
 } from '@/features/listings/create';
+import { BOOKING_MODE_COPY } from '@/features/bookings/types';
 import { useListingDetail, useUpdateListing } from '@/features/listings/queries';
 import { ListingTermsFields, validateTerms } from '@/features/listings/terms-fields';
 import {
@@ -78,6 +79,8 @@ function SignedInEditListing({ userId }: { userId: string }) {
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [furnished, setFurnished] = useState(false);
   const [terms, setTerms] = useState<ListingTerms>(EMPTY_TERMS);
+  const [instantBook, setInstantBook] = useState(false);
+  const [requestToBook, setRequestToBook] = useState(true);
   const [district, setDistrict] = useState<string | null>(null);
   const [sector, setSector] = useState<string | null>(null);
   const [address, setAddress] = useState('');
@@ -118,6 +121,8 @@ function SignedInEditListing({ userId }: { userId: string }) {
       available_from: listing.available_from,
       amenities: listing.amenities,
     });
+    setInstantBook(listing.instant_book_enabled);
+    setRequestToBook(listing.request_to_book_enabled);
     setDistrict(listing.district);
     setSector(listing.sector);
     setAddress(listing.listing_locations?.address ?? '');
@@ -132,9 +137,14 @@ function SignedInEditListing({ userId }: { userId: string }) {
   const priceValue = Number.parseInt(price.replace(/[^\d]/g, ''), 10);
   // Only an approved listing has anything to lose by a material edit. Saying
   // so before the edit beats a listing that quietly leaves the feed after it.
-  const reviewWarning = ['published', 'paused', 'unavailable', 'rented'].includes(
-    listing.status,
-  );
+  const reviewWarning = [
+    'published',
+    'paused',
+    'unavailable',
+    'rented',
+    'booking_pending',
+    'reserved',
+  ].includes(listing.status);
   // Captured out of the closure: the early returns above narrow `listing`, but
   // that narrowing does not survive into an async callback.
   const listingId = listing.id;
@@ -196,6 +206,8 @@ function SignedInEditListing({ userId }: { userId: string }) {
           district,
           sector,
           ...terms,
+          instant_book_enabled: instantBook,
+          request_to_book_enabled: requestToBook,
         },
       });
       router.back();
@@ -372,6 +384,30 @@ function SignedInEditListing({ userId }: { userId: string }) {
         <ListingTermsFields terms={terms} onChange={setTerms} errors={errors} />
 
         <View style={styles.field}>
+          <Text style={styles.fieldLabel}>How people book</Text>
+          <Text style={styles.help}>Choose one or both. At least one has to stay on.</Text>
+          {(
+            [
+              ['request', requestToBook, setRequestToBook, instantBook],
+              ['instant', instantBook, setInstantBook, requestToBook],
+            ] as const
+          ).map(([mode, on, set, otherOn]) => (
+            <View key={mode} style={styles.bookingMode}>
+              <View style={styles.chipWrap}>
+                <Chip
+                  label={BOOKING_MODE_COPY[mode].label + (on ? ': on' : ': off')}
+                  selected={on}
+                  // Turning the last one off would leave no way to book, which
+                  // the database refuses; do not offer it.
+                  onPress={() => (on && !otherOn ? undefined : set(!on))}
+                />
+              </View>
+              <Text style={styles.help}>{BOOKING_MODE_COPY[mode].detail}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.field}>
           <Text style={styles.fieldLabel}>District</Text>
           {reviewWarning && (
             <Text style={styles.help}>
@@ -453,6 +489,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.white },
   content: { padding: spacing.md, paddingBottom: spacing.xl, gap: spacing.md },
   field: { gap: spacing.sm },
+  bookingMode: { gap: spacing.xs, marginTop: spacing.xs },
   fieldLabel: {
     fontSize: fontSize.sm,
     fontFamily: fontFamily.semibold,

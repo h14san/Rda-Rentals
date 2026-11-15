@@ -238,6 +238,8 @@ export interface ListingEdit {
   min_rental_months: number | null;
   available_from: string | null;
   amenities: string[];
+  instant_book_enabled: boolean;
+  request_to_book_enabled: boolean;
 }
 
 /**

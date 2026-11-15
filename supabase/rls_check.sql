@@ -121,6 +121,7 @@ declare
   m_report uuid;
   transcript jsonb;
   user_d uuid := 'aaaaaaaa-0000-4000-8000-0000000000d4';
+  booking uuid;
   a_active_listing uuid;
   a_draft_listing uuid;
   visible int;
@@ -273,6 +274,13 @@ begin
   if affected <> 1 then
     raise exception 'FAIL: user B cannot update its own listing.';
   end if;
+
+  -- Give it an exact location while it is still a draft, for the booking
+  -- checks in step 21: the address must stay private until a booking is
+  -- confirmed, and there has to be an address for that to mean anything.
+  insert into public.listing_locations (listing_id, address, latitude, longitude)
+  select id, 'KG 1 Ave, house 12', -1.9500, 30.0600
+  from public.listings where owner_id = user_b and title = 'B own listing';
 
   -- 7b. A landlord cannot skip moderation (rule 9). A draft goes to review,
   --     never straight to published; suspending or approving is staff-only.
@@ -1642,6 +1650,335 @@ begin
      where listing_id = b_listing and status = 'submitted'),
     'approved', null, array['existence_checked', 'authorization_checked']);
 
+  -- 21. Booking. A rents, B is the landlord of b_listing (request to book).
+  --     Later the roles swap on a_active_listing (instant book).
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+
+  -- Rule 7 needs at least one way to book.
+  begin
+    update public.listings
+    set instant_book_enabled = false, request_to_book_enabled = false
+    where id = b_listing;
+    raise exception 'FAIL: a listing was left with no booking mode.';
+  exception
+    when check_violation then null;
+  end;
+
+  begin
+    perform public.request_booking(b_listing, current_date + 30, 12);
+    raise exception 'FAIL: a landlord booked their own listing.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  --     As A: request. The note travels as a chat message, so it is masked.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+
+  booking := public.request_booking(b_listing, current_date + 30, 12, 'Reach me on 0788 999 888');
+
+  if not exists (
+    select 1 from public.bookings
+    where id = booking and status = 'requested' and mode = 'request' and expires_at > now()
+  ) then
+    raise exception 'FAIL: a request to book did not start as requested.';
+  end if;
+
+  if exists (
+    select 1 from public.messages where conversation_id = conv and body like '%0788 999 888%'
+  ) then
+    raise exception 'FAIL: the note sent with a booking request was not masked.';
+  end if;
+
+  select count(*) into visible from public.messages
+  where conversation_id = conv and kind = 'system' and body like 'Booking requested:%';
+  if visible <> 1 then
+    raise exception 'FAIL: a booking request posted % system messages, expected 1.', visible;
+  end if;
+
+  begin
+    perform public.request_booking(b_listing, current_date + 40, 6);
+    raise exception 'FAIL: a renter made two live bookings on one listing.';
+  exception
+    when object_not_in_prerequisite_state then null;
+  end;
+
+  begin
+    perform public.request_booking(b_listing, current_date - 1, 6);
+    raise exception 'FAIL: a booking was requested for a date in the past.';
+  exception
+    when invalid_parameter_value then null;
+    when object_not_in_prerequisite_state then null;  -- the live-booking check may win
+  end;
+
+  -- No write path except the functions.
+  update public.bookings set status = 'confirmed' where id = booking;
+  get diagnostics affected = row_count;
+  if affected <> 0 then
+    raise exception 'FAIL: a renter confirmed a booking by writing the row.';
+  end if;
+
+  begin
+    insert into public.bookings (listing_id, listing_title, renter_id, landlord_id, mode,
+                                 move_in_date, duration_months, status)
+    values (b_listing, 'forged', user_a, user_b, 'instant', current_date + 1, 1, 'confirmed');
+    raise exception 'FAIL: a renter inserted a confirmed booking.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.respond_booking(booking, true);
+    raise exception 'FAIL: a renter accepted their own request.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.confirm_booking(booking);
+    raise exception 'FAIL: a booking was confirmed before the landlord accepted it.';
+  exception
+    when object_not_in_prerequisite_state then null;
+  end;
+
+  begin
+    perform public.expire_bookings();
+    raise exception 'FAIL: a client ran the expiry job.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- Rules 3 and 4: a request reveals nothing.
+  select count(*) into visible from public.listing_locations where listing_id = b_listing;
+  if visible <> 0 then
+    raise exception 'FAIL: a requested booking revealed the exact address.';
+  end if;
+
+  --     As B: accept. The listing leaves the feed; the address is still private.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+
+  begin
+    perform public.cancel_booking(booking);
+    raise exception 'FAIL: a landlord cancelled a request instead of declining it.';
+  exception
+    when object_not_in_prerequisite_state then null;
+  end;
+
+  perform public.respond_booking(booking, true);
+
+  select status into v_status from public.listings where id = b_listing;
+  if v_status <> 'booking_pending' then
+    raise exception 'FAIL: accepting left the listing %, expected booking_pending.', v_status;
+  end if;
+
+  begin
+    perform public.confirm_booking(booking);
+    raise exception 'FAIL: the landlord confirmed on the renter''s behalf.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    update public.listings set status = 'published' where id = b_listing;
+    raise exception 'FAIL: a landlord pulled a listing out of booking_pending.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+
+  select count(*) into visible from public.listings where id = b_listing;
+  if visible <> 1 then
+    raise exception 'FAIL: the renter lost sight of the listing they are booking.';
+  end if;
+
+  select count(*) into visible from public.listing_locations where listing_id = b_listing;
+  if visible <> 0 then
+    raise exception 'FAIL: an accepted, unconfirmed booking revealed the exact address.';
+  end if;
+
+  --     As A: confirm. Now, and only now, the address and unmasked contact.
+  perform public.confirm_booking(booking);
+
+  select status into v_status from public.listings where id = b_listing;
+  if v_status <> 'reserved' then
+    raise exception 'FAIL: confirming left the listing %, expected reserved.', v_status;
+  end if;
+
+  select count(*) into visible from public.listing_locations
+  where listing_id = b_listing and address is not null;
+  if visible <> 1 then
+    raise exception 'FAIL: a confirmed booking did not reveal the exact address.';
+  end if;
+
+  -- The release is for this listing only.
+  select count(*) into visible from public.listing_locations where listing_id <> b_listing
+    and listing_id not in (select id from public.listings where owner_id = user_a);
+  if visible <> 0 then
+    raise exception 'FAIL: a confirmed booking revealed another listing''s address.';
+  end if;
+
+  insert into public.messages (conversation_id, sender_id, body)
+  values (conv, user_a, 'My number is 0788 999 888')
+  returning id into a_message;
+  if not exists (
+    select 1 from public.messages
+    where id = a_message and not masked and body = 'My number is 0788 999 888'
+  ) then
+    raise exception 'FAIL: contact details were still masked after a confirmed booking.';
+  end if;
+
+  -- Older messages stay as they were delivered.
+  if exists (
+    select 1 from public.messages
+    where conversation_id = conv and masked and body like '%0788%'
+  ) then
+    raise exception 'FAIL: confirming a booking unmasked an earlier message.';
+  end if;
+
+  --     As B: move-in. Marking it rented completes the booking.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+
+  select count(*) into visible from public.notifications
+  where kind in ('booking_requested', 'booking_confirmed');
+  if visible <> 2 then
+    raise exception 'FAIL: the landlord has % booking notifications, expected 2.', visible;
+  end if;
+
+  update public.listings set status = 'rented' where id = b_listing;
+  if not exists (select 1 from public.bookings where id = booking and status = 'completed') then
+    raise exception 'FAIL: marking a reserved listing rented did not complete the booking.';
+  end if;
+
+  --     Instant Book, roles swapped: A's listing, B books.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+  update public.listings
+  set status = 'published', instant_book_enabled = true, request_to_book_enabled = false,
+      available_from = null, min_rental_months = 6
+  where id = a_active_listing;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+
+  -- Too short a stay for instant, and requests are off: refused with a reason.
+  begin
+    perform public.request_booking(a_active_listing, current_date + 10, 3);
+    raise exception 'FAIL: an ineligible instant booking went through.';
+  exception
+    when object_not_in_prerequisite_state then null;
+  end;
+
+  booking := public.request_booking(a_active_listing, current_date + 10, 12);
+
+  if not exists (
+    select 1 from public.bookings
+    where id = booking and status = 'confirmed' and mode = 'instant'
+  ) then
+    raise exception 'FAIL: an eligible instant booking was not confirmed at once.';
+  end if;
+
+  select status into v_status from public.listings where id = a_active_listing;
+  if v_status <> 'reserved' then
+    raise exception 'FAIL: an instant booking left the listing %, expected reserved.', v_status;
+  end if;
+
+  select count(*) into visible from public.listing_locations where listing_id = a_active_listing;
+  if visible <> 1 then
+    raise exception 'FAIL: an instant booking did not reveal the exact address.';
+  end if;
+
+  --     As A (landlord): cancel. The listing returns and the address closes.
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_a, 'role', 'authenticated')::text,
+    true
+  );
+  perform public.cancel_booking(booking);
+
+  select status into v_status from public.listings where id = a_active_listing;
+  if v_status <> 'published' then
+    raise exception 'FAIL: cancelling left the listing %, expected published.', v_status;
+  end if;
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_b, 'role', 'authenticated')::text,
+    true
+  );
+
+  select count(*) into visible from public.listing_locations where listing_id = a_active_listing;
+  if visible <> 0 then
+    raise exception 'FAIL: the exact address stayed visible after the booking was cancelled.';
+  end if;
+
+  begin
+    perform public.cancel_booking(booking);
+    raise exception 'FAIL: a cancelled booking was cancelled again.';
+  exception
+    when object_not_in_prerequisite_state then null;
+  end;
+
+  --     Staff can cancel, with a note, and it is logged.
+  booking := public.request_booking(a_active_listing, current_date + 10, 12);
+
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', user_c, 'role', 'authenticated')::text,
+    true
+  );
+
+  select count(*) into visible from public.bookings where id = booking;
+  if visible <> 1 then
+    raise exception 'FAIL: staff cannot see a booking.';
+  end if;
+
+  begin
+    perform public.cancel_booking(booking, '  ');
+    raise exception 'FAIL: staff cancelled a booking without a note.';
+  exception
+    when invalid_parameter_value then null;
+  end;
+
+  perform public.cancel_booking(booking, 'The listing is under investigation.');
+
+  select count(*) into visible from public.moderation_events
+  where action = 'booking_cancelled' and actor = user_c;
+  if visible <> 1 then
+    raise exception 'FAIL: a staff cancellation was not logged.';
+  end if;
+
+  if not exists (
+    select 1 from public.bookings where id = booking and cancelled_by = 'staff'
+  ) then
+    raise exception 'FAIL: a staff cancellation was not recorded as one.';
+  end if;
+
   -- 8. Anonymous users see published listings only.
   set local role anon;
   perform set_config('request.jwt.claims', null, true);
@@ -1753,6 +2090,23 @@ begin
   begin
     perform public.register_push_token('ExponentPushToken[anon]', 'android');
     raise exception 'FAIL: anonymous user registered a push token.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- 22. Anonymous users see no bookings and make none.
+  begin
+    select count(*) into visible from public.bookings;
+    if visible <> 0 then
+      raise exception 'FAIL: anonymous user can read bookings.';
+    end if;
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.request_booking(b_listing, current_date + 30, 12);
+    raise exception 'FAIL: anonymous user made a booking.';
   exception
     when insufficient_privilege then null;
   end;

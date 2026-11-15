@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import type { BookingRow } from '@/features/bookings/types';
 import type {
   ConversationParticipantRow,
   ConversationRow,
@@ -50,6 +51,9 @@ export const LISTING_STATUSES = [
   'rented',
   'rejected',
   'suspended',
+  // Set only by the booking functions. Neither is on the public feed.
+  'booking_pending',
+  'reserved',
 ] as const;
 export type ListingStatus = (typeof LISTING_STATUSES)[number];
 
@@ -69,6 +73,8 @@ export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
   rented: 'Rented',
   rejected: 'Rejected',
   suspended: 'Suspended',
+  booking_pending: 'Booking pending',
+  reserved: 'Reserved',
 };
 
 /**
@@ -104,6 +110,9 @@ export const LANDLORD_STATUS_ACTIONS: Partial<
   unavailable: [{ to: 'published', label: 'Republish' }],
   rented: [{ to: 'published', label: 'Available again' }],
   rejected: [{ to: 'draft', label: 'Back to draft' }],
+  // The renter has moved in; this also completes the booking. There is no way
+  // out of booking_pending here: cancelling the booking is how that ends.
+  reserved: [{ to: 'rented', label: 'Mark rented (moved in)' }],
 };
 
 export type ReviewReason = 'location' | 'photos';
@@ -150,6 +159,9 @@ export type ListingRow = {
    * "republish" will send it to review instead.
    */
   review_reason: ReviewReason | null;
+  /** Rule 7: the landlord chooses. The database requires at least one. */
+  instant_book_enabled: boolean;
+  request_to_book_enabled: boolean;
   status: ListingStatus;
   is_featured: boolean;
   created_at: string;
@@ -277,10 +289,14 @@ export type Database = {
           | 'min_rental_months'
           | 'available_from'
           | 'amenities'
+          | 'instant_book_enabled'
+          | 'request_to_book_enabled'
         > &
           Partial<
             Pick<
               ListingRow,
+              | 'instant_book_enabled'
+              | 'request_to_book_enabled'
               | 'bathrooms'
               | 'size_sqm'
               | 'deposit_rwf'
@@ -444,6 +460,13 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // Changed only through the booking functions; there is no write policy.
+      bookings: {
+        Row: BookingRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       // Written only by notify_user(); a user may mark their own read.
       notifications: {
         Row: NotificationRow;
@@ -481,6 +504,21 @@ export type Database = {
       staff_listing_location: {
         Args: { p_listing_id: string };
         Returns: { address: string | null; latitude: number | null; longitude: number | null }[];
+      };
+      request_booking: {
+        Args: {
+          p_listing_id: string;
+          p_move_in: string;
+          p_months: number;
+          p_message?: string | null;
+        };
+        Returns: string;
+      };
+      respond_booking: { Args: { p_booking_id: string; p_accept: boolean }; Returns: undefined };
+      confirm_booking: { Args: { p_booking_id: string }; Returns: undefined };
+      cancel_booking: {
+        Args: { p_booking_id: string; p_note?: string | null };
+        Returns: undefined;
       };
       set_staff_role: {
         Args: { p_user_id: string; p_role: StaffRole; p_grant: boolean };

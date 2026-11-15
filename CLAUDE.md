@@ -98,7 +98,10 @@ The plan maps the Blueprint's phases onto what was already built:
 - **Phase 3e (done, live 2026-11-18):** the staff console at `/staff`, inside
   the app: queues, user and listing lookup across every status, one audit
   timeline, role grants (admin only) and counts. **Phase 3 is complete.**
-- **Phase 4:** booking (Instant Book + Request to Book).
+- **Phase 4 (done, live 2026-11-20):** booking. Instant Book and Request to
+  Book, chosen per listing by the landlord. A confirmed booking releases the
+  exact address to that renter and ends contact masking between the two.
+- **Stopped here for the owner's review.** Do not start Phase 5.
 - **Later:** AI matching and alerts, payments, digital rental, and agencies.
 
 **What to work on next is in `docs/WORKPLAN.md`.** It has milestones M0–M7
@@ -126,6 +129,25 @@ overturn any of them:
   reporter, and the reverse.
 - **2026-11-15, at most 10 reports per account per 24 hours**, on top of one
   live report per target.
+- **2026-11-20, a new listing is Request to Book only.** Instant Book is
+  opt-in from the edit screen, because it is the mode that can surprise a
+  landlord.
+- **2026-11-20, the renter confirms after the landlord accepts.** Accepting is
+  not booking. The confirm step is where payment will sit in Phase 6, and it
+  is the moment the address is released, so the renter must take it on purpose.
+- **2026-11-20, 72 hours to answer a request, and 72 more to confirm an
+  acceptance.** Then it expires and the listing returns to the feed.
+- **2026-11-20, an accepted request takes the listing off the feed**
+  (`booking_pending`), so two people are never led to the same place at once.
+  A confirmation declines every other pending request on that listing.
+- **2026-11-20, a booking carries no free text.** The renter's note is sent as
+  an ordinary chat message. Declining and cancelling take no reason from
+  either party. Only a staff cancellation has a note, shown to both.
+- **2026-11-20, move-in dates are the 1st of the next three months** (chips,
+  as on the landlord's own form), plus the listing's stated date if later.
+- **2026-11-20, cancelling a confirmed booking hides the address again** and
+  masking resumes for new messages. The renter has already seen the address;
+  this only stops it being read from now on.
 - **2026-11-19, re-review after edits (was an open decision).** Changing the
   **location or photos** of an approved listing sends it back to review.
   **Rent, terms and description** do not. A location change removes all three
@@ -302,8 +324,10 @@ from the real pin by a random bearing and distance drawn uniformly over a
   the disc, or the circle sometimes misses the property.
 - Non-owners get no "Open in Maps", because navigating to the circle's centre
   sends them to the wrong street.
-- Phase 4 booking widens the `listing_locations` policy to the confirmed
-  renter. Nothing else should.
+- The one other reader is the renter of a `confirmed` or `completed` booking
+  on that listing (`listing_locations_confirmed_renter`, select only). A
+  requested or accepted booking reveals nothing, and cancelling closes it
+  again. Nothing else should ever be added to this policy.
 
 **`profiles` has no phone column of any kind.** The login number lives in
 `auth.users` and reaches its owner through `session.user.phone`.
@@ -567,8 +591,9 @@ through. Add a fixture before touching either regex. Known gap: a bare
 nine-digit run like "780000 800" is masked.
 
 **Masking stops at a confirmed booking, for new messages only.**
-`contact_masking_active(conversation)` returns true until booking (M7)
-replaces it. Old messages stay masked: unmasking history would need a
+`contact_masking_active(conversation)` is false while a `confirmed` or
+`completed` booking exists between that renter and that listing, and true
+again if it is cancelled. Old messages stay masked: unmasking history would need a
 recipient read path into `message_originals`, and that is the back door the
 table exists to close.
 
@@ -591,6 +616,58 @@ event is the normal case. Realtime applies the `messages` select policy, so
 the unfiltered inbox subscription only receives the caller's own
 conversations. `rls-check` cannot exercise Realtime: a non-participant
 subscribing and receiving nothing is a manual test.
+
+## Booking
+
+**No client writes `bookings`.** There is a select policy (the two parties and
+staff) and nothing else. Every change is one of four functions:
+`request_booking`, `respond_booking`, `confirm_booking`, `cancel_booking`.
+Under them, `bookings_guard` enforces the state machine again, so a bug in a
+function cannot make an impossible move. `payment_required` and
+`payment_confirmed` are in the status list for Phase 6 and the guard refuses
+every move into them (rule 14).
+
+**The server decides instant or request.** `request_booking` books at once
+when the listing allows Instant Book and the renter is eligible: a named
+profile, a move-in date on or after `available_from`, a stay of at least
+`min_rental_months`. That is the whole list, on purpose (rule 10).
+`wouldBookInstantly` in `features/bookings/types.ts` mirrors it only so the
+button says what will happen. Change the two together.
+
+**A booking has no free-text column, and system messages never quote a user.**
+System messages are not masked, so anything a person typed that ended up in
+one would be a way around masking. The renter's note is inserted as their own
+`text` message and masked like any other. The single exception is the note on
+a staff cancellation, which staff write for both readers.
+
+**Every booking event posts a system message** through `booking_announce`,
+creating the conversation if the two have never spoken. That is how "ask for
+more information" works: in the chat, with no application form (§23). The
+conversation screen shows the live booking as a bar with its actions, so a
+landlord can accept from where they were asked.
+
+**Two listing statuses belong to booking alone.** `booking_pending` (accepted,
+waiting for the renter) and `reserved` (confirmed). Neither is public. A
+landlord's only move is `reserved -> rented` at move-in, which completes the
+booking by trigger. `booking_release_listing` returns a listing to
+`published` when its booking ends, or to `pending_review` if its location or
+photos changed meanwhile. It has to check that itself, because it runs as the
+function owner and the guard trigger lets it through.
+
+**A renter keeps seeing a listing they are booking** after it leaves the feed
+(`listings_select_booked`), but never a draft, rejected or suspended one.
+
+**Expiry runs three ways.** `pg_cron` calls `expire_bookings()` every 15
+minutes; every booking function calls it first; and `respond_booking` and
+`confirm_booking` refuse a row past `expires_at` on their own. A late cron
+therefore cannot let a stale request be accepted. The `cron.schedule` call is
+wrapped so a project without `pg_cron` still migrates.
+
+**Wrong-state refusals raise `object_not_in_prerequisite_state`**, and "not
+yours to do" raises `insufficient_privilege`. `rls-check` tells them apart.
+
+**Staff can read and cancel bookings, nothing else.** They cannot accept,
+decline or confirm for anyone. A staff cancellation needs a note and is logged.
 
 ## Help content
 
@@ -806,6 +883,9 @@ src/
                             profile; post is a hidden tab reached from profile
     (tabs)/messages.tsx     inbox, with archived filter and unread state
     conversation/[id].tsx   one conversation: bubbles, composer, block/report menu
+    book/[listingId].tsx    request or instant-book form: date, length, note
+    bookings.tsx            my bookings, as renter and as landlord
+    staff/bookings.tsx      staff: every booking, cancel with a note
     help/                   safety and help: index + one screen per topic
     notifications.tsx       the in-app list; tap opens the screen it is about
     notification-settings.tsx  push state + per-category switches
@@ -833,6 +913,7 @@ src/
     moderation/             report reasons, report + moderation queries
     staff/                  console queries: stats, lookups, audit, roles
     help/                   the help text itself (content.ts)
+    bookings/               booking queries, status labels, instant-book rule
     messaging/              inbox, messages, realtime, blocks (not the AI chat)
     notifications/          list, preferences, realtime, push tap routing
     profile/                public profile query
@@ -865,6 +946,8 @@ supabase/
                                       staff_stats, admin read of user_roles
   migrations/20261119120000_re_review_after_edits.sql  review_reason,
                                       material-edit triggers, guard update
+  migrations/20261120120000_booking.sql  booking settings, bookings + guard,
+                                      location release, masking end, expiry cron
   seed.sql                  15 demo Kigali listings (no photos — nothing in
                             the storage bucket to point at until a real upload)
   rls_check.sql             security assertions

@@ -69,6 +69,12 @@ export default function StaffHubScreen() {
       <View style={styles.section}>
         <SectionTitle>Look up</SectionTitle>
         <StaffRow
+          title="Bookings"
+          meta="Look one up, or cancel one that should not stand"
+          onPress={go('/staff/bookings')}
+          right={chevron}
+        />
+        <StaffRow
           title="Users"
           meta={`${s.users} accounts · ${s.suspended_accounts} suspended`}
           onPress={go('/staff/users')}

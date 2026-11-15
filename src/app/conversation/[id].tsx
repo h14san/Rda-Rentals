@@ -15,9 +15,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/action-sheet';
+import { BookingCard } from '@/components/booking-card';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
+import { useBookingForPair } from '@/features/bookings/queries';
+import { isActiveBooking } from '@/features/bookings/types';
 import {
   PAGE,
   myState,
@@ -65,6 +68,15 @@ function Conversation({ id, userId }: { id: string; userId: string }) {
   const blocked = useHasBlocked(userId, other?.id ?? null);
   const setBlocked = useSetBlocked(userId, other?.id ?? '');
 
+  // A conversation is one renter and one listing, which is exactly what a
+  // booking is between. Its system messages change this, so it refetches with
+  // the messages.
+  const booking = useBookingForPair(
+    conversation.data?.listing_id ?? null,
+    conversation.data?.renter_id ?? null,
+  );
+  const { refetch: refetchBooking } = booking;
+
   useConversationRealtime(id, userId, markRead);
 
   // Opening the conversation is reading it. Re-run when the newest message
@@ -72,10 +84,11 @@ function Conversation({ id, userId }: { id: string; userId: string }) {
   const newestId = messages.data?.[0]?.id;
   useEffect(() => {
     if (!newestId) return;
+    void refetchBooking();
     markRead();
     // Reading the conversation also clears its line in the notifications list.
     clearNotification(id);
-  }, [newestId, markRead, clearNotification, id]);
+  }, [newestId, markRead, clearNotification, id, refetchBooking]);
 
   if (conversation.isPending || messages.isPending)
     return <LoadingState label="Loading the conversation…" />;
@@ -170,6 +183,10 @@ function Conversation({ id, userId }: { id: string; userId: string }) {
           <Text style={styles.caption}>No longer listed</Text>
         )}
       </Pressable>
+
+      {booking.data && isActiveBooking(booking.data.status) && (
+        <BookingCard booking={booking.data} userId={userId} compact />
+      )}
 
       <FlatList
         data={messages.data}

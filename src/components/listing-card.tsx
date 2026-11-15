@@ -6,7 +6,7 @@ import { CompactBadges } from '@/components/verification-badges';
 import { listingFacts, type ListingWithImages } from '@/features/listings/types';
 import { formatLocation, formatPrice, timeAgo } from '@/lib/format';
 import { imageUrl } from '@/lib/supabase';
-import { colors, fontFamily, radius, shadow, spacing, type } from '@/theme';
+import { colors, fontFamily, radius, spacing, type } from '@/theme';
 
 /**
  * Feed card: image-first, per the Airbnb-inspired direction in the framework
@@ -97,11 +97,12 @@ export function ListingCard({
 }
 
 const styles = StyleSheet.create({
+  // No box around the card: the photo is the card, and the text sits under it
+  // on the page. A border and shadow on every listing made the feed a stack of
+  // frames instead of a column of places.
   card: {
     backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    marginBottom: spacing.lg,
-    ...shadow,
+    marginBottom: spacing.xl,
   },
   imageWrap: { position: 'relative' },
   image: {
@@ -110,8 +111,7 @@ const styles = StyleSheet.create({
     // phone, and the extra height keeps a room readable instead of cropping it
     // to a letterbox.
     aspectRatio: 5 / 4,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
+    borderRadius: radius.lg,
     backgroundColor: colors.lightGray,
   },
   imageFallback: { alignItems: 'center', justifyContent: 'center' },
@@ -119,8 +119,8 @@ const styles = StyleSheet.create({
 
   featuredBadge: {
     position: 'absolute',
-    top: spacing.sm,
-    left: spacing.sm,
+    top: spacing.sm + 4,
+    left: spacing.sm + 4,
     backgroundColor: colors.gold,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
@@ -134,8 +134,8 @@ const styles = StyleSheet.create({
 
   heart: {
     position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
+    top: spacing.sm + 4,
+    right: spacing.sm + 4,
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(17,24,39,0.55)',
   },
 
-  body: { padding: spacing.md, gap: spacing.xs },
+  body: { paddingTop: spacing.sm + 2, gap: 2 },
   // Price and "/ month" sit on one baseline, with the unit deliberately quiet:
   // the figure is what gets scanned, the unit only disambiguates it.
   price: type.price,

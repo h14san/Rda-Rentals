@@ -103,6 +103,8 @@ function AuthGate() {
         options={{ title: 'Reported conversation' }}
       />
       <Stack.Screen name="conversation/[id]" options={{ title: '' }} />
+      <Stack.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
+      <Stack.Screen name="my-listings" options={{ title: 'Your listings' }} />
       <Stack.Screen name="bookings" options={{ title: 'Bookings' }} />
       <Stack.Screen name="book/[listingId]" options={{ title: 'Book' }} />
       <Stack.Screen name="staff/bookings" options={{ title: 'Bookings' }} />

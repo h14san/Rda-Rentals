@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
+import { AskListing } from '@/components/ask-listing';
 import { ImageCarousel } from '@/components/image-carousel';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, SectionTitle } from '@/components/ui';
@@ -77,6 +78,13 @@ export default function ListingDetailScreen() {
       ?.checked_at ?? null;
 
   const facts = listingFacts(listing);
+
+  function openConversation() {
+    startConversation.mutate(listing!.id, {
+      onSuccess: (conversationId) => router.push(`/conversation/${conversationId}`),
+      onError: (e) => Alert.alert('Could not open the conversation', e.message),
+    });
+  }
   const suspension =
     listing.status === 'suspended' ? suspensions.data?.get(listing.id) : undefined;
   const amenities = knownAmenities(listing.amenities);
@@ -156,6 +164,11 @@ export default function ListingDetailScreen() {
               </View>
             ))}
           </View>
+
+          <AskListing
+            listingId={listing.id}
+            onMessageLandlord={isOwner ? undefined : openConversation}
+          />
 
           <View style={styles.section}>
             <SectionTitle>What Rwanda Rentals checked</SectionTitle>
@@ -326,13 +339,7 @@ export default function ListingDetailScreen() {
             style={styles.ctaPrimary}
             icon={<Ionicons name="chatbubble-outline" size={18} color={colors.charcoal} />}
             loading={startConversation.isPending}
-            onPress={() =>
-              startConversation.mutate(listing.id, {
-                onSuccess: (conversationId) =>
-                  router.push(`/conversation/${conversationId}`),
-                onError: (e) => Alert.alert('Could not open the conversation', e.message),
-              })
-            }
+            onPress={openConversation}
           />
           {hasLiveBooking ? (
             <Button

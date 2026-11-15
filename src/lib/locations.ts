@@ -54,15 +54,6 @@ export const SECTORS_BY_DISTRICT: Record<District, readonly string[]> = {
   ],
 } as const;
 
-/** The brief's launch neighbourhoods, surfaced as quick chips on the feed. */
-export const LAUNCH_SECTORS = [
-  'Kimironko',
-  'Nyamirambo',
-  'Kacyiru',
-  'Remera',
-  'Gisozi',
-] as const;
-
 /** Map camera default. Kigali city centre. */
 export const KIGALI_CENTER = {
   latitude: -1.9441,
@@ -76,7 +67,3 @@ export function sectorsFor(district: string | null | undefined): readonly string
   return SECTORS_BY_DISTRICT[district as District] ?? [];
 }
 
-/** Reverse lookup, for showing a sector's district without a second picker. */
-export function districtForSector(sector: string): District | undefined {
-  return KIGALI_DISTRICTS.find((d) => SECTORS_BY_DISTRICT[d].includes(sector));
-}

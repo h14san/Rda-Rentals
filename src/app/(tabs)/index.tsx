@@ -14,10 +14,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ActionSheet } from '@/components/action-sheet';
 import { FeedMap } from '@/components/feed-map';
 import { ListingCard } from '@/components/listing-card';
 import { EmptyState, ErrorState, ListingCardSkeleton } from '@/components/states';
-import { Chip } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
 import { useFavoriteControl } from '@/features/listings/favorites';
 import { useFilters } from '@/features/listings/filters-context';
@@ -27,16 +27,10 @@ import {
   type SortOrder,
 } from '@/features/listings/queries';
 import { isEmptyResult, useSmartSearch } from '@/features/listings/smart-search';
-import { activeFilterCount } from '@/features/listings/types';
-import { LAUNCH_SECTORS, districtForSector } from '@/lib/locations';
-import { colors, radius, spacing, type } from '@/theme';
+import { activeFilterCount, filterSummary } from '@/features/listings/types';
+import { colors, fontFamily, radius, shadow, spacing, type } from '@/theme';
 
-const SORT_CYCLE: SortOrder[] = ['newest', 'price_asc', 'price_desc', 'confirmed'];
-
-/** Tap cycles the ordering — four options do not justify a modal picker. */
-function nextSort(current: SortOrder): SortOrder {
-  return SORT_CYCLE[(SORT_CYCLE.indexOf(current) + 1) % SORT_CYCLE.length];
-}
+const SORT_OPTIONS: SortOrder[] = ['newest', 'price_asc', 'price_desc', 'confirmed'];
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -52,6 +46,7 @@ export default function FeedScreen() {
 
   const [searchText, setSearchText] = useState('');
   const [view, setView] = useState<'list' | 'map'>('list');
+  const [sortOpen, setSortOpen] = useState(false);
   const smartSearch = useSmartSearch();
   const { session } = useAuth();
   const favorites = useFavoriteControl(session?.user.id ?? null);
@@ -98,23 +93,42 @@ export default function FeedScreen() {
   const listings = useMemo(() => data?.pages.flatMap((p) => p.rows) ?? [], [data]);
   const total = data?.pages[0]?.total ?? 0;
   const filterCount = activeFilterCount(filters);
-
-  /** Quick sector chips act as a shortcut into the same filter object. */
-  function toggleSector(sector: string) {
-    setFilters(
-      filters.sector === sector
-        ? { ...filters, sector: null, district: null }
-        : { ...filters, sector, district: districtForSector(sector) ?? null },
-    );
-  }
+  // Read back off the Filters object the query ran with, so what is shown is
+  // what was searched, whichever path set it.
+  const chips = filterSummary(filters);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.title}>Find a rental</Text>
-            <Text style={styles.subtitle}>Kigali</Text>
+        <View style={styles.searchLine}>
+          {/* One raised pill, the way a search bar reads on every phone. The
+              text in it is the quick way to filter: type what you want and the
+              filters are set for you. */}
+          <View style={styles.searchPill}>
+            <Ionicons name="sparkles-outline" size={18} color={colors.softBlack} />
+            <TextInput
+              style={styles.searchInput}
+              value={searchText}
+              onChangeText={setSearchText}
+              placeholder="Try: cheap studio near Kimironko"
+              placeholderTextColor={colors.muted}
+              returnKeyType="search"
+              onSubmitEditing={runSmartSearch}
+              editable={!smartSearch.isPending}
+              accessibilityLabel="Search rentals in your own words"
+            />
+            {smartSearch.isPending ? (
+              <ActivityIndicator size="small" color={colors.muted} />
+            ) : searchText.length > 0 ? (
+              <Pressable
+                onPress={clearSearch}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                hitSlop={8}
+              >
+                <Ionicons name="close-circle" size={18} color={colors.muted} />
+              </Pressable>
+            ) : null}
           </View>
 
           <Pressable
@@ -123,69 +137,49 @@ export default function FeedScreen() {
               filterCount > 0 ? `Filters, ${filterCount} active` : 'Filters'
             }
             onPress={() => router.push('/filters')}
-            style={({ pressed }) => [styles.filterButton, pressed && { opacity: 0.8 }]}
+            style={({ pressed }) => [
+              styles.filterButton,
+              filterCount > 0 && styles.filterButtonActive,
+              pressed && { opacity: 0.8 },
+            ]}
           >
-            <Ionicons name="options-outline" size={18} color={colors.softBlack} />
-            <Text style={styles.filterLabel}>
-              Filters{filterCount > 0 ? ` (${filterCount})` : ''}
-            </Text>
+            <Ionicons name="options-outline" size={20} color={colors.softBlack} />
+            {filterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{filterCount}</Text>
+              </View>
+            )}
           </Pressable>
         </View>
 
-        <View style={styles.searchRow}>
-          <Ionicons name="sparkles-outline" size={18} color={colors.muted} />
-          <TextInput
-            style={styles.searchInput}
-            value={searchText}
-            onChangeText={setSearchText}
-            placeholder="Try: cheap studio near Kimironko"
-            placeholderTextColor={colors.muted}
-            returnKeyType="search"
-            onSubmitEditing={runSmartSearch}
-            editable={!smartSearch.isPending}
-          />
-          {smartSearch.isPending ? (
-            <ActivityIndicator size="small" color={colors.muted} />
-          ) : searchText.length > 0 ? (
-            <Pressable
-              onPress={clearSearch}
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-            >
-              <Ionicons name="close-circle" size={18} color={colors.muted} />
-            </Pressable>
-          ) : null}
-        </View>
-
         {!!interpretation && (
-          <View style={styles.interpretation}>
-            <Text style={styles.interpretationText} numberOfLines={2}>
-              {interpretation}
-            </Text>
-            <Pressable
-              onPress={clearSearch}
-              accessibilityRole="button"
-              accessibilityLabel="Clear smart search"
-            >
-              <Text style={styles.clearLink}>Clear</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.interpretation} numberOfLines={2}>
+            {interpretation}
+          </Text>
         )}
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-        >
-          {LAUNCH_SECTORS.map((sector) => (
-            <Chip
-              key={sector}
-              label={sector}
-              selected={filters.sector === sector}
-              onPress={() => toggleSector(sector)}
-            />
-          ))}
-        </ScrollView>
+        {chips.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.activeRow}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Clear all filters"
+              onPress={clearSearch}
+              style={[styles.activeChip, styles.clearChip]}
+            >
+              <Ionicons name="close" size={14} color={colors.white} />
+              <Text style={[styles.activeChipText, styles.clearChipText]}>Clear</Text>
+            </Pressable>
+            {chips.map((chip) => (
+              <View key={chip} style={styles.activeChip}>
+                <Text style={styles.activeChipText}>{chip}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        )}
 
         {!isPending && !isError && (
           <View style={styles.resultRow}>
@@ -196,38 +190,26 @@ export default function FeedScreen() {
             <View style={styles.resultActions}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={
-                  view === 'list' ? 'Show on a map' : 'Show as a list'
-                }
-                onPress={() => setView(view === 'list' ? 'map' : 'list')}
-                style={({ pressed }) => [
-                  styles.sortButton,
-                  pressed && { opacity: 0.7 },
-                ]}
+                accessibilityLabel={`Sort: ${SORT_LABELS[sort]}. Opens the sort options.`}
+                onPress={() => setSortOpen(true)}
+                style={({ pressed }) => [styles.pillButton, pressed && { opacity: 0.7 }]}
               >
-                <Ionicons
-                  name={view === 'list' ? 'map-outline' : 'list-outline'}
-                  size={16}
-                  color={colors.charcoal}
-                />
-                <Text style={styles.sortLabel}>{view === 'list' ? 'Map' : 'List'}</Text>
+                <Text style={styles.pillLabel}>{SORT_LABELS[sort]}</Text>
+                <Ionicons name="chevron-down" size={14} color={colors.charcoal} />
               </Pressable>
 
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Sort: ${SORT_LABELS[sort]}. Tap to change.`}
-                onPress={() => setSort(nextSort(sort))}
-                style={({ pressed }) => [
-                  styles.sortButton,
-                  pressed && { opacity: 0.7 },
-                ]}
+                accessibilityLabel={view === 'list' ? 'Show on a map' : 'Show as a list'}
+                onPress={() => setView(view === 'list' ? 'map' : 'list')}
+                style={({ pressed }) => [styles.pillButton, pressed && { opacity: 0.7 }]}
               >
                 <Ionicons
-                  name="swap-vertical-outline"
-                  size={16}
+                  name={view === 'list' ? 'map-outline' : 'list-outline'}
+                  size={15}
                   color={colors.charcoal}
                 />
-                <Text style={styles.sortLabel}>{SORT_LABELS[sort]}</Text>
+                <Text style={styles.pillLabel}>{view === 'list' ? 'Map' : 'List'}</Text>
               </Pressable>
             </View>
           </View>
@@ -251,7 +233,7 @@ export default function FeedScreen() {
               : 'There are no live listings yet. Be the first to post one.'
           }
           actionLabel={filterCount > 0 ? 'Clear filters' : undefined}
-          onAction={filterCount > 0 ? resetFilters : undefined}
+          onAction={filterCount > 0 ? clearSearch : undefined}
         />
       ) : view === 'map' ? (
         <FeedMap
@@ -292,6 +274,19 @@ export default function FeedScreen() {
           }
         />
       )}
+
+      {/* A list to choose from, not a button that cycles: the order someone
+          wants should be one deliberate tap away, not up to three blind ones. */}
+      <ActionSheet
+        visible={sortOpen}
+        onClose={() => setSortOpen(false)}
+        title="Sort by"
+        actions={SORT_OPTIONS.map((option) => ({
+          label: SORT_LABELS[option],
+          selected: sort === option,
+          onPress: () => setSort(option),
+        }))}
+      />
     </SafeAreaView>
   );
 }
@@ -300,65 +295,96 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.white },
   header: {
     paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    gap: spacing.md,
-    borderBottomWidth: 1,
+    paddingBottom: spacing.sm + 4,
+    gap: spacing.sm + 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-  },
-  title: type.h1,
-  subtitle: type.meta,
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-  },
-  filterLabel: type.label,
-  searchRow: {
+  searchLine: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginHorizontal: spacing.md,
     paddingHorizontal: spacing.md,
+  },
+  searchPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    height: 52,
+    borderRadius: radius.pill,
+    backgroundColor: colors.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    ...shadow,
+  },
+  searchInput: { flex: 1, ...type.body, paddingVertical: 0 },
+  filterButton: {
+    width: 48,
     height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  filterButtonActive: { borderColor: colors.softBlack, borderWidth: 1.5 },
+  filterBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.softBlack,
+  },
+  filterBadgeText: {
+    fontFamily: fontFamily.bold,
+    fontSize: 11,
+    color: colors.white,
+  },
+  interpretation: {
+    ...type.meta,
+    color: colors.charcoal,
+    paddingHorizontal: spacing.md,
+  },
+  activeRow: { paddingHorizontal: spacing.md, gap: spacing.sm },
+  activeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
     borderRadius: radius.pill,
     backgroundColor: colors.lightGray,
   },
-  searchInput: { flex: 1, ...type.body, paddingVertical: 0 },
-  interpretation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  interpretationText: { ...type.meta, flex: 1, color: colors.charcoal },
-  clearLink: type.label,
-  chipRow: { paddingHorizontal: spacing.md, gap: spacing.sm },
+  activeChipText: type.label,
+  clearChip: { backgroundColor: colors.softBlack },
+  clearChipText: { color: colors.white },
   resultRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
   },
-  resultCount: type.meta,
-  resultActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  sortButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  sortLabel: type.label,
+  resultCount: type.bodyStrong,
+  resultActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  pillButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+  },
+  pillLabel: type.label,
   listContent: { padding: spacing.md },
   listPadding: { padding: spacing.md },
   footer: { paddingVertical: spacing.lg },

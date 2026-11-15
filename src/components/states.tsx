@@ -90,10 +90,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
-  skeletonCard: { marginBottom: spacing.lg, gap: spacing.sm },
+  skeletonCard: { marginBottom: spacing.xl, gap: spacing.sm },
   skeletonImage: {
     width: '100%',
-    aspectRatio: 4 / 3,
+    aspectRatio: 5 / 4,
     borderRadius: radius.lg,
     backgroundColor: colors.lightGray,
   },

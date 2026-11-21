@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { type ColorValue, Pressable, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/features/auth/context';
 import { lists, rents } from '@/features/auth/mode';
@@ -13,6 +13,13 @@ import {
 import { usePush } from '@/features/notifications/use-push';
 import { useT } from '@/lib/i18n';
 import { colors, fontFamily, spacing, type } from '@/theme';
+
+// Since React Native 0.88 the tab bar types its colour as any ColorValue,
+// which includes numbers and null; Ionicons accepts neither. The tab bar
+// always passes a string in practice, so anything else falls back to the
+// icon's default rather than being cast through.
+const iconColor = (c: ColorValue | null | undefined) =>
+  typeof c === 'string' ? c : undefined;
 
 export default function TabsLayout() {
   const { session, mode } = useAuth();
@@ -72,7 +79,7 @@ export default function TabsLayout() {
           title: t('Explore'),
           headerShown: false,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'search' : 'search-outline'} color={color} size={24} />
+            <Ionicons name={focused ? 'search' : 'search-outline'} color={iconColor(color)} size={24} />
           ),
         }}
       />
@@ -83,7 +90,7 @@ export default function TabsLayout() {
           title: t('Saved'),
           headerTitle: t('Saved rentals'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'heart' : 'heart-outline'} color={color} size={24} />
+            <Ionicons name={focused ? 'heart' : 'heart-outline'} color={iconColor(color)} size={24} />
           ),
         }}
       />
@@ -94,7 +101,7 @@ export default function TabsLayout() {
           title: t('Listings'),
           headerTitle: t('Your listings'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} color={color} size={24} />
+            <Ionicons name={focused ? 'home' : 'home-outline'} color={iconColor(color)} size={24} />
           ),
         }}
       />
@@ -105,7 +112,7 @@ export default function TabsLayout() {
           title: t('Post'),
           headerTitle: t('Post a rental'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} color={color} size={24} />
+            <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} color={iconColor(color)} size={24} />
           ),
         }}
       />
@@ -130,7 +137,7 @@ export default function TabsLayout() {
           tabBarBadge: unread > 0 ? unread : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.softBlack, color: colors.white },
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} color={color} size={24} />
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} color={iconColor(color)} size={24} />
           ),
         }}
       />
@@ -164,7 +171,7 @@ export default function TabsLayout() {
             borderRadius: 5,
           },
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} color={color} size={24} />
+            <Ionicons name={focused ? 'person' : 'person-outline'} color={iconColor(color)} size={24} />
           ),
         }}
       />

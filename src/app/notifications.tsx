@@ -93,7 +93,7 @@ export default function NotificationsScreen() {
             >
               <Text style={styles.markAllText}>{t('Mark all as read')}</Text>
             </Pressable>
-          ) : null
+          ) : undefined
         }
         ListEmptyComponent={
           <EmptyState

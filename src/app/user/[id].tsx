@@ -57,7 +57,7 @@ export default function PublicProfileScreen() {
         <ListingCard listing={item} onPress={() => router.push(`/listing/${item.id}`)} />
       )}
       ListFooterComponent={
-        isSelf ? null : (
+        isSelf ? undefined : (
           <Button
             label="Report this account"
             variant="ghost"

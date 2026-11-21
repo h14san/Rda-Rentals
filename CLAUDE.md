@@ -8,7 +8,7 @@ The target product is a privacy-controlled marketplace with in-app chat,
 specific verification badges, booking and an admin console. Contact is through
 in-app chat only; there is no phone number or email anywhere a user can read.
 
-Expo SDK 57 (RN 0.86, React 19.2) + expo-router · Supabase (Postgres/Auth/
+Expo SDK 58 (RN 0.88, React 19.3) + expo-router · Supabase (Postgres/Auth/
 Storage) · TanStack Query · react-native-maps.
 
 **Built:** auth (email OTP), feed, filters, detail, posting, editing, profile,
@@ -250,8 +250,9 @@ npx supabase functions deploy send-push --no-verify-jwt   # called by Postgres
 ```
 
 Install native deps with `npx expo install <pkg>`, never plain `npm install` —
-it pins the SDK 57–compatible version (that is why react-native-maps is 1.27.2,
-not the latest 1.29.0).
+it pins the SDK-compatible version rather than the latest. The SDK 58 upgrade
+(2026-11-21) had to regenerate `package-lock.json` from scratch: npm refused
+to move expo-router and expo-symbols together in place (a false ERESOLVE).
 
 ## Traps that cost real time
 
@@ -303,7 +304,7 @@ the CVE-2024-27980 fix), and Git Bash only has the extensionless shell script.
 Passing an args array *with* `shell: true` is separately deprecated. See the
 comment in `scripts/run-sql.mjs`.
 
-**No NativeWind.** 4.2.6 predates RN 0.86 and v5 is preview. Style with
+**No NativeWind.** 4.2.6 predates RN 0.86 (now 0.88) and v5 is preview. Style with
 `StyleSheet` over the tokens in `src/theme/index.ts`; that file is the single
 home for the palette. Don't reintroduce Tailwind without checking RN support.
 

@@ -623,6 +623,8 @@ export const FR_MORE: Record<string, string> = {
 
   // Templates: {name} is filled in by the code
   'Enter the {n}-digit code.': 'Saisissez le code à {n} chiffres.',
+  'We will email you a code.': 'Nous vous enverrons un code par e-mail.',
+  'We will text you a code.': 'Nous vous enverrons un code par SMS.',
   'Resend in {n}s': 'Renvoyer dans {n} s',
   'Archived ({n})': 'Archivées ({n})',
   'You: ': 'Vous : ',

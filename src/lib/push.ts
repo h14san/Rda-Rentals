@@ -77,6 +77,9 @@ export async function registerForPush({ prompt }: { prompt: boolean }): Promise<
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL, {
         name: 'Rwanda Rentals',
+        // The enum is exported (build/index.js re-exports it), but SDK 58
+        // compiles it to a form eslint-plugin-import cannot read.
+        // eslint-disable-next-line import/namespace
         importance: Notifications.AndroidImportance.HIGH,
       });
     }

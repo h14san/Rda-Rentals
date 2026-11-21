@@ -43,7 +43,7 @@ against the database.
 
 | Layer | Choice |
 |---|---|
-| App | Expo SDK 57 / React Native 0.86, expo-router |
+| App | Expo SDK 58 / React Native 0.88, expo-router |
 | Backend | Supabase: Postgres, Auth, Storage, Edge Functions |
 | Server state | TanStack Query |
 | Validation | Zod |

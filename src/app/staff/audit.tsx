@@ -56,7 +56,7 @@ export default function StaffAuditScreen() {
               <Chip label={`By ${actor.name} · clear`} selected onPress={() => setActor(null)} />
             )}
           </View>
-        ) : null
+        ) : undefined
       }
       ListEmptyComponent={
         <EmptyState title="Nothing recorded" message="No actions match this filter." />

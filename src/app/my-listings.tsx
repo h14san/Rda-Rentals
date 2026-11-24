@@ -297,7 +297,7 @@ function MyListings({ userId }: { userId: string }) {
               ))}
             </View>
             </View>
-          ) : null
+          ) : undefined
         }
         ListEmptyComponent={
           listings.data.length === 0 ? (

@@ -57,7 +57,7 @@ export default function MessagesScreen() {
               ]}
             />
           </View>
-        ) : null
+        ) : undefined
       }
       ListEmptyComponent={
         showArchived ? (

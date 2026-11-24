@@ -44,7 +44,7 @@ export default function SavedSearchesScreen() {
           <Text style={styles.meta}>
             We notify you when a new rental matches one of these.
           </Text>
-        ) : null
+        ) : undefined
       }
       ListEmptyComponent={
         <EmptyState

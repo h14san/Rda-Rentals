@@ -256,6 +256,13 @@ it pins the SDK-compatible version rather than the latest. The SDK 58 upgrade
 (2026-11-21) had to regenerate `package-lock.json` from scratch: npm refused
 to move expo-router and expo-symbols together in place (a false ERESOLVE).
 
+**SDK 58 is not yet checked on a device screen by screen** (merged
+2026-11-24; it was only opened in Expo Go on an iPhone). The two big jumps
+are where to look first: react-native-gesture-handler 2 → 3 (the photo
+gallery's swipe and pinch zoom) and expo-router's navigation rework (tab
+modes, the Explore redirect for hosts, modals). The dev build must be rebuilt
+for the map, since a SDK 57 build does not run SDK 58 JavaScript.
+
 ## Traps that cost real time
 
 **Supabase row types must be `type`, not `interface`.** postgrest-js requires

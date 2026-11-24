@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase';
  * with one env var once an SMS provider exists.
  *
  * Both channels are one-time-code flows with an identical two-step shape
- * (enter identifier -> enter 6-digit code), which is why the sign-in screens
+ * (enter identifier -> enter the code), which is why the sign-in screens
  * need no changes when the channel switches. Deliberately NOT email+password:
  * that would need a different screen and would have to be thrown away later.
  */
@@ -88,10 +88,10 @@ export const IDENTIFIER_LABEL =
 export const IDENTIFIER_PLACEHOLDER =
   AUTH_CHANNEL === 'phone' ? '0788 123 456' : 'you@example.com';
 
+// No digit count here: it said "6-digit" while email codes are 8. The code
+// screen states the real length from OTP_LENGTH, so this cannot drift again.
 export const IDENTIFIER_HINT =
-  AUTH_CHANNEL === 'phone'
-    ? 'We will text you a 6-digit code.'
-    : 'We will email you a 6-digit code.';
+  AUTH_CHANNEL === 'phone' ? 'We will text you a code.' : 'We will email you a code.';
 
 /** Step 1: request a one-time code. `identifier` must already be normalised. */
 export async function requestCode(identifier: string): Promise<void> {

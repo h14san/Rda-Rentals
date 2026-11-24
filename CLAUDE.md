@@ -13,9 +13,10 @@ Storage) · TanStack Query · react-native-maps.
 
 **Built:** auth (email OTP), feed, filters, detail, posting, editing, profile,
 and the three AI features (assistant, natural-language search,
-photo-to-description). The exact location is private (Phase 1 below). There are
-no unit tests. CI (`.github/workflows/ci.yml`) typechecks and lints every push;
-it never touches the database.
+photo-to-description). The exact location is private (Phase 1 below). Unit
+tests (Jest, `__tests__/`) cover the logic behind the core flows. CI
+(`.github/workflows/ci.yml`) typechecks, lints and runs them on every push; it
+never touches the database.
 
 ## Source docs: the Blueprint wins
 
@@ -238,6 +239,7 @@ npm start              # Expo Go — everything except the map
 npx expo run:android   # dev build — adds the map
 npm run typecheck      # tsc --noEmit
 npx eslint .
+npm test               # Jest unit tests (__tests__/), no database or network
 npm run db:push        # apply supabase/migrations
 npm run db:seed        # demo data — NON-PRODUCTION ONLY
 npm run db:rls-check   # asserts the RLS policies hold (passes --yes; always rolls back)
@@ -698,6 +700,30 @@ yours to do" raises `insufficient_privilege`. `rls-check` tells them apart.
 
 **Staff can read and cancel bookings, nothing else.** They cannot accept,
 decline or confirm for anyone. A staff cancellation needs a note and is logged.
+
+## Unit tests
+
+**Jest through `jest-expo` (Jest 30 since SDK 58), files `__tests__/*-test.ts`.**
+They test logic, not screens, and need no database: modules that import
+`@/lib/supabase` mock it, because the real one throws without `.env`.
+
+- **The feed test records the real request.** `feed-query-test.tsx` gives
+  `useListingsFeed` a real supabase-js client whose `fetch` records the URL,
+  so it asserts the exact PostgREST query (only `published`, unstated terms
+  match, amenities all-of, no `listing_locations`). It does not replace
+  `db:rls-check`: RLS is the boundary, this pins what the app asks for.
+- **`contracts-test.ts` reads Deno files as text** to check the values kept in
+  two copies (amenities, the Android channel id) still agree.
+- **Testing Library 14 renders asynchronously.** `renderHook` and `render`
+  must be awaited; without it `result` is undefined and the run hangs.
+- **TypeScript 6 loads no global types by default**, so `tsconfig.json` lists
+  `types: ["jest", "node"]`. A new global type package has to be added there.
+- `push.ts` registers its notification handler as it loads; a test importing
+  it mocks `expo-notifications`, whose jest-expo mock cannot.
+
+Not covered here: the SQL rules (masking, the status guard, booking state)
+are asserted by `db:rls-check` against the database, and no screen is
+rendered yet.
 
 ## Help content
 

@@ -222,10 +222,15 @@ overturn any of them:
   before production. **Phase 3a now stores identity documents** in the
   `verification-evidence` bucket in eu-central-1: no real landlord should upload
   an ID until this is settled.
-- **Evidence retention.** How long ID photos are kept after a decision is
-  undecided. `decided_at` is recorded so a purge job can be added; it has to
-  delete through the Storage API, because deleting `storage.objects` rows in SQL
-  leaves the files behind.
+- **Evidence retention: decided 2026-11-25** (stated in the NCSA
+  data-controller registration). ID and ownership photos are deleted 30 days
+  after a case is approved or rejected, or 90 days after "changes requested"
+  goes unanswered. `purge-evidence` (no JWT, deploy with `--no-verify-jwt`)
+  does it nightly from `pg_cron`, files through the Storage API first, then
+  `mark_evidence_purged()` deletes the rows and stamps
+  `verification_cases.evidence_purged_at`. The rule itself is
+  `evidence_due_for_purge()`; change it with the registration and the privacy
+  help text.
 - **Phone OTP: decided 2026-10-30, use Pindo.** The hook function (`send-sms`)
   is built and deployed. It still needs a Pindo account, an API token and a
   registered sender ID, then the steps in `docs/WORKPLAN.md`.
@@ -249,6 +254,7 @@ npx supabase functions deploy ask-listing    # no Docker needed to deploy
 npx supabase functions deploy auto-describe
 npx supabase functions deploy delete-account
 npx supabase functions deploy send-push --no-verify-jwt   # called by Postgres
+npx supabase functions deploy purge-evidence --no-verify-jwt   # nightly, by pg_cron
 ```
 
 Install native deps with `npx expo install <pkg>`, never plain `npm install` —

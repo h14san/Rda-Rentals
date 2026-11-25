@@ -443,3 +443,8 @@ verify_jwt = false
 # request instead of sending a user JWT. The function verifies that signature.
 [functions.send-sms]
 verify_jwt = false
+
+# purge-evidence is called nightly by pg_cron (pg_net), with no user JWT. The
+# request carries nothing; what is due is decided in SQL. See its index.ts.
+[functions.purge-evidence]
+verify_jwt = false

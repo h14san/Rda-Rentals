@@ -205,6 +205,14 @@ begin
     true
   );
 
+  -- B, signed in, cannot touch the evidence purge either.
+  begin
+    perform public.mark_evidence_purged(array[gen_random_uuid()]);
+    raise exception 'FAIL: a signed-in user can mark documents as deleted.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
   -- 1. B can see A's PUBLISHED listing (the feed must work across landlords).
   select count(*) into visible from public.listings where id = a_active_listing;
   if visible <> 1 then
@@ -2392,6 +2400,22 @@ begin
   begin
     perform public.request_booking(b_listing, current_date + 30, 12);
     raise exception 'FAIL: anonymous user made a booking.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- Evidence retention: the purge functions are the service role's alone. A
+  -- caller who could run mark_evidence_purged could erase a case's documents.
+  begin
+    perform * from public.evidence_due_for_purge(1);
+    raise exception 'FAIL: anonymous user can list documents due for deletion.';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.mark_evidence_purged(array[gen_random_uuid()]);
+    raise exception 'FAIL: anonymous user can mark documents as deleted.';
   exception
     when insufficient_privilege then null;
   end;

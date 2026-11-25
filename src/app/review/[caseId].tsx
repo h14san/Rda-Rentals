@@ -150,7 +150,11 @@ export default function ReviewCaseScreen() {
       {!isListing && (
         <View style={styles.section}>
           <SectionTitle>Documents</SectionTitle>
-          {c.evidence.length === 0 ? (
+          {c.evidence.length === 0 && c.evidence_purged_at ? (
+            <Text style={styles.meta}>
+              {`The documents were deleted ${timeAgo(c.evidence_purged_at)}, as the retention rule requires. The decision and its record are kept.`}
+            </Text>
+          ) : c.evidence.length === 0 ? (
             <Text style={styles.meta}>
               No documents arrived. Request changes and ask them to send the photo again.
             </Text>

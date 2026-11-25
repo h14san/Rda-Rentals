@@ -240,6 +240,8 @@ export type VerificationCaseRow = {
   decision_note: string | null;
   /** Set when an already-approved listing came back because of an edit. */
   reopen_reason: ReviewReason | null;
+  /** When the documents were deleted under the retention rule (30 days after a decision). */
+  evidence_purged_at: string | null;
 };
 
 export type VerificationEvidenceRow = {

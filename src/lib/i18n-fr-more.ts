@@ -469,6 +469,8 @@ export const FR_MORE: Record<string, string> = {
     'Vous pouvez supprimer n’importe quelle annonce, avec ses photos, depuis votre profil.',
   'To delete your account and everything attached to it, open Edit profile and choose Delete account.':
     'Pour supprimer votre compte et tout ce qui y est rattaché, ouvrez « Modifier le profil » et choisissez « Supprimer le compte ».',
+  'Identity document photos are deleted 30 days after the check is decided, or 90 days after we ask for a new photo if none arrives. The result of the check is kept.':
+    'Les photos des pièces d’identité sont supprimées 30 jours après la décision, ou 90 jours après notre demande d’une nouvelle photo si aucune n’arrive. Le résultat de la vérification est conservé.',
 
   // Staff console
   'The review queue is for Rwanda Rentals verification staff.':

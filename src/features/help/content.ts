@@ -189,6 +189,7 @@ export const HELP: Record<HelpTopic, { title: string; summary: string; sections:
         body: [
           'You can delete any listing, with its photos, from your profile.',
           'To delete your account and everything attached to it, open Edit profile and choose Delete account.',
+          'Identity document photos are deleted 30 days after the check is decided, or 90 days after we ask for a new photo if none arrives. The result of the check is kept.',
         ],
       },
     ],

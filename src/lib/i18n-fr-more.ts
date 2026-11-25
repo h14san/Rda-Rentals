@@ -73,15 +73,7 @@ export const FR_MORE: Record<string, string> = {
   'Near Kimironko market, KG 11 Ave': 'Près du marché de Kimironko, KG 11 Ave',
   'Private. Tenants see the sector and an approximate area only.':
     'Privé. Les locataires ne voient que le secteur et une zone approximative.',
-  'Keep mine': 'Garder la mienne',
   Replace: 'Remplacer',
-  'Nothing to describe yet': 'Rien à décrire pour le moment',
-  'The photos were not clear enough to describe. Try adding a wider shot of the room, or write the description yourself.':
-    'Les photos n’étaient pas assez nettes pour être décrites. Ajoutez une vue plus large de la pièce, ou rédigez la description vous-même.',
-  'Could not write a description': 'Impossible de rédiger une description',
-  'Replace your description?': 'Remplacer votre description ?',
-  'What you have written will be replaced by one written from your photos.':
-    'Ce que vous avez écrit sera remplacé par un texte rédigé à partir de vos photos.',
   'Submitted for review': 'Soumise pour vérification',
   'Could not submit': 'Envoi impossible',
   New: 'Nouveau',
@@ -90,10 +82,6 @@ export const FR_MORE: Record<string, string> = {
   'Loading listing…': 'Chargement de l’annonce…',
   'Edit listing': 'Modifier l’annonce',
   'Could not save': 'Enregistrement impossible',
-  'Nothing to describe': 'Rien à décrire',
-  'The photos did not show enough. Write a few lines yourself.':
-    'Les photos n’en montraient pas assez. Écrivez quelques lignes vous-même.',
-  'Could not write it': 'Rédaction impossible',
   'Choose one or both. At least one has to stay on.':
     'Choisissez l’un ou les deux. Au moins un doit rester activé.',
   'Only tick what the place really has. Renters filter on these.':
@@ -462,8 +450,8 @@ export const FR_MORE: Record<string, string> = {
   'Where it is kept': 'Où elles sont conservées',
   'On servers in the European Union (Frankfurt), run by our hosting provider.':
     'Sur des serveurs dans l’Union européenne (Francfort), gérés par notre hébergeur.',
-  'The search assistant and "Write it for me" send the text you type, or the photos you choose, to Google\'s Gemini service to produce an answer.':
-    'La recherche assistée et « Rédiger pour moi » envoient le texte que vous saisissez, ou les photos que vous choisissez, au service Gemini de Google pour produire une réponse.',
+  'Search and "Ask about this place" send the text you type to Google\'s Gemini service to produce an answer. Your photos are not sent.':
+    'La recherche et « Poser une question sur ce logement » envoient le texte que vous saisissez au service Gemini de Google pour produire une réponse. Vos photos ne sont pas envoyées.',
   'Deleting your information': 'Supprimer vos informations',
   'You can delete any listing, with its photos, from your profile.':
     'Vous pouvez supprimer n’importe quelle annonce, avec ses photos, depuis votre profil.',
@@ -631,8 +619,6 @@ export const FR_MORE: Record<string, string> = {
   'Archived ({n})': 'Archivées ({n})',
   'You: ': 'Vous : ',
   'Uploading photo {done} of {total}…': 'Envoi de la photo {done} sur {total}…',
-  'Add {n} or more photos for a fuller description.':
-    'Ajoutez {n} photos ou plus pour une description plus complète.',
   '{live} live · {total} in all': '{live} en ligne · {total} au total',
   '{n} waiting for you': '{n} en attente de votre réponse',
   'Choose {min} to {max} · {n} chosen': 'Choisissez-en {min} à {max} · {n} sélectionnées',

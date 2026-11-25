@@ -12,8 +12,8 @@ Expo SDK 58 (RN 0.88, React 19.3) + expo-router · Supabase (Postgres/Auth/
 Storage) · TanStack Query · react-native-maps.
 
 **Built:** auth (email OTP), feed, filters, detail, posting, editing, profile,
-and the three AI features (assistant, natural-language search,
-photo-to-description). The exact location is private (Phase 1 below). Unit
+and the AI features (natural-language search and "Ask about this place";
+photo-to-description was removed 2026-11-25). The exact location is private (Phase 1 below). Unit
 tests (Jest, `__tests__/`) cover the logic behind the core flows. CI
 (`.github/workflows/ci.yml`) typechecks, lints and runs them on every push; it
 never touches the database.
@@ -183,6 +183,10 @@ overturn any of them:
   French, stale listings pausing after 30 days, any move-in date, a second
   sign-in factor for staff, booking settings and "Write it for me" on both
   post and edit, a cover-photo control, and a host dashboard line.
+- **2026-11-25 (owner), "Write it for me" (auto-describe) is removed**, from
+  post and edit, and the `auto-describe` function is deleted. Listing photos
+  no longer go to Google; the data-controller registration was written to
+  match. Restoring it means re-adding photos to Gemini in that registration.
 - **2026-11-23 (owner), the Ask assistant is deleted**, screen and `chat`
   function both. `ask-listing` (one listing) and `smart-search` remain.
 - **2026-11-23 (owner), Featured is neither shown nor ordered on.** The
@@ -251,7 +255,6 @@ npm run db:rls-check   # asserts the RLS policies hold (passes --yes; always rol
 
 npx supabase functions deploy smart-search   # the AI functions;
 npx supabase functions deploy ask-listing    # no Docker needed to deploy
-npx supabase functions deploy auto-describe
 npx supabase functions deploy delete-account
 npx supabase functions deploy send-push --no-verify-jwt   # called by Postgres
 npx supabase functions deploy purge-evidence --no-verify-jwt   # nightly, by pg_cron
@@ -925,10 +928,6 @@ until three secrets exist. Turning it on is the owner's steps in
 `EXPO_PUBLIC_AUTH_CHANNEL=phone`. Written from both providers' docs and never
 run against either.
 
-**"Write it for me" on the edit screen reads the listing's own public photo
-URLs on the phone** and sends them like fresh photos. No server change. Not
-tried on a device: it depends on the image compressor accepting remote URLs.
-
 **Booking's move-in date accepts any day** typed as day/month/year, beside
 the 1st-of-the-month chips.
 
@@ -1026,13 +1025,13 @@ which never sees a listing, so the same guarantees are rebuilt differently:
 - It was deployed and typechecked, **not exercised end to end**: that needs a
   signed-in session on a device.
 
-Three Edge Functions, one shared key: `smart-search`, `chat` and `auto-describe`
-under `supabase/functions/`, all holding `GEMINI_API_KEY` (Google AI Studio free
+The AI Edge Functions (`smart-search`, `ask-listing`) share one key under
+`supabase/functions/`, all holding `GEMINI_API_KEY` (Google AI Studio free
 tier). **The key must never enter the app bundle** — anything shipped in React
 Native is extractable.
 
-**`supabase/functions/_shared/` is imported by all three, so editing it means
-redeploying all three.** `gemini.ts` holds the model default, CORS, the JSON
+**`supabase/functions/_shared/` is imported by every AI function, so editing it
+means redeploying each of them.** `gemini.ts` holds the model default, CORS, the JSON
 helper and the provider-error mapping; `filters.ts` holds the filter contract —
 response schema, sentinel decoding, and the Kigali vocabulary rules — shared by
 `smart-search` and `chat`. Both files exist because the duplication was already
@@ -1060,33 +1059,8 @@ echo request internals. They go to the function logs; the client gets a short
 message it can act on. (There is no `supabase functions logs` subcommand, so
 diagnosing means temporarily returning the detail, then removing it.)
 
-**Auto-describe writes a draft, never a published fact.** The result lands in
-the same Description field the landlord would have typed into, on the post
-wizard's details step, behind a "Write it for me" action on the field's label
-row (`TextField`'s `accessory` slot). The prompt's prohibitions are the load-
-bearing part: no rent, no floor area, no distance to a landmark, no utilities or
-security claims, no describing people in the photos. A tenant who arrives to
-find an invented detail is the problem the brief opens with.
-
-**Price is deliberately withheld from the describe prompt.** It has its own
-field on every card and the detail page, and prose that repeats it contradicts
-the listing the first time the rent is edited.
-
-**Describe photos are compressed smaller than upload photos** (1024px / q0.6 vs
-1600px / q0.7, both in `create.ts`). Vision models tile their input, so a larger
-image buys no extra detail — it just doubles the data spent posting one listing
-on mobile data. Sequential, like the uploads: decoding several multi-megapixel
-photos at once is what makes a cheap device drop frames mid-post.
-
-**Auto-describe is wired into the post wizard only.** The edit screen's existing
-photos are already in storage, so describing them needs a second input mode
-(URLs fetched server-side) — and that URL has to be pinned to this project's own
-storage host before it is safe to accept.
-
-**`temperature` differs by function on purpose:** 0 for smart-search (filter
-extraction has one right answer, and a retry returning different results looks
-broken) and 0.6 for auto-describe (a landlord who dislikes the wording presses
-the button again, and at 0 they get the same paragraph back).
+**`temperature` is 0 for smart-search** (filter extraction has one right
+answer, and a retry returning different results looks broken).
 
 **The chatbot never sees a listing row, on purpose.** The brief describes an
 assistant that "reads the live database"; `chat` instead returns a reply plus a
@@ -1118,8 +1092,7 @@ would spend requests on rows the renter has scrolled past, on connections where
 a hanging request is the normal case.
 
 Deploy with `npx supabase functions deploy smart-search` /
-`npx supabase functions deploy chat` /
-`npx supabase functions deploy auto-describe`; Docker is not needed.
+`npx supabase functions deploy ask-listing`; Docker is not needed.
 `supabase/functions` is excluded from both `tsconfig.json` and
 `eslint.config.js` — it is Deno, with `npm:` specifiers and a `Deno` global that
 the app's toolchain cannot resolve.
@@ -1183,7 +1156,7 @@ src/
     auth/context.tsx        session + profile + mode, routing gate
     auth/mode.ts            guest / host / both: what it is, where it is stored
     listings/               types, queries, create, filters-context,
-                            smart-search, chat, auto-describe
+                            smart-search, chat
     verification/           badge labels, case queries, evidence upload
     moderation/             report reasons, report + moderation queries
     staff/                  console queries: stats, lookups, audit, roles
@@ -1196,11 +1169,10 @@ src/
                             edge-functions, images (pick + compress)
   theme/                    colour, spacing, radius, shadow tokens
 supabase/
-  functions/_shared/gemini.ts         key, CORS, provider errors (all three)
+  functions/_shared/gemini.ts         key, CORS, provider errors (AI functions)
   functions/_shared/filters.ts        filter contract (smart-search + chat)
   functions/smart-search/             query -> Filters
   functions/chat/                     conversation -> reply + Filters
-  functions/auto-describe/            photos -> description
   functions/ask-listing/              one listing + a question -> answer, known
   functions/delete-account/           deletes the caller's files, then the user
   functions/send-sms/                 Auth's Send SMS hook -> Pindo (inactive

@@ -1,5 +1,5 @@
 // Shared plumbing for the Gemini-backed Edge Functions (smart-search,
-// auto-describe).
+// ask-listing).
 //
 // Both functions exist for the same reason — they hold GEMINI_API_KEY, which can
 // never ship inside a React Native bundle — so they need the same key handling,
@@ -9,7 +9,7 @@
 //
 // Editing this file means BOTH functions must be redeployed:
 //   npx supabase functions deploy smart-search
-//   npx supabase functions deploy auto-describe
+//   npx supabase functions deploy ask-listing
 
 /**
  * Free-tier default. Override with the GEMINI_MODEL secret without a redeploy.
@@ -42,7 +42,7 @@ export function modelName(): string {
  * Turns a provider failure into a short, actionable message.
  *
  * `feature` is the user-facing name of the caller ("Smart search",
- * "Auto-describe"), because a landlord reading "unavailable right now" needs to
+ * "Ask about this place"), because someone reading "unavailable right now" needs to
  * know which thing is unavailable.
  *
  * The SDK surfaces HTTP failures as messages rather than typed classes, so

@@ -169,7 +169,7 @@ interface TextFieldProps extends TextInputProps {
   error?: string | null;
   hint?: string;
   /**
-   * Control shown on the label row, right-aligned — e.g. the "Write it for me"
+   * Control shown on the label row, right-aligned — e.g. an
    * action beside Description. It sits with the label rather than above the
    * field so it reads as being about that field, and so it cannot be mistaken
    * for part of the value being edited.

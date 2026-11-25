@@ -30,7 +30,6 @@ import {
   type PickedImage,
 } from '@/features/listings/create';
 import { BookingModeFields } from '@/components/booking-mode-fields';
-import { useAutoDescribe } from '@/features/listings/auto-describe';
 import { useListingDetail, useUpdateListing } from '@/features/listings/queries';
 import { ListingTermsFields, validateTerms } from '@/features/listings/terms-fields';
 import {
@@ -107,7 +106,6 @@ function SignedInEditListing({ userId }: { userId: string }) {
       return next;
     });
   }
-  const autoDescribe = useAutoDescribe();
 
   if (isPending) return <LoadingState label="Loading listing…" />;
   if (isError) return <ErrorState error={error} onRetry={() => void refetch()} />;
@@ -507,48 +505,6 @@ function SignedInEditListing({ userId }: { userId: string }) {
           multiline
           numberOfLines={5}
           style={styles.textArea}
-          // The photos are already uploaded, so they are read back from their
-          // public URLs and compressed on the phone exactly like fresh ones.
-          // No server change, and no URL the function has to trust.
-          accessory={
-            keptImages.length > 0 ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Write the description from my photos"
-                disabled={autoDescribe.isPending}
-                onPress={() =>
-                  autoDescribe.mutate(
-                    {
-                      images: keptImages.map((i) => ({
-                        uri: imageUrl(i.storage_path),
-                        // Unknown until decoded; the compressor only needs
-                        // which edge is longer, and resizes by width.
-                        width: 1600,
-                        height: 1200,
-                      })),
-                      facts: { title, propertyType, bedrooms, furnished, district, sector },
-                    },
-                    {
-                      onSuccess: (result) =>
-                        result.unusable
-                          ? Alert.alert(
-                              'Nothing to describe',
-                              'The photos did not show enough. Write a few lines yourself.',
-                            )
-                          : setDescription(result.description),
-                      onError: (e) => Alert.alert('Could not write it', e.message),
-                    },
-                  )
-                }
-                style={[styles.aiAction, autoDescribe.isPending && { opacity: 0.6 }]}
-              >
-                <Ionicons name="sparkles-outline" size={14} color={colors.softBlack} />
-                <Text style={styles.aiActionLabel}>
-                  {autoDescribe.isPending ? 'Reading photos…' : 'Write it for me'}
-                </Text>
-              </Pressable>
-            ) : undefined
-          }
         />
 
         {!!photoProgress && <Text style={styles.note}>{photoProgress}</Text>}
@@ -622,8 +578,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.softBlack,
   },
-  aiAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  aiActionLabel: { fontFamily: fontFamily.semibold, fontSize: fontSize.sm, color: colors.softBlack },
   coverBadge: {
     position: 'absolute',
     bottom: 4,

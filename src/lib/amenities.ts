@@ -5,9 +5,7 @@
  * needed offline. It is also the vocabulary the AI search functions are given,
  * so "with parking and a water tank" can only map to keys that exist here.
  *
- * These are landlord-declared facts, shown as such. They are not something the
- * auto-describe prompt may infer from a photo, which is why that prompt still
- * forbids utility and security claims.
+ * These are landlord-declared facts, shown as such, never inferred.
  */
 
 export const AMENITIES = [

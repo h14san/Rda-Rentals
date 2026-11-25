@@ -4,7 +4,6 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -20,10 +19,6 @@ import { BookingModeFields } from '@/components/booking-mode-fields';
 import { EmptyState } from '@/components/states';
 import { Button, Chip, SectionTitle, TextField } from '@/components/ui';
 import { useAuth } from '@/features/auth/context';
-import {
-  DESCRIBE_IDEAL_IMAGES,
-  useAutoDescribe,
-} from '@/features/listings/auto-describe';
 import {
   EMPTY_TERMS,
   MAX_IMAGES,
@@ -117,15 +112,9 @@ function SignedInPostListing({ userId }: { userId: string }) {
     longitude: number;
   } | null>(null);
 
-  // Set after auto-describe fills the field, to prompt the review the brief
-  // asks for. Cleared on the first keystroke — by then they are reviewing it.
-  const [describedFromPhotos, setDescribedFromPhotos] = useState(false);
-
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
-
-  const autoDescribe = useAutoDescribe();
 
   const priceValue = Number.parseInt(price.replace(/[^\d]/g, ''), 10);
   const stepIndex = STEP_ORDER.indexOf(step);
@@ -135,7 +124,6 @@ function SignedInPostListing({ userId }: { userId: string }) {
     setImages([]);
     setTitle('');
     setDescription('');
-    setDescribedFromPhotos(false);
     setPrice('');
     setPropertyType(null);
     setBedrooms(null);
@@ -159,68 +147,6 @@ function SignedInPostListing({ userId }: { userId: string }) {
   async function onAddFromCamera() {
     const shot = await captureImage();
     if (shot) setImages((current) => [...current, shot].slice(0, MAX_IMAGES));
-  }
-
-  /**
-   * Photo-to-description.
-   *
-   * The result goes into the same field the landlord would have typed in, so a
-   * sentence they disagree with is an edit rather than a listing that overstates
-   * the property. Nothing is published from here.
-   */
-  function runAutoDescribe() {
-    autoDescribe.mutate(
-      {
-        images,
-        facts: { title, propertyType, bedrooms, furnished, district, sector },
-      },
-      {
-        onSuccess: (result) => {
-          if (result.unusable) {
-            Alert.alert(
-              'Nothing to describe yet',
-              'The photos were not clear enough to describe. Try adding a wider shot of the room, or write the description yourself.',
-            );
-            return;
-          }
-          setDescription(result.description);
-          setDescribedFromPhotos(true);
-          setErrors(({ description: _cleared, ...rest }) => rest);
-        },
-        onError: (error) =>
-          Alert.alert('Could not write a description', error.message),
-      },
-    );
-  }
-
-  function onAutoDescribePress() {
-    if (autoDescribe.isPending) return;
-
-    if (images.length === 0) {
-      // Unreachable from the wizard (the photos step gates on this), but the
-      // button must not silently do nothing if that ever changes.
-      setErrors((current) => ({
-        ...current,
-        description: 'Add a photo first — the description is written from them.',
-      }));
-      return;
-    }
-
-    if (description.trim().length === 0) {
-      runAutoDescribe();
-      return;
-    }
-
-    // A modal is too heavy for a validation message but right for discarding
-    // something the landlord typed.
-    Alert.alert(
-      'Replace your description?',
-      'What you have written will be replaced by one written from your photos.',
-      [
-        { text: 'Keep mine', style: 'cancel' },
-        { text: 'Replace', style: 'destructive', onPress: runAutoDescribe },
-      ],
-    );
   }
 
   function validateDetails(): boolean {
@@ -465,48 +391,12 @@ function SignedInPostListing({ userId }: { userId: string }) {
             <TextField
               label="Description"
               value={description}
-              onChangeText={(t) => {
-                setDescription(t);
-                if (describedFromPhotos) setDescribedFromPhotos(false);
-              }}
+              onChangeText={setDescription}
               error={errors.description}
-              hint={
-                describedFromPhotos
-                  ? 'Written from your photos — read it over and fix anything that is not right.'
-                  : images.length < DESCRIBE_IDEAL_IMAGES
-                    ? translate('Add {n} or more photos for a fuller description.', { n: DESCRIBE_IDEAL_IMAGES })
-                    : undefined
-              }
               placeholder="Water and electricity included, secure compound, 10 minutes from the bus stop…"
               multiline
               numberOfLines={5}
               style={styles.textArea}
-              accessory={
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Write the description from my photos"
-                  accessibilityState={{ busy: autoDescribe.isPending }}
-                  onPress={onAutoDescribePress}
-                  disabled={autoDescribe.isPending}
-                  style={({ pressed }) => [
-                    styles.aiAction,
-                    (pressed || autoDescribe.isPending) && { opacity: 0.6 },
-                  ]}
-                >
-                  {autoDescribe.isPending ? (
-                    <ActivityIndicator size="small" color={colors.muted} />
-                  ) : (
-                    <Ionicons
-                      name="sparkles-outline"
-                      size={14}
-                      color={colors.softBlack}
-                    />
-                  )}
-                  <Text style={styles.aiActionLabel}>
-                    {autoDescribe.isPending ? 'Reading photos…' : 'Write it for me'}
-                  </Text>
-                </Pressable>
-              }
             />
           </View>
         )}
@@ -700,20 +590,6 @@ const styles = StyleSheet.create({
   },
   /* Same sparkles affordance as the feed's smart search bar: one mark means
      "the model did this" everywhere in the app. */
-  aiAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 4,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.pill,
-    backgroundColor: colors.lightGray,
-  },
-  aiActionLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
-    color: colors.softBlack,
-  },
 
   textArea: {
     minHeight: 120,

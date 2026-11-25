@@ -25,32 +25,6 @@ export const MAX_IMAGES = 8;
 const MAX_EDGE = 1600;
 const JPEG_QUALITY = 0.7;
 
-/**
- * Smaller budget for the copy sent to auto-describe.
- *
- * Nothing is stored, so the only cost is upload time on a connection the
- * landlord is about to need again for the real upload. Vision models downscale
- * and tile their input anyway, so a 1600px original buys no extra detail in the
- * description — it just doubles the data spent on posting one listing.
- */
-const ANALYSIS_MAX_EDGE = 1024;
-const ANALYSIS_QUALITY = 0.6;
-
-/**
- * base64 JPEG for the auto-describe function, at the smaller analysis budget.
- *
- * Sequential for the same reason uploads are: this runs on the phone, and
- * decoding several multi-megapixel photos at once is what makes a cheap device
- * drop frames or get killed mid-post.
- */
-export async function compressForAnalysis(images: PickedImage[]): Promise<string[]> {
-  const out: string[] = [];
-  for (const image of images) {
-    out.push(await compressToJpeg(image, ANALYSIS_MAX_EDGE, ANALYSIS_QUALITY));
-  }
-  return out;
-}
-
 export interface DraftInput {
   ownerId: string;
   title: string;

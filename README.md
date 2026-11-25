@@ -190,7 +190,6 @@ src/
       favorites.ts          saved ids, saved list, optimistic toggle
       smart-search.ts       natural-language query -> Filters
       chat.ts               conversation turn -> reply + Filters
-      auto-describe.ts      photos -> draft description
       filters-context.tsx   filter state shared across routes
   lib/                      supabase, auth, contact, format, locations,
                             amenities, maps
@@ -208,19 +207,17 @@ supabase/
     _shared/filters.ts      the filter contract both search paths target
     smart-search/           query -> Filters
     chat/                   conversation -> reply + Filters
-    auto-describe/          photos -> description
 ```
 
 ## AI features
 
-All three run as Edge Functions, so the model API key never ships in the app
+They run as Edge Functions, so the model API key never ships in the app
 bundle. Anything in a React Native build is extractable.
 
 | Feature | Function | Where it appears |
 |---|---|---|
 | Assistant | `chat` | the Ask tab |
 | Natural-language search | `smart-search` | search bar on the Explore tab |
-| Photo-to-description | `auto-describe` | "Write it for me" beside Description in the post wizard |
 
 One key, set as a **function secret**, not in `.env`:
 
@@ -228,11 +225,10 @@ One key, set as a **function secret**, not in `.env`:
 npx supabase secrets set GEMINI_API_KEY=...
 npx supabase functions deploy chat
 npx supabase functions deploy smart-search
-npx supabase functions deploy auto-describe
 ```
 
-All three import `supabase/functions/_shared/`, so **a change there means
-redeploying all three.** `chat` and `smart-search` also share
+Every AI function imports `supabase/functions/_shared/`, so **a change there means
+redeploying each of them.** `chat` and `smart-search` also share
 `_shared/filters.ts`, the one server-side description of the filter contract:
 the response schema, the sentinel decoding, the Kigali place names and the
 amenity vocabulary.
@@ -258,30 +254,6 @@ with, so if the wording and the filters ever disagree, the chips are the truth.
 Follow-ups refine rather than restart. The filters in force are sent with each
 turn, and the model returns the full set it wants applied. "Cheapest" is a
 sort, not an invented `maxPrice`.
-
-### Photo-to-description
-
-The landlord's photos are compressed to 1024px / q0.6, smaller than the 1600px
-upload size. Vision models tile their input anyway, so a bigger image buys no
-extra detail and doubles the data spent posting one listing. The photos go to
-`auto-describe`, and the result lands in the editable Description field.
-Nothing is published from it.
-
-What the prompt forbids matters more than what it asks for: no rent, deposit,
-minimum stay or move-in date, no floor area, no distance to a landmark, no
-utilities or security claims, and no describing people. The model may only
-name what is visible plus the facts the landlord entered. Structured terms have
-their own fields, and prose repeating them goes stale the first time one is
-edited.
-
-**Model names expire.** Google refuses retired names for newly issued keys:
-`gemini-2.5-flash` was rejected with "no longer available to new users" on a
-2026 key. The default is `gemini-3.6-flash`, and it can be changed without a
-redeploy:
-
-```bash
-npx supabase secrets set GEMINI_MODEL=<model-name>
-```
 
 ## Notes
 

@@ -181,7 +181,7 @@ export const HELP: Record<HelpTopic, { title: string; summary: string; sections:
         heading: 'Where it is kept',
         body: [
           'On servers in the European Union (Frankfurt), run by our hosting provider.',
-          'The search assistant and "Write it for me" send the text you type, or the photos you choose, to Google\'s Gemini service to produce an answer.',
+          'Search and "Ask about this place" send the text you type to Google\'s Gemini service to produce an answer. Your photos are not sent.',
         ],
       },
       {

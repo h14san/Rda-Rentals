@@ -6,7 +6,7 @@
  * The Deno files are read as text, because they use npm: specifiers and a
  * Deno global that Jest cannot load.
  */
-import { readFileSync } from 'fs';
+import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 import { AMENITIES } from '@/lib/amenities';
@@ -37,4 +37,23 @@ it('push is sent to the Android channel the app creates', () => {
   const app = stringConstant(read('src/lib/push.ts'), 'ANDROID_CHANNEL');
   const server = stringConstant(read('supabase/functions/send-push/index.ts'), 'ANDROID_CHANNEL');
   expect(server).toBe(app);
+});
+
+// The real pin is anywhere in the disc the offset is drawn from; a smaller
+// circle on the map would sometimes exclude the property it describes.
+it('the map circle matches the disc the approximate point is drawn from', () => {
+  // Read as text: maps.ts imports react-native's Linking and the app's Alert.
+  const app = /const APPROX_RADIUS_M = (\d+)/.exec(read('src/lib/maps.ts'));
+  if (!app) throw new Error('APPROX_RADIUS_M not found');
+
+  // The newest migration that sets the default wins, as it does in the database.
+  const discs = readdirSync(join(__dirname, '..', 'supabase/migrations'))
+    .sort()
+    .flatMap((file) => [
+      ...read(`supabase/migrations/${file}`).matchAll(
+        /offset_m\s+double precision[^,]*default \((\d+) \* sqrt\(random\(\)\)\)/g,
+      ),
+    ]);
+  expect(discs.length).toBeGreaterThan(0);
+  expect(discs.at(-1)![1]).toBe(app[1]);
 });
